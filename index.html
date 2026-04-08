@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hour Golf — Member Usage Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'IBM Plex Mono', monospace; background: #f5f3ef; color: #2a2a2a; -webkit-font-smoothing: antialiased; }
+    
+    .header { background: #1a472a; color: #fff; padding: 20px 24px; }
+    .header-inner { display: flex; justify-content: space-between; align-items: center; max-width: 1100px; margin: 0 auto; }
+    .logo { font-size: 18px; letter-spacing: 6px; font-weight: 700; }
+    .logo-sub { font-size: 11px; opacity: 0.6; letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+    .header-stats { display: flex; gap: 20px; align-items: center; }
+    .stat-box { display: flex; flex-direction: column; align-items: center; }
+    .stat-val { font-size: 22px; font-weight: 700; }
+    .stat-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; }
+    .refresh-btn { padding: 8px 14px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; color: #fff; cursor: pointer; font-size: 12px; font-family: inherit; margin-left: 16px; }
+    .refresh-btn:hover { background: rgba(255,255,255,0.25); }
+    
+    .nav { display: flex; border-bottom: 2px solid #1a472a; background: #fff; max-width: 1100px; margin: 0 auto; }
+    .nav-btn { padding: 12px 20px; border: none; background: transparent; cursor: pointer; font-size: 12px; font-family: inherit; color: #888; letter-spacing: 1px; }
+    .nav-btn.active { color: #1a472a; font-weight: 700; border-bottom: 2px solid #1a472a; margin-bottom: -2px; }
+    
+    .content { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    
+    .month-sel { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; }
+    .mo-btn { padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; background: #fff; cursor: pointer; font-size: 11px; font-family: inherit; }
+    .mo-btn.active { border-color: #1a472a; background: #1a472a; color: #fff; font-weight: 700; }
+    
+    .summary { display: flex; gap: 24px; padding: 16px 20px; background: #fff; border-radius: 8px; margin-bottom: 24px; border: 1px solid #e0ddd6; }
+    .sum-item { display: flex; flex-direction: column; }
+    .sum-val { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .sum-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
+    
+    .section-head { font-size: 13px; text-transform: uppercase; letter-spacing: 2px; color: #1a472a; margin: 0 0 12px; border-bottom: 1px solid #1a472a; padding-bottom: 8px; }
+    
+    .table { background: #fff; border-radius: 8px; border: 1px solid #e0ddd6; overflow: hidden; margin-bottom: 16px; }
+    .t-head { display: flex; padding: 10px 16px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; border-bottom: 1px solid #e0ddd6; gap: 8px; }
+    .t-row { display: flex; padding: 12px 16px; border-bottom: 1px solid #f0ede6; align-items: center; gap: 8px; font-size: 13px; }
+    .t-row:last-child { border-bottom: none; }
+    .t-row.clickable { cursor: pointer; }
+    .t-row.clickable:hover { background: #faf9f6; }
+    
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 3px; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .tier-select { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; font-family: inherit; background: #fff; }
+    
+    .email-sm { font-size: 11px; color: #999; }
+    .muted { font-size: 11px; color: #999; }
+    .tab-num { font-variant-numeric: tabular-nums; }
+    .text-r { text-align: right; }
+    .text-c { text-align: center; }
+    .red { color: #cc4455; }
+    .green { color: #4a7c59; }
+    .bold { font-weight: 700; }
+    
+    .search-input { width: 100%; padding: 10px 16px; border: 1px solid #e0ddd6; border-radius: 8px; font-size: 14px; font-family: inherit; margin-bottom: 16px; background: #fff; }
+    
+    .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding: 16px 20px; background: #fff; border-radius: 8px; border: 1px solid #e0ddd6; }
+    
+    .saving-bar { text-align: center; padding: 8px; background: #fffbeb; color: #a67c00; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+    
+    .setup { max-width: 480px; margin: 0 auto; padding: 80px 24px; text-align: center; }
+    .setup-input { width: 100%; padding: 12px 16px; border: 2px solid #1a472a; border-radius: 6px; font-size: 14px; font-family: inherit; margin-bottom: 16px; }
+    .setup-btn { width: 100%; padding: 14px; background: #1a472a; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 700; letter-spacing: 2px; cursor: pointer; font-family: inherit; }
+    .setup-btn:hover { background: #245a35; }
+    .setup-btn:disabled { opacity: 0.5; cursor: default; }
+    .error { color: #c45; font-size: 13px; margin-bottom: 12px; text-align: left; }
+    
+    @media (max-width: 768px) {
+      .t-head, .t-row { font-size: 11px; padding: 8px 12px; }
+      .header-stats { gap: 12px; }
+      .stat-val { font-size: 18px; }
+      .summary { flex-wrap: wrap; gap: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback } = React;
+
+    const SUPABASE_URL = "https://uxpkqbioxoezjmcoylkw.supabase.co";
+    const TIERS = ["Non-Member", "Patron", "Starter", "Green Jacket", "Unlimited"];
+    const TIER_COLORS = {
+      "Non-Member": "#78716c", Patron: "#4a7c59", Starter: "#2d6a9f",
+      "Green Jacket": "#1a472a", Unlimited: "#a67c00",
+    };
+
+    function monthLabel(iso) {
+      const d = new Date(iso);
+      const n = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      return `${n[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+    }
+
+    async function supa(key, table, params = "") {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}${params}`, {
+        headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", Prefer: "return=representation" },
+      });
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      return r.json();
+    }
+
+    async function supaPost(key, table, data) {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+        method: "POST", headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", Prefer: "return=representation,resolution=merge-duplicates" },
+        body: JSON.stringify(data),
+      });
+      if (!r.ok) { const e = await r.text(); throw new Error(`${r.status}: ${e}`); }
+      return r.json();
+    }
+
+    async function supaPatch(key, table, match, data) {
+      const p = Object.entries(match).map(([k,v]) => `${k}=eq.${encodeURIComponent(v)}`).join("&");
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${p}`, {
+        method: "PATCH", headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", Prefer: "return=representation" },
+        body: JSON.stringify(data),
+      });
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      return r.json();
+    }
+
+    function App() {
+      const [apiKey, setApiKey] = useState(localStorage.getItem("hg-key") || "");
+      const [keyInput, setKeyInput] = useState(localStorage.getItem("hg-key") || "");
+      const [connected, setConnected] = useState(false);
+      const [error, setError] = useState("");
+      const [loading, setLoading] = useState(false);
+      const [members, setMembers] = useState([]);
+      const [bookings, setBookings] = useState([]);
+      const [tierConfig, setTierConfig] = useState([]);
+      const [monthlyUsage, setMonthlyUsage] = useState([]);
+      const [view, setView] = useState("overview");
+      const [selectedMonth, setSelectedMonth] = useState(null);
+      const [selectedMember, setSelectedMember] = useState(null);
+      const [search, setSearch] = useState("");
+      const [saving, setSaving] = useState(false);
+
+      const connect = useCallback(async (key) => {
+        if (!key) return;
+        setError(""); setLoading(true);
+        try {
+          const [m, b, tc, mu] = await Promise.all([
+            supa(key, "members", "?order=name"),
+            supa(key, "bookings", "?order=booking_start.desc&limit=5000"),
+            supa(key, "tier_config", "?order=display_order"),
+            supa(key, "monthly_usage", "?order=billing_month.desc,overage_charge.desc"),
+          ]);
+          setMembers(m); setBookings(b); setTierConfig(tc); setMonthlyUsage(mu);
+          setConnected(true); setApiKey(key);
+          localStorage.setItem("hg-key", key);
+        } catch (e) {
+          setError(`Connection failed: ${e.message}`);
+          setConnected(false);
+        }
+        setLoading(false);
+      }, []);
+
+      useEffect(() => { if (apiKey) connect(apiKey); }, []);
+
+      const refresh = () => connect(apiKey);
+
+      const allMonths = useMemo(() => {
+        const s = new Set(monthlyUsage.map(r => r.billing_month));
+        return [...s].sort().reverse();
+      }, [monthlyUsage]);
+
+      const activeMonth = selectedMonth || allMonths[0] || "";
+      const currentData = useMemo(() => monthlyUsage.filter(r => r.billing_month === activeMonth), [monthlyUsage, activeMonth]);
+      const membersMonth = currentData.filter(r => r.tier !== "Non-Member");
+      const nonMembers = currentData.filter(r => r.tier === "Non-Member");
+      const totalOverage = membersMonth.reduce((s, r) => s + Number(r.overage_charge || 0), 0);
+      const totalMemberHrs = membersMonth.reduce((s, r) => s + Number(r.total_hours || 0), 0);
+
+      const allCustomers = useMemo(() => {
+        const map = {};
+        bookings.forEach(b => {
+          if (!map[b.customer_email]) map[b.customer_email] = { email: b.customer_email, name: b.customer_name, hrs: 0, cnt: 0 };
+          map[b.customer_email].hrs += Number(b.duration_hours || 0);
+          map[b.customer_email].cnt++;
+          if (b.customer_name) map[b.customer_email].name = b.customer_name;
+        });
+        return Object.values(map).sort((a, b) => b.hrs - a.hrs);
+      }, [bookings]);
+
+      const selData = useMemo(() => {
+        if (!selectedMember) return null;
+        return {
+          member: members.find(m => m.email === selectedMember),
+          bookings: bookings.filter(b => b.customer_email === selectedMember),
+          usage: monthlyUsage.filter(r => r.customer_email === selectedMember),
+          customer: allCustomers.find(c => c.email === selectedMember),
+        };
+      }, [selectedMember, members, bookings, monthlyUsage, allCustomers]);
+
+      async function updateTier(email, tier, name) {
+        setSaving(true);
+        try {
+          const ex = members.find(m => m.email === email);
+          if (ex) await supaPatch(apiKey, "members", { email }, { tier });
+          else await supaPost(apiKey, "members", { email, name: name || email, tier });
+          await refresh();
+        } catch (e) { setError(`Update failed: ${e.message}`); }
+        setSaving(false);
+      }
+
+      // Setup screen
+      if (!connected) {
+        return (
+          <div className="setup">
+            <div className="logo" style={{fontSize:28,color:'#1a472a'}}>HOUR GOLF</div>
+            <div className="logo-sub" style={{color:'#888',marginBottom:32}}>Member Usage Tracker</div>
+            <label style={{display:'block',fontSize:12,fontWeight:700,letterSpacing:1,textTransform:'uppercase',color:'#555',marginBottom:8,textAlign:'left'}}>Supabase Anon API Key</label>
+            <p style={{fontSize:12,color:'#999',marginBottom:12,textAlign:'left',lineHeight:1.5}}>
+              Supabase → Settings → API → Project API keys → anon / public (starts with "eyJ...")
+            </p>
+            <input className="setup-input" type="password" value={keyInput} onChange={e => setKeyInput(e.target.value)} placeholder="eyJhbGciOiJIUzI1NiIs..." />
+            {error && <p className="error">{error}</p>}
+            <button className="setup-btn" onClick={() => connect(keyInput)} disabled={!keyInput || loading}>
+              {loading ? "Connecting..." : "Connect"}
+            </button>
+          </div>
+        );
+      }
+
+      function TierBadge({ tier }) {
+        return <span className="badge" style={{background: TIER_COLORS[tier] || '#888'}}>{tier}</span>;
+      }
+
+      function TierSelect({ value, onChange }) {
+        return (
+          <select className="tier-select" value={value} onChange={e => onChange(e.target.value)}>
+            {TIERS.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        );
+      }
+
+      function hrs(n) { return Number(n).toFixed(1) + "h"; }
+      function dlr(n) { return "$" + Number(n).toFixed(2); }
+      function allowanceDisplay(n) { return Number(n) >= 99999 ? "∞" : Number(n) + "h"; }
+
+      return (
+        <div>
+          <header className="header">
+            <div className="header-inner">
+              <div>
+                <div className="logo">HOUR GOLF</div>
+                <div className="logo-sub">Member Usage Tracker</div>
+              </div>
+              <div className="header-stats">
+                <div className="stat-box"><span className="stat-val">{members.length}</span><span className="stat-lbl">Members</span></div>
+                <div className="stat-box"><span className="stat-val">{allCustomers.length}</span><span className="stat-lbl">Customers</span></div>
+                <div className="stat-box"><span className="stat-val">{bookings.length}</span><span className="stat-lbl">Bookings</span></div>
+                <button className="refresh-btn" onClick={refresh} disabled={loading}>{loading ? "↻" : "↻ Refresh"}</button>
+              </div>
+            </div>
+          </header>
+
+          <nav className="nav">
+            {[["overview","Monthly Overview"],["customers","All Customers"],["tiers","Tier Config"]].map(([k,l]) => (
+              <button key={k} className={`nav-btn ${view===k?'active':''}`} onClick={() => {setView(k);setSelectedMember(null)}}>{l}</button>
+            ))}
+            {selData && <button className={`nav-btn ${view==='detail'?'active':''}`} onClick={() => setView('detail')}>{selData.customer?.name || selectedMember}</button>}
+          </nav>
+
+          {saving && <div className="saving-bar">Saving...</div>}
+
+          {view === "overview" && (
+            <div className="content">
+              <div className="month-sel">
+                {allMonths.map(m => <button key={m} className={`mo-btn ${m===activeMonth?'active':''}`} onClick={() => setSelectedMonth(m)}>{monthLabel(m)}</button>)}
+              </div>
+
+              {membersMonth.length > 0 && (
+                <div className="summary">
+                  <div className="sum-item"><span className="sum-val">{totalMemberHrs.toFixed(1)}h</span><span className="sum-lbl">Member Hours</span></div>
+                  <div className="sum-item"><span className={`sum-val ${totalOverage>0?'red':'green'}`}>{dlr(totalOverage)}</span><span className="sum-lbl">Overage Due</span></div>
+                  <div className="sum-item"><span className="sum-val">{membersMonth.filter(r => Number(r.overage_hours)>0).length}</span><span className="sum-lbl">Over Allotment</span></div>
+                </div>
+              )}
+
+              {membersMonth.length > 0 && (<>
+                <h2 className="section-head">Members — {monthLabel(activeMonth)}</h2>
+                <div className="table">
+                  <div className="t-head">
+                    <span style={{flex:2}}>Member</span><span style={{flex:1}}>Tier</span>
+                    <span style={{flex:1}} className="text-r">Used</span><span style={{flex:1}} className="text-r">Allotment</span>
+                    <span style={{flex:1}} className="text-r">Overage</span><span style={{flex:1}} className="text-r">Charge</span>
+                  </div>
+                  {membersMonth.map(r => (
+                    <div key={r.customer_email} className="t-row clickable" onClick={() => {setSelectedMember(r.customer_email);setView('detail')}}>
+                      <span style={{flex:2}}><strong>{r.customer_name}</strong><br/><span className="email-sm">{r.customer_email}</span></span>
+                      <span style={{flex:1}}><TierBadge tier={r.tier}/></span>
+                      <span style={{flex:1}} className="text-r tab-num">{hrs(r.total_hours)}</span>
+                      <span style={{flex:1}} className="text-r tab-num">{allowanceDisplay(r.included_hours)}</span>
+                      <span style={{flex:1}} className={`text-r tab-num ${Number(r.overage_hours)>0?'red':''}`}>{Number(r.overage_hours)>0?hrs(r.overage_hours):"—"}</span>
+                      <span style={{flex:1}} className={`text-r tab-num ${Number(r.overage_charge)>0?'red bold':''}`}>{Number(r.overage_charge)>0?dlr(r.overage_charge):"—"}</span>
+                    </div>
+                  ))}
+                </div>
+              </>)}
+
+              <h2 className="section-head" style={{marginTop:32}}>Non-Members — {monthLabel(activeMonth)}</h2>
+              <div className="table">
+                <div className="t-head">
+                  <span style={{flex:2}}>Customer</span><span style={{flex:1}} className="text-r">Hours</span>
+                  <span style={{flex:1}} className="text-r">Sessions</span><span style={{flex:1}} className="text-r">Revenue</span>
+                  <span style={{flex:1}} className="text-c">Assign</span>
+                </div>
+                {nonMembers.slice(0,25).map(r => (
+                  <div key={r.customer_email} className="t-row">
+                    <span style={{flex:2,cursor:'pointer'}} onClick={() => {setSelectedMember(r.customer_email);setView('detail')}}><strong>{r.customer_name}</strong><br/><span className="email-sm">{r.customer_email}</span></span>
+                    <span style={{flex:1}} className="text-r tab-num">{hrs(r.total_hours)}</span>
+                    <span style={{flex:1}} className="text-r tab-num">{r.booking_count}</span>
+                    <span style={{flex:1}} className="text-r tab-num">${(Number(r.total_hours)*60).toFixed(0)}</span>
+                    <span style={{flex:1}} className="text-c">
+                      <select className="tier-select" value="Non-Member" onChange={e => updateTier(r.customer_email,e.target.value,r.customer_name)}>
+                        <option value="Non-Member">—</option>
+                        {TIERS.filter(t=>t!=='Non-Member').map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {view === "customers" && (
+            <div className="content">
+              <input className="search-input" type="text" placeholder="Search by name or email..." value={search} onChange={e => setSearch(e.target.value)} />
+              <div className="table">
+                <div className="t-head">
+                  <span style={{flex:2}}>Customer</span><span style={{flex:1}}>Tier</span>
+                  <span style={{flex:1}} className="text-r">Total Hours</span><span style={{flex:1}} className="text-r">Sessions</span>
+                  <span style={{flex:1}} className="text-c">Assign</span>
+                </div>
+                {allCustomers.filter(c => {
+                  const q = search.toLowerCase();
+                  return (c.name||'').toLowerCase().includes(q) || c.email.toLowerCase().includes(q);
+                }).map(c => {
+                  const m = members.find(x => x.email === c.email);
+                  const tier = m?.tier || 'Non-Member';
+                  return (
+                    <div key={c.email} className="t-row">
+                      <span style={{flex:2,cursor:'pointer'}} onClick={() => {setSelectedMember(c.email);setView('detail')}}><strong>{c.name}</strong><br/><span className="email-sm">{c.email}</span></span>
+                      <span style={{flex:1}}><TierBadge tier={tier}/></span>
+                      <span style={{flex:1}} className="text-r tab-num">{c.hrs.toFixed(1)}h</span>
+                      <span style={{flex:1}} className="text-r tab-num">{c.cnt}</span>
+                      <span style={{flex:1}} className="text-c"><TierSelect value={tier} onChange={t => updateTier(c.email,t,c.name)}/></span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {view === "tiers" && (
+            <div className="content">
+              <h2 className="section-head">Tier Configuration</h2>
+              <div className="table">
+                <div className="t-head">
+                  <span style={{flex:2}}>Tier</span><span style={{flex:1}} className="text-r">Monthly</span>
+                  <span style={{flex:1}} className="text-r">Included</span><span style={{flex:1}} className="text-r">Overage Rate</span>
+                  <span style={{flex:1}} className="text-r">Shop Discount</span>
+                </div>
+                {tierConfig.map(tc => (
+                  <div key={tc.tier} className="t-row">
+                    <span style={{flex:2}}><TierBadge tier={tc.tier}/></span>
+                    <span style={{flex:1}} className="text-r tab-num">${Number(tc.monthly_fee).toFixed(0)}/mo</span>
+                    <span style={{flex:1}} className="text-r tab-num">{Number(tc.included_hours)>=99999?"Unlimited":Number(tc.included_hours)+"h"}</span>
+                    <span style={{flex:1}} className="text-r tab-num">${Number(tc.overage_rate)}/hr</span>
+                    <span style={{flex:1}} className="text-r tab-num">{tc.pro_shop_discount}%</span>
+                  </div>
+                ))}
+              </div>
+
+              <h2 className="section-head" style={{marginTop:32}}>Current Members</h2>
+              <div className="table">
+                <div className="t-head">
+                  <span style={{flex:2}}>Member</span><span style={{flex:1}}>Tier</span>
+                  <span style={{flex:1}} className="text-r">Rate</span><span style={{flex:1}}>Stripe ID</span>
+                </div>
+                {members.map(m => (
+                  <div key={m.email} className="t-row">
+                    <span style={{flex:2}}><strong>{m.name}</strong><br/><span className="email-sm">{m.email}</span></span>
+                    <span style={{flex:1}}><TierSelect value={m.tier} onChange={t => updateTier(m.email,t,m.name)}/></span>
+                    <span style={{flex:1}} className="text-r tab-num">{m.monthly_rate?`$${Number(m.monthly_rate).toFixed(0)}`:"—"}</span>
+                    <span style={{flex:1}}><span className="email-sm">{m.stripe_customer_id||"Not linked"}</span></span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {view === "detail" && selData && (
+            <div className="content">
+              <div className="detail-header">
+                <div>
+                  <h2 style={{margin:0,fontSize:18}}>{selData.customer?.name || selectedMember}</h2>
+                  <span className="email-sm">{selectedMember}</span>
+                </div>
+                <TierSelect value={selData.member?.tier || 'Non-Member'} onChange={t => updateTier(selectedMember,t,selData.customer?.name)}/>
+              </div>
+
+              <h3 className="section-head">Monthly Breakdown</h3>
+              <div className="table">
+                <div className="t-head">
+                  <span style={{flex:1}}>Month</span><span style={{flex:1}} className="text-r">Hours</span>
+                  <span style={{flex:1}} className="text-r">Allotment</span><span style={{flex:1}} className="text-r">Overage</span>
+                  <span style={{flex:1}} className="text-r">Charge</span>
+                </div>
+                {selData.usage.map(u => (
+                  <div key={u.billing_month} className="t-row">
+                    <span style={{flex:1}}>{monthLabel(u.billing_month)}</span>
+                    <span style={{flex:1}} className="text-r tab-num">{hrs(u.total_hours)}</span>
+                    <span style={{flex:1}} className="text-r tab-num">{allowanceDisplay(u.included_hours)}</span>
+                    <span style={{flex:1}} className={`text-r tab-num ${Number(u.overage_hours)>0?'red':''}`}>{Number(u.overage_hours)>0?hrs(u.overage_hours):"—"}</span>
+                    <span style={{flex:1}} className={`text-r tab-num ${Number(u.overage_charge)>0?'red bold':''}`}>{Number(u.overage_charge)>0?dlr(u.overage_charge):"—"}</span>
+                  </div>
+                ))}
+              </div>
+
+              <h3 className="section-head" style={{marginTop:24}}>All Bookings</h3>
+              <div className="table">
+                <div className="t-head">
+                  <span style={{flex:2}}>Date</span><span style={{flex:1}}>Bay</span><span style={{flex:1}} className="text-r">Duration</span>
+                </div>
+                {selData.bookings.map((b,i) => {
+                  const d = new Date(b.booking_start), e = new Date(b.booking_end);
+                  return (
+                    <div key={i} className="t-row">
+                      <span style={{flex:2}}>
+                        {d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"})}
+                        {" "}<span className="muted">{d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}–{e.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}</span>
+                      </span>
+                      <span style={{flex:1}}>{b.bay}</span>
+                      <span style={{flex:1}} className="text-r tab-num">{hrs(b.duration_hours)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
