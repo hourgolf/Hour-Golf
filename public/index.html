@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hour Golf — Admin Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --primary: #1a472a; --primary-light: #245a35; --primary-bg: #f0f7f2;
+      --bg: #f5f3ef; --surface: #fff; --border: #e0ddd6; --border-light: #f0ede6;
+      --text: #2a2a2a; --text-muted: #888; --text-dim: #999;
+      --red: #cc4455; --red-bg: #fef2f2; --gold: #a67c00; --gold-bg: #fffbeb;
+      --blue: #2d6a9f; --font: 'IBM Plex Mono', monospace;
+      --radius: 8px; --row-pad: 12px 16px;
+    }
+    [data-theme="dark"] {
+      --bg: #141414; --surface: #1e1e1e; --border: #333; --border-light: #2a2a2a;
+      --text: #e0e0e0; --text-muted: #888; --text-dim: #666;
+      --primary-bg: #1a2e20; --red-bg: #2a1515; --gold-bg: #2a2515;
+    }
+    [data-density="compact"] { --row-pad: 8px 12px; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; transition: background 0.2s, color 0.2s; }
+    .header { background: var(--primary); color: #fff; padding: 16px 24px; }
+    .header-inner { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto; flex-wrap: wrap; gap: 12px; }
+    .logo { font-size: 18px; letter-spacing: 6px; font-weight: 700; }
+    .logo-sub { font-size: 10px; opacity: 0.5; letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+    .header-stats { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+    .stat-box { display: flex; flex-direction: column; align-items: center; }
+    .stat-val { font-size: 20px; font-weight: 700; }
+    .stat-lbl { font-size: 8px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.5; }
+    .hdr-btn { padding: 6px 12px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); border-radius: 4px; color: #fff; cursor: pointer; font-size: 11px; font-family: var(--font); }
+    .hdr-btn:hover { background: rgba(255,255,255,0.22); }
+    .nav { display: flex; border-bottom: 2px solid var(--primary); background: var(--surface); max-width: 1200px; margin: 0 auto; overflow-x: auto; }
+    .nav-btn { padding: 12px 16px; border: none; background: transparent; cursor: pointer; font-size: 11px; font-family: var(--font); color: var(--text-muted); letter-spacing: 1px; white-space: nowrap; }
+    .nav-btn.active { color: var(--primary); font-weight: 700; border-bottom: 2px solid var(--primary); margin-bottom: -2px; }
+    .nav-btn .cnt { background: var(--primary); color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 10px; margin-left: 4px; }
+    .content { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .summary { display: flex; gap: 20px; padding: 16px 20px; background: var(--surface); border-radius: var(--radius); margin-bottom: 20px; border: 1px solid var(--border); flex-wrap: wrap; }
+    .sum-item { display: flex; flex-direction: column; min-width: 80px; }
+    .sum-val { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .sum-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+    .section-head { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin: 0 0 10px; border-bottom: 1px solid var(--primary); padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .tbl { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; margin-bottom: 16px; }
+    .th { display: flex; padding: 10px 16px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); border-bottom: 1px solid var(--border); gap: 8px; }
+    .th span.sort { cursor: pointer; user-select: none; }
+    .th span.sort:hover { color: var(--primary); }
+    .th span.sort::after { content: ''; margin-left: 2px; }
+    .th span.sort.asc::after { content: ' ↑'; }
+    .th span.sort.desc::after { content: ' ↓'; }
+    .tr { display: flex; padding: var(--row-pad); border-bottom: 1px solid var(--border-light); align-items: center; gap: 8px; font-size: 13px; transition: background 0.1s; }
+    .tr:last-child { border-bottom: none; }
+    .tr.click { cursor: pointer; }
+    .tr.click:hover { background: var(--primary-bg); }
+    .tr.cancelled { opacity: 0.4; text-decoration: line-through; }
+    .tr.selected { background: var(--primary-bg); }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 3px; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .badge-sm { font-size: 8px; padding: 2px 6px; }
+    .tier-sel { padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; font-family: var(--font); background: var(--surface); color: var(--text); }
+    .email-sm { font-size: 11px; color: var(--text-dim); }
+    .muted { font-size: 11px; color: var(--text-dim); }
+    .tab-num { font-variant-numeric: tabular-nums; }
+    .text-r { text-align: right; }
+    .text-c { text-align: center; }
+    .red { color: var(--red); }
+    .green { color: #4a7c59; }
+    .bold { font-weight: 700; }
+    .search { width: 100%; padding: 10px 16px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 14px; font-family: var(--font); background: var(--surface); color: var(--text); margin-bottom: 12px; }
+    .fbar { display: flex; gap: 8px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
+    .fbar select, .fbar input[type="date"] { padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 11px; font-family: var(--font); background: var(--surface); color: var(--text); }
+    .fbar label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+    .month-sel { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 16px; }
+    .mo-btn { padding: 6px 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); cursor: pointer; font-size: 11px; font-family: var(--font); color: var(--text); }
+    .mo-btn.active { border-color: var(--primary); background: var(--primary); color: #fff; font-weight: 700; }
+    .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 16px 20px; background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); flex-wrap: wrap; gap: 12px; }
+    .saving { text-align: center; padding: 6px; background: var(--gold-bg); color: var(--gold); font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+    .setup { max-width: 440px; margin: 0 auto; padding: 80px 24px; text-align: center; }
+    .setup input { width: 100%; padding: 12px 16px; border: 2px solid var(--primary); border-radius: 6px; font-size: 14px; font-family: var(--font); margin-bottom: 16px; background: var(--surface); color: var(--text); }
+    .setup button { width: 100%; padding: 14px; background: var(--primary); color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 700; letter-spacing: 2px; cursor: pointer; font-family: var(--font); }
+    .setup button:disabled { opacity: 0.5; }
+    .err { color: var(--red); font-size: 13px; margin-bottom: 12px; }
+    .btn { padding: 4px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); cursor: pointer; font-size: 11px; font-family: var(--font); color: var(--text); letter-spacing: 0.5px; }
+    .btn:hover { opacity: 0.85; }
+    .btn.danger { border-color: var(--red); color: var(--red); }
+    .btn.primary { border-color: var(--primary); color: var(--primary); font-weight: 700; }
+    .btn.primary:hover { background: var(--primary); color: #fff; }
+    .btn:disabled { opacity: 0.3; cursor: default; }
+    /* Bulk action bar */
+    .bulk-bar { position: sticky; bottom: 0; left: 0; right: 0; background: var(--primary); color: #fff; padding: 12px 24px; display: flex; justify-content: center; gap: 12px; align-items: center; font-size: 13px; z-index: 100; animation: slideUp 0.2s ease; }
+    .bulk-bar button { padding: 8px 16px; border: 1px solid rgba(255,255,255,0.4); border-radius: 4px; background: transparent; color: #fff; cursor: pointer; font-family: var(--font); font-size: 12px; font-weight: 700; }
+    .bulk-bar button:hover { background: rgba(255,255,255,0.15); }
+    .bulk-bar button.bulk-danger { border-color: var(--red); color: #ffaaaa; }
+    /* Checkbox */
+    .chk { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
+    /* Modal */
+    .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .modal { background: var(--surface); border-radius: 12px; padding: 28px; width: 90%; max-width: 480px; max-height: 90vh; overflow-y: auto; color: var(--text); }
+    .modal h2 { font-size: 15px; letter-spacing: 2px; text-transform: uppercase; color: var(--primary); margin-bottom: 20px; }
+    .mf { margin-bottom: 14px; }
+    .mf label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 5px; }
+    .mf input, .mf select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: var(--font); background: var(--surface); color: var(--text); }
+    .macts { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+    .macts .btn { padding: 10px 20px; font-size: 13px; }
+    .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 6px; font-size: 13px; font-family: var(--font); font-weight: 500; z-index: 2000; animation: slideUp 0.3s ease; }
+    .toast.success { background: var(--primary); color: #fff; }
+    .toast.error { background: var(--red); color: #fff; }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    /* Settings panel */
+    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .color-opt { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 2px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .color-opt.active { border-color: var(--primary); }
+    .color-dot { width: 20px; height: 20px; border-radius: 50%; }
+    .font-opt { padding: 8px 12px; border: 2px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 13px; text-align: center; }
+    .font-opt.active { border-color: var(--primary); }
+    /* Today slots */
+    .bay-lane { margin-bottom: 20px; }
+    .bay-label { font-size: 13px; font-weight: 700; letter-spacing: 2px; color: var(--primary); margin-bottom: 6px; text-transform: uppercase; }
+    .slot { display: flex; align-items: stretch; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 4px; overflow: hidden; }
+    .slot.now { border-color: var(--primary); border-width: 2px; }
+    .slot.past { opacity: 0.45; }
+    .slot-t { width: 130px; padding: 10px 12px; font-size: 12px; font-weight: 700; background: var(--primary-bg); border-right: 1px solid var(--border); display: flex; align-items: center; font-variant-numeric: tabular-nums; }
+    .slot-i { flex: 1; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
+    .slot-c { font-size: 13px; font-weight: 500; }
+    .slot-m { font-size: 11px; color: var(--text-dim); }
+    /* Week grid */
+    .wk-grid { display: grid; grid-template-columns: 70px 1fr 1fr; gap: 1px; background: var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 20px; }
+    .wk-h { background: var(--primary); color: #fff; padding: 8px; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; text-align: center; }
+    .wk-d { background: var(--surface); padding: 6px; font-size: 11px; font-weight: 700; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; }
+    .wk-d .dn { font-size: 16px; color: var(--primary); }
+    .wk-d .dl { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; }
+    .wk-d.today { background: var(--primary-bg); }
+    .wk-c { background: var(--surface); padding: 4px 6px; min-height: 44px; }
+    .wk-c.today { background: var(--primary-bg); }
+    .wk-b { font-size: 10px; padding: 2px 5px; margin-bottom: 2px; border-radius: 3px; background: var(--primary-bg); color: var(--primary); border-left: 2px solid var(--primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+    .wk-b:hover { opacity: 0.8; }
+    .wk-nav { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+    .wk-nav span { font-size: 13px; font-weight: 700; }
+    .confirm-box { text-align: center; }
+    .confirm-box p { font-size: 14px; line-height: 1.6; margin-bottom: 8px; }
+    @media(max-width:768px) {
+      .th,.tr { font-size: 11px; padding: 8px 10px; }
+      .header-stats { gap: 10px; }
+      .stat-val { font-size: 16px; }
+      .wk-grid { grid-template-columns: 50px 1fr 1fr; }
+      .slot-t { width: 90px; font-size: 10px; }
+      .settings-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <script type="text/babel">
+const{useState,useEffect,useMemo,useCallback}=React;
+const SB="https://uxpkqbioxoezjmcoylkw.supabase.co";
+const TIERS=["Non-Member","Patron","Starter","Green Jacket","Unlimited"];
+const TC={"Non-Member":"#78716c",Patron:"#4a7c59",Starter:"#2d6a9f","Green Jacket":"#1a472a",Unlimited:"#a67c00"};
+const BAYS=["Bay 1","Bay 2"];
+const TZ="America/Los_Angeles";
+const THEMES={augusta:{primary:"#1a472a",label:"Augusta Green"},midnight:{primary:"#1a1a2e",label:"Midnight"},navy:{primary:"#1b3a5c",label:"Navy"},slate:{primary:"#3d4451",label:"Slate"},rust:{primary:"#8b4513",label:"Rust"},noir:{primary:"#222",label:"Noir"}};
+const FONTS={"'IBM Plex Mono', monospace":"IBM Plex Mono","'JetBrains Mono', monospace":"JetBrains Mono","'Space Mono', monospace":"Space Mono"};
+
+function fT(d){return d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",timeZone:TZ});}
+function fD(d){return d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",timeZone:TZ});}
+function fDL(d){return d.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric",timeZone:TZ});}
+function fDS(d){return d.toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:TZ});}
+function lds(d){return d.toLocaleDateString("en-CA",{timeZone:TZ});}
+function tds(){return lds(new Date());}
+function mL(iso){const d=new Date(iso);const n=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];return `${n[d.getUTCMonth()]} ${d.getUTCFullYear()}`;}
+
+async function supa(k,t,p=""){const r=await fetch(`${SB}/rest/v1/${t}${p}`,{headers:{apikey:k,Authorization:`Bearer ${k}`,"Content-Type":"application/json",Prefer:"return=representation"}});if(!r.ok)throw new Error(`${r.status}`);return r.json();}
+async function supaP(k,t,d){const r=await fetch(`${SB}/rest/v1/${t}`,{method:"POST",headers:{apikey:k,Authorization:`Bearer ${k}`,"Content-Type":"application/json",Prefer:"return=representation,resolution=merge-duplicates"},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function supaPa(k,t,m,d){const p=Object.entries(m).map(([a,b])=>`${a}=eq.${encodeURIComponent(b)}`).join("&");const r=await fetch(`${SB}/rest/v1/${t}?${p}`,{method:"PATCH",headers:{apikey:k,Authorization:`Bearer ${k}`,"Content-Type":"application/json",Prefer:"return=representation"},body:JSON.stringify(d)});if(!r.ok)throw new Error(`${r.status}`);return r.json();}
+async function supaDel(k,t,m){const p=Object.entries(m).map(([a,b])=>`${a}=eq.${encodeURIComponent(b)}`).join("&");const r=await fetch(`${SB}/rest/v1/${t}?${p}`,{method:"DELETE",headers:{apikey:k,Authorization:`Bearer ${k}`,"Content-Type":"application/json",Prefer:"return=representation"}});if(!r.ok)throw new Error(`${r.status}`);return r.json();}
+
+function useToast(){const[t,sT]=useState(null);return{show:(m,ty="success")=>{sT({m,ty});setTimeout(()=>sT(null),3000);},el:t?<div className={`toast ${t.ty}`}>{t.m}</div>:null};}
+
+function loadSettings(){try{return JSON.parse(localStorage.getItem("hg-settings"))||{};}catch{return{};}}
+function saveSettings(s){localStorage.setItem("hg-settings",JSON.stringify(s));}
+
+function Badge({tier}){return <span className="badge" style={{background:TC[tier]||'#888'}}>{tier}</span>;}
+function TierSel({value,onChange}){return <select className="tier-sel" value={value} onChange={e=>onChange(e.target.value)}>{TIERS.map(t=><option key={t} value={t}>{t}</option>)}</select>;}
+function hrs(n){return Number(n).toFixed(1)+"h";}
+function dlr(n){return "$"+Number(n).toFixed(2);}
+function allD(n){return Number(n)>=99999?"∞":Number(n)+"h";}
+function Modal({open,onClose,children}){if(!open)return null;return <div className="modal-bg" onClick={e=>{if(e.target===e.currentTarget)onClose();}}><div className="modal">{children}</div></div>;}
+function Confirm({open,onClose,onOk,title,msg,detail,label="Confirm",danger}){
+  return <Modal open={open} onClose={onClose}><div className="confirm-box"><h2 style={{fontSize:15,letterSpacing:2,textTransform:'uppercase',color:danger?'var(--red)':'var(--primary)',marginBottom:14}}>{title}</h2><p>{msg}</p>{detail&&<span className="muted" style={{display:'block',marginBottom:16}}>{detail}</span>}<div className="macts" style={{justifyContent:'center'}}><button className="btn" onClick={onClose}>Nevermind</button><button className={`btn ${danger?'danger':'primary'}`} onClick={onOk}>{label}</button></div></div></Modal>;
+}
+
+function BookingForm({open,onClose,onSave,booking,customers,presetEmail}){
+  const ed=!!booking;const[em,sEm]=useState("");const[nm,sNm]=useState("");const[dt,sDt]=useState("");const[st,sSt]=useState("10:00");const[et,sEt]=useState("11:00");const[bay,sBay]=useState("Bay 1");const[sav,sSav]=useState(false);
+  useEffect(()=>{if(open&&booking){sEm(booking.customer_email||"");sNm(booking.customer_name||"");const s=new Date(booking.booking_start),e=new Date(booking.booking_end);sDt(s.toLocaleDateString("en-CA",{timeZone:TZ}));sSt(s.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",timeZone:TZ}));sEt(e.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",timeZone:TZ}));sBay(booking.bay||"Bay 1");}else if(open){sEm(presetEmail||"");sNm("");if(presetEmail){const m=customers.find(c=>c.email===presetEmail);if(m)sNm(m.name);}sDt(tds());sSt("10:00");sEt("11:00");sBay("Bay 1");}},[open,booking,presetEmail]);
+  function hE(v){sEm(v);const m=customers.find(c=>c.email===v);if(m)sNm(m.name);}
+  async function hS(){if(!em||!dt||!st||!et)return;sSav(true);const sD=new Date(`${dt}T${st}:00`),eD=new Date(`${dt}T${et}:00`);await onSave({customer_email:em.trim().toLowerCase(),customer_name:nm.trim()||em.trim(),booking_start:sD.toISOString(),booking_end:eD.toISOString(),duration_hours:Math.round(Math.max(0,(eD-sD)/3600000)*100)/100,bay,booking_status:"Confirmed",...(ed?{}:{booking_id:`manual_${Date.now()}`})});sSav(false);}
+  return <Modal open={open} onClose={onClose}><h2>{ed?"Edit Booking":"Add Booking"}</h2>
+    <div className="mf"><label>Email</label>{ed?<input value={em} disabled style={{opacity:.5}}/>:<><input type="email" list="cl" value={em} onChange={e=>hE(e.target.value)} placeholder="email"/><datalist id="cl">{customers.map(c=><option key={c.email} value={c.email}>{c.name}</option>)}</datalist></>}</div>
+    <div className="mf"><label>Name</label><input value={nm} onChange={e=>sNm(e.target.value)} placeholder="Name"/></div>
+    <div className="mf"><label>Date</label><input type="date" value={dt} onChange={e=>sDt(e.target.value)}/></div>
+    <div style={{display:'flex',gap:12}}><div className="mf" style={{flex:1}}><label>Start</label><input type="time" value={st} onChange={e=>sSt(e.target.value)}/></div><div className="mf" style={{flex:1}}><label>End</label><input type="time" value={et} onChange={e=>sEt(e.target.value)}/></div></div>
+    {st&&et&&dt&&<div style={{fontSize:11,color:'var(--text-dim)',marginBottom:10}}>Duration: {Math.max(0,(new Date(`${dt}T${et}:00`)-new Date(`${dt}T${st}:00`))/3600000).toFixed(1)}h</div>}
+    <div className="mf"><label>Bay</label><select value={bay} onChange={e=>sBay(e.target.value)}>{BAYS.map(b=><option key={b}>{b}</option>)}</select></div>
+    <div className="macts"><button className="btn" onClick={onClose}>Cancel</button><button className="btn primary" onClick={hS} disabled={sav||!em||!dt}>{sav?"...":ed?"Save":"Add"}</button></div>
+  </Modal>;
+}
+
+// Settings panel
+function SettingsPanel({open,onClose,settings,onChange}){
+  if(!open)return null;
+  function set(k,v){onChange({...settings,[k]:v});}
+  return <Modal open={open} onClose={onClose}>
+    <h2>Dashboard Settings</h2>
+    <div className="mf"><label>Color Theme</label>
+      <div className="settings-grid">{Object.entries(THEMES).map(([k,v])=>(
+        <div key={k} className={`color-opt ${settings.theme===k?'active':''}`} onClick={()=>set('theme',k)}>
+          <span className="color-dot" style={{background:v.primary}}/>{v.label}
+        </div>
+      ))}</div>
+    </div>
+    <div className="mf"><label>Font</label>
+      <div className="settings-grid">{Object.entries(FONTS).map(([k,v])=>(
+        <div key={k} className={`font-opt ${settings.font===k?'active':''}`} style={{fontFamily:k}} onClick={()=>set('font',k)}>{v}</div>
+      ))}</div>
+    </div>
+    <div className="mf"><label>Mode</label>
+      <div className="settings-grid">
+        <div className={`color-opt ${!settings.dark?'active':''}`} onClick={()=>set('dark',false)}>☀ Light</div>
+        <div className={`color-opt ${settings.dark?'active':''}`} onClick={()=>set('dark',true)}>◑ Dark</div>
+      </div>
+    </div>
+    <div className="mf"><label>Density</label>
+      <div className="settings-grid">
+        <div className={`color-opt ${settings.density!=='compact'?'active':''}`} onClick={()=>set('density','comfortable')}>Comfortable</div>
+        <div className={`color-opt ${settings.density==='compact'?'active':''}`} onClick={()=>set('density','compact')}>Compact</div>
+      </div>
+    </div>
+    <div className="macts"><button className="btn primary" onClick={onClose}>Done</button></div>
+  </Modal>;
+}
+
+function App(){
+  const[apiKey,setApiKey]=useState(localStorage.getItem("hg-key")||"");
+  const[keyIn,setKeyIn]=useState(localStorage.getItem("hg-key")||"");
+  const[conn,setConn]=useState(false);const[err,setErr]=useState("");const[loading,setLoad]=useState(false);
+  const[members,setMem]=useState([]);const[bookings,setBk]=useState([]);const[tierCfg,setTC]=useState([]);
+  const[mu,setMU]=useState([]);const[payments,setPay]=useState([]);
+  const[view,setView]=useState("today");const[selMonth,setSelMonth]=useState(null);const[selMember,setSelMember]=useState(null);
+  const[search,setSearch]=useState("");const[saving,setSav]=useState(false);const[showCanc,setShowCanc]=useState(false);
+  const[addOpen,setAddOpen]=useState(false);const[addEmail,setAddEmail]=useState("");
+  const[editBk,setEditBk]=useState(null);const[cancTgt,setCancTgt]=useState(null);
+  const[delTgt,setDelTgt]=useState(null);const[chgTgt,setChgTgt]=useState(null);
+  const[linking,setLinking]=useState(null);const[weekOff,setWeekOff]=useState(0);
+  const[cSort,setCSort]=useState("hours");const[cTier,setCTier]=useState("all");
+  const[selected,setSelected]=useState(new Set());
+  const[settingsOpen,setSettingsOpen]=useState(false);
+  const[settings,setSettings]=useState(()=>{const s=loadSettings();return{theme:s.theme||'augusta',font:s.font||"'IBM Plex Mono', monospace",dark:!!s.dark,density:s.density||'comfortable'};});
+  const[bayFilter,setBayFilter]=useState("all");
+  const toast=useToast();
+
+  // Apply settings
+  useEffect(()=>{
+    saveSettings(settings);
+    const t=THEMES[settings.theme]||THEMES.augusta;
+    document.documentElement.style.setProperty('--primary',t.primary);
+    document.documentElement.style.setProperty('--primary-light',t.primary+'cc');
+    document.documentElement.style.setProperty('--font',settings.font);
+    document.body.style.fontFamily=settings.font;
+    document.documentElement.setAttribute('data-theme',settings.dark?'dark':'light');
+    document.documentElement.setAttribute('data-density',settings.density);
+  },[settings]);
+
+  const connect=useCallback(async(k)=>{
+    if(!k)return;setErr("");setLoad(true);
+    try{const[m,b,tc,u,p]=await Promise.all([supa(k,"members","?order=name"),supa(k,"bookings","?order=booking_start.desc&limit=5000"),supa(k,"tier_config","?order=display_order"),supa(k,"monthly_usage","?order=billing_month.desc,overage_charge.desc"),supa(k,"payments","?order=created_at.desc").catch(()=>[])]);
+    setMem(m);setBk(b);setTC(tc);setMU(u);setPay(p);setConn(true);setApiKey(k);localStorage.setItem("hg-key",k);}catch(e){setErr(`Failed: ${e.message}`);setConn(false);}setLoad(false);
+  },[]);
+  useEffect(()=>{if(apiKey)connect(apiKey);},[]);
+  const refresh=()=>connect(apiKey);
+  useEffect(()=>{if(!conn)return;const iv=setInterval(refresh,60000);return()=>clearInterval(iv);},[conn,apiKey]);
+
+  // Keyboard shortcuts
+  useEffect(()=>{function h(e){if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA')return;if(e.key==='n'){e.preventDefault();openAdd();}if(e.key==='r'){e.preventDefault();refresh();}if(e.key==='/'){e.preventDefault();setView('customers');setTimeout(()=>{const el=document.querySelector('.search');if(el)el.focus();},100);}}window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h);},[]);
+
+  async function cancelBooking(){if(!cancTgt)return;setSav(true);try{await supaPa(apiKey,"bookings",{booking_id:cancTgt.booking_id},{booking_status:"Cancelled"});toast.show("Cancelled");setCancTgt(null);await refresh();}catch(e){toast.show(e.message,"error");}setSav(false);}
+  async function deleteBooking(){if(!delTgt)return;setSav(true);try{await supaDel(apiKey,"bookings",{booking_id:delTgt.booking_id});toast.show("Deleted");setDelTgt(null);await refresh();}catch(e){toast.show(e.message,"error");}setSav(false);}
+  async function saveBk(data){setSav(true);try{if(editBk){await supaPa(apiKey,"bookings",{booking_id:editBk.booking_id},data);toast.show("Updated");setEditBk(null);}else{await supaP(apiKey,"bookings",data);toast.show("Added");setAddOpen(false);}await refresh();}catch(e){toast.show(e.message,"error");}setSav(false);}
+  async function restoreBk(b){setSav(true);try{await supaPa(apiKey,"bookings",{booking_id:b.booking_id},{booking_status:"Confirmed"});toast.show("Restored");await refresh();}catch(e){toast.show(e.message,"error");}setSav(false);}
+  async function updateTier(email,tier,name){setSav(true);try{const ex=members.find(m=>m.email===email);if(ex)await supaPa(apiKey,"members",{email},{tier});else await supaP(apiKey,"members",{email,name:name||email,tier});toast.show(`${name||email} → ${tier}`);await refresh();}catch(e){toast.show(e.message,"error");}setSav(false);}
+
+  // Bulk actions
+  async function bulkCancel(){if(selected.size===0)return;setSav(true);const ids=[...selected];for(const id of ids){try{await supaPa(apiKey,"bookings",{booking_id:id},{booking_status:"Cancelled"});}catch{}}toast.show(`Cancelled ${ids.length} bookings`);setSelected(new Set());await refresh();setSav(false);}
+  async function bulkDelete(){if(selected.size===0)return;setSav(true);const ids=[...selected];for(const id of ids){try{await supaDel(apiKey,"bookings",{booking_id:id});}catch{}}toast.show(`Deleted ${ids.length} bookings`);setSelected(new Set());await refresh();setSav(false);}
+  function toggleSelect(id){setSelected(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});}
+  function selectAll(ids){setSelected(s=>s.size===ids.length?new Set():new Set(ids));}
+
+  async function chargeOverage(){if(!chgTgt)return;setSav(true);try{const r=await fetch("/api/stripe-charge",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${apiKey}`},body:JSON.stringify({stripe_customer_id:chgTgt.stripe_customer_id,amount_cents:Math.round(chgTgt.amount*100),description:`Hour Golf overage — ${mL(chgTgt.month)}`,member_email:chgTgt.email,billing_month:chgTgt.month})});const d=await r.json();if(!r.ok)throw new Error(d.detail||d.error);await supaP(apiKey,"payments",{member_email:chgTgt.email,billing_month:chgTgt.month,amount_cents:Math.round(chgTgt.amount*100),stripe_payment_intent_id:d.payment_intent_id,status:"succeeded",description:`Overage — ${mL(chgTgt.month)}`});toast.show(`Charged $${chgTgt.amount.toFixed(2)}`);setChgTgt(null);await refresh();}catch(e){toast.show(`Failed: ${e.message}`,"error");}setSav(false);}
+  async function linkStripe(email,name){setLinking(email);try{const r=await fetch("/api/stripe-lookup",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${apiKey}`},body:JSON.stringify({email})});const d=await r.json();if(!r.ok)throw new Error(d.detail||d.error);if(!d.found||!d.customers.length){toast.show(`No Stripe for ${email}`,"error");setLinking(null);return;}await supaPa(apiKey,"members",{email},{stripe_customer_id:d.customers[0].id});toast.show(`Linked ${name||email}`);await refresh();}catch(e){toast.show(e.message,"error");}setLinking(null);}
+  function isPaid(email,month){return payments.some(p=>p.member_email===email&&p.billing_month===month&&p.status==="succeeded");}
+
+  // Derived
+  const activeBk=useMemo(()=>bookings.filter(b=>b.booking_status!=="Cancelled"),[bookings]);
+  const allMonths=useMemo(()=>[...new Set(mu.map(r=>r.billing_month))].sort().reverse(),[mu]);
+  const actMonth=selMonth||allMonths[0]||"";
+  const curData=useMemo(()=>mu.filter(r=>r.billing_month===actMonth),[mu,actMonth]);
+  const memMonth=curData.filter(r=>r.tier!=="Non-Member");
+  const nonMem=curData.filter(r=>r.tier==="Non-Member");
+  const totOver=memMonth.reduce((s,r)=>s+Number(r.overage_charge||0),0);
+  const totHrs=memMonth.reduce((s,r)=>s+Number(r.total_hours||0),0);
+
+  const allCust=useMemo(()=>{const m={};activeBk.forEach(b=>{if(!m[b.customer_email])m[b.customer_email]={email:b.customer_email,name:b.customer_name,hrs:0,cnt:0};m[b.customer_email].hrs+=Number(b.duration_hours||0);m[b.customer_email].cnt++;if(b.customer_name)m[b.customer_email].name=b.customer_name;});return Object.values(m);},[activeBk]);
+  const custList=useMemo(()=>{const m={};bookings.forEach(b=>{if(!m[b.customer_email])m[b.customer_email]={email:b.customer_email,name:b.customer_name};if(b.customer_name)m[b.customer_email].name=b.customer_name;});return Object.values(m).sort((a,b)=>(a.name||'').localeCompare(b.name||''));},[bookings]);
+
+  const todayBk=useMemo(()=>{const t=tds();let bks=activeBk.filter(b=>lds(new Date(b.booking_start))===t);if(bayFilter!=="all")bks=bks.filter(b=>b.bay===bayFilter);return bks.sort((a,b)=>new Date(a.booking_start)-new Date(b.booking_start));},[activeBk,bayFilter]);
+  const todayByBay=useMemo(()=>{const r={};BAYS.forEach(bay=>{r[bay]=todayBk.filter(b=>b.bay===bay);});return r;},[todayBk]);
+  const now=new Date();
+  function bkSt(b){const s=new Date(b.booking_start),e=new Date(b.booking_end);if(now>=s&&now<=e)return"now";if(now<s)return"upcoming";return"past";}
+  const todayHrs=todayBk.reduce((s,b)=>s+Number(b.duration_hours||0),0);
+  const todayRev=useMemo(()=>todayBk.reduce((s,b)=>{const m=members.find(x=>x.email===b.customer_email);if(m&&m.tier!=="Non-Member")return s;return s+Number(b.duration_hours||0)*60;},0),[todayBk,members]);
+
+  const weekDays=useMemo(()=>{const d=[];const b=new Date();b.setDate(b.getDate()-b.getDay()+(weekOff*7));for(let i=0;i<7;i++){const x=new Date(b);x.setDate(b.getDate()+i);d.push(x);}return d;},[weekOff]);
+  const weekBk=useMemo(()=>{const r={};weekDays.forEach(d=>{const ds=lds(d);BAYS.forEach(bay=>{r[`${ds}-${bay}`]=activeBk.filter(b=>lds(new Date(b.booking_start))===ds&&b.bay===bay).sort((a,b)=>new Date(a.booking_start)-new Date(b.booking_start));});});return r;},[weekDays,activeBk]);
+
+  const filtCust=useMemo(()=>{let l=[...allCust];const q=search.toLowerCase();if(q)l=l.filter(c=>(c.name||'').toLowerCase().includes(q)||c.email.toLowerCase().includes(q));if(cTier!=="all")l=l.filter(c=>{const m=members.find(x=>x.email===c.email);return(m?.tier||"Non-Member")===cTier;});if(cSort==="hours")l.sort((a,b)=>b.hrs-a.hrs);else if(cSort==="name")l.sort((a,b)=>(a.name||'').localeCompare(b.name||''));else l.sort((a,b)=>b.cnt-a.cnt);return l;},[allCust,search,cSort,cTier,members]);
+
+  const selData=useMemo(()=>{if(!selMember)return null;const mb=bookings.filter(b=>b.customer_email===selMember);let filtered=showCanc?mb:mb.filter(b=>b.booking_status!=="Cancelled");if(bayFilter!=="all")filtered=filtered.filter(b=>b.bay===bayFilter);return{member:members.find(m=>m.email===selMember),bookings:filtered,cancelledCount:mb.filter(b=>b.booking_status==="Cancelled").length,usage:mu.filter(r=>r.customer_email===selMember),customer:allCust.find(c=>c.email===selMember)};},[selMember,members,bookings,mu,allCust,showCanc,bayFilter]);
+
+  if(!conn)return <div className="setup"><div className="logo" style={{fontSize:28,color:'var(--primary)'}}>HOUR GOLF</div><div style={{color:'var(--text-muted)',fontSize:11,letterSpacing:2,marginBottom:32}}>ADMIN DASHBOARD</div><input type="password" value={keyIn} onChange={e=>setKeyIn(e.target.value)} placeholder="Supabase API Key"/>{err&&<p className="err">{err}</p>}<button onClick={()=>connect(keyIn)} disabled={!keyIn||loading}>{loading?"...":"Connect"}</button></div>;
+
+  function openAdd(em){setAddEmail(em||"");setEditBk(null);setAddOpen(true);}
+
+  return(<div>
+    <header className="header"><div className="header-inner"><div><div className="logo">HOUR GOLF</div><div className="logo-sub">Admin Dashboard</div></div><div className="header-stats">
+      <div className="stat-box"><span className="stat-val">{todayBk.length}</span><span className="stat-lbl">Today</span></div>
+      <div className="stat-box"><span className="stat-val">{todayHrs.toFixed(1)}h</span><span className="stat-lbl">Bay Hrs</span></div>
+      <div className="stat-box"><span className="stat-val">{members.length}</span><span className="stat-lbl">Members</span></div>
+      <button className="hdr-btn" onClick={()=>openAdd()}>+ Booking</button>
+      <button className="hdr-btn" onClick={refresh} disabled={loading}>↻</button>
+      <button className="hdr-btn" onClick={()=>setSettingsOpen(true)}>⚙</button>
+    </div></div></header>
+
+    <nav className="nav">{[["today","Today",todayBk.length],["week","Week"],["overview","Monthly"],["customers","Customers"],["tiers","Config"]].map(([k,l,c])=>(<button key={k} className={`nav-btn ${view===k?'active':''}`} onClick={()=>{setView(k);setSelMember(null);setSelected(new Set())}}>{l}{c>0&&<span className="cnt">{c}</span>}</button>))}
+    {selData&&<button className={`nav-btn ${view==='detail'?'active':''}`} onClick={()=>setView('detail')}>{selData.customer?.name||selMember}</button>}</nav>
+
+    {saving&&<div className="saving">Saving...</div>}
+
+    {/* TODAY */}
+    {view==="today"&&<div className="content">
+      <div className="fbar"><label>Bay:</label><select value={bayFilter} onChange={e=>setBayFilter(e.target.value)}><option value="all">All Bays</option>{BAYS.map(b=><option key={b} value={b}>{b}</option>)}</select></div>
+      <div className="summary">
+        <div className="sum-item"><span className="sum-val">{todayBk.length}</span><span className="sum-lbl">Bookings</span></div>
+        <div className="sum-item"><span className="sum-val">{todayHrs.toFixed(1)}h</span><span className="sum-lbl">Bay Hours</span></div>
+        <div className="sum-item"><span className="sum-val">${todayRev.toFixed(0)}</span><span className="sum-lbl">Est Revenue</span></div>
+        <div className="sum-item"><span className="sum-val">{todayBk.filter(b=>bkSt(b)==="upcoming").length}</span><span className="sum-lbl">Upcoming</span></div>
+      </div>
+      {(bayFilter==="all"?BAYS:[bayFilter]).map(bay=><div key={bay} className="bay-lane"><div className="bay-label">{bay} — {fDL(new Date())}</div>
+        {(todayByBay[bay]||[]).length===0&&<div className="slot"><div className="slot-t">—</div><div className="slot-i"><span className="muted">No bookings</span></div></div>}
+        {(todayByBay[bay]||[]).map(b=>{const s=new Date(b.booking_start),e=new Date(b.booking_end);const st=bkSt(b);const mem=members.find(x=>x.email===b.customer_email);return(
+          <div key={b.booking_id} className={`slot ${st}`}><div className="slot-t">{fT(s)}–{fT(e)}</div><div className="slot-i"><div>
+            <div className="slot-c" style={{cursor:'pointer'}} onClick={()=>{setSelMember(b.customer_email);setView('detail')}}>{b.customer_name}</div>
+            <div className="slot-m">{hrs(b.duration_hours)} {mem&&mem.tier!=='Non-Member'&&<Badge tier={mem.tier}/>}</div></div>
+            <div style={{display:'flex',gap:6,alignItems:'center'}}>{st==="now"&&<span className="badge" style={{background:'var(--primary)',fontSize:9}}>NOW</span>}{st==="upcoming"&&<span className="badge badge-sm" style={{background:'var(--blue)'}}>NEXT</span>}
+            <button className="btn" style={{fontSize:10}} onClick={()=>setEditBk(b)}>Edit</button><button className="btn danger" style={{fontSize:10}} onClick={()=>setCancTgt(b)}>Cancel</button></div></div></div>);})}
+      </div>)}
+    </div>}
+
+    {/* WEEK */}
+    {view==="week"&&<div className="content">
+      <div className="wk-nav"><button className="btn" onClick={()=>setWeekOff(w=>w-1)}>← Prev</button><button className="btn" onClick={()=>setWeekOff(0)}>This Week</button><button className="btn" onClick={()=>setWeekOff(w=>w+1)}>Next →</button><span style={{marginLeft:8}}>{fDS(weekDays[0])} – {fDS(weekDays[6])}</span></div>
+      <div className="wk-grid"><div className="wk-h">Day</div>{BAYS.map(b=><div key={b} className="wk-h">{b}</div>)}
+        {weekDays.map(d=>{const ds=lds(d);const isT=ds===tds();return React.createElement(React.Fragment,{key:ds},
+          <div className={`wk-d ${isT?'today':''}`}><span className="dl">{d.toLocaleDateString("en-US",{weekday:"short",timeZone:TZ})}</span><span className="dn">{d.toLocaleDateString("en-US",{day:"numeric",timeZone:TZ})}</span></div>,
+          ...BAYS.map(bay=>{const bks=weekBk[`${ds}-${bay}`]||[];return <div key={bay} className={`wk-c ${isT?'today':''}`}>{bks.map(b=><div key={b.booking_id} className="wk-b" onClick={()=>{setSelMember(b.customer_email);setView('detail')}} title={`${b.customer_name} ${fT(new Date(b.booking_start))}–${fT(new Date(b.booking_end))}`}>{fT(new Date(b.booking_start))} {b.customer_name?.split(' ')[0]}</div>)}</div>;}));})}
+      </div>
+    </div>}
+
+    {/* MONTHLY */}
+    {view==="overview"&&<div className="content">
+      <div className="month-sel">{allMonths.map(m=><button key={m} className={`mo-btn ${m===actMonth?'active':''}`} onClick={()=>setSelMonth(m)}>{mL(m)}</button>)}</div>
+      {memMonth.length>0&&<div className="summary"><div className="sum-item"><span className="sum-val">{totHrs.toFixed(1)}h</span><span className="sum-lbl">Member Hours</span></div><div className="sum-item"><span className={`sum-val ${totOver>0?'red':'green'}`}>{dlr(totOver)}</span><span className="sum-lbl">Overage Due</span></div><div className="sum-item"><span className="sum-val">{memMonth.filter(r=>Number(r.overage_hours)>0).length}</span><span className="sum-lbl">Over Allotment</span></div></div>}
+      {memMonth.length>0&&<><h2 className="section-head">Members — {mL(actMonth)}</h2><div className="tbl"><div className="th"><span style={{flex:2}}>Member</span><span style={{flex:1}}>Tier</span><span style={{flex:1}} className="text-r">Used</span><span style={{flex:1}} className="text-r">Allot</span><span style={{flex:1}} className="text-r">Over</span><span style={{flex:1}} className="text-r">Charge</span><span style={{flex:1}} className="text-r">Status</span></div>
+        {memMonth.map(r=>{const ho=Number(r.overage_charge)>0;const pd=isPaid(r.customer_email,r.billing_month);return(<div key={r.customer_email} className="tr click" onClick={()=>{setSelMember(r.customer_email);setView('detail')}}><span style={{flex:2}}><strong>{r.customer_name}</strong><br/><span className="email-sm">{r.customer_email}</span></span><span style={{flex:1}}><Badge tier={r.tier}/></span><span style={{flex:1}} className="text-r tab-num">{hrs(r.total_hours)}</span><span style={{flex:1}} className="text-r tab-num">{allD(r.included_hours)}</span><span style={{flex:1}} className={`text-r tab-num ${Number(r.overage_hours)>0?'red':''}`}>{Number(r.overage_hours)>0?hrs(r.overage_hours):"—"}</span><span style={{flex:1}} className={`text-r tab-num ${ho?'red bold':''}`}>{ho?dlr(r.overage_charge):"—"}</span><span style={{flex:1}} className="text-r">{ho&&pd&&<span className="badge" style={{background:'#4a7c59',fontSize:9}}>PAID</span>}{ho&&!pd&&<span className="badge" style={{background:'var(--red)',fontSize:9}}>UNPAID</span>}{!ho&&<span className="muted">—</span>}</span></div>);})}</div></>}
+      <h2 className="section-head" style={{marginTop:24}}>Non-Members — {mL(actMonth)}</h2><div className="tbl"><div className="th"><span style={{flex:2}}>Customer</span><span style={{flex:1}} className="text-r">Hours</span><span style={{flex:1}} className="text-r">Sessions</span><span style={{flex:1}} className="text-r">Revenue</span><span style={{flex:1}} className="text-c">Assign</span></div>
+        {nonMem.slice(0,25).map(r=>(<div key={r.customer_email} className="tr"><span style={{flex:2,cursor:'pointer'}} onClick={()=>{setSelMember(r.customer_email);setView('detail')}}><strong>{r.customer_name}</strong><br/><span className="email-sm">{r.customer_email}</span></span><span style={{flex:1}} className="text-r tab-num">{hrs(r.total_hours)}</span><span style={{flex:1}} className="text-r tab-num">{r.booking_count}</span><span style={{flex:1}} className="text-r tab-num">${(Number(r.total_hours)*60).toFixed(0)}</span><span style={{flex:1}} className="text-c"><select className="tier-sel" value="Non-Member" onChange={e=>updateTier(r.customer_email,e.target.value,r.customer_name)}><option value="Non-Member">—</option>{TIERS.filter(t=>t!=='Non-Member').map(t=><option key={t}>{t}</option>)}</select></span></div>))}</div>
+    </div>}
+
+    {/* CUSTOMERS */}
+    {view==="customers"&&<div className="content">
+      <input className="search" type="text" placeholder="Search name or email... (keyboard shortcut: /)" value={search} onChange={e=>setSearch(e.target.value)}/>
+      <div className="fbar"><label>Sort:</label><select value={cSort} onChange={e=>setCSort(e.target.value)}><option value="hours">Hours</option><option value="sessions">Sessions</option><option value="name">Name</option></select><label style={{marginLeft:12}}>Tier:</label><select value={cTier} onChange={e=>setCTier(e.target.value)}><option value="all">All</option>{TIERS.map(t=><option key={t}>{t}</option>)}</select><span className="muted" style={{marginLeft:12}}>{filtCust.length} results</span></div>
+      <div className="tbl"><div className="th"><span style={{flex:2}}>Customer</span><span style={{flex:1}}>Tier</span><span style={{flex:1}} className="text-r">Hours</span><span style={{flex:1}} className="text-r">Sessions</span><span style={{flex:1}} className="text-c">Assign</span></div>
+        {filtCust.map(c=>{const m=members.find(x=>x.email===c.email);const tier=m?.tier||'Non-Member';return(<div key={c.email} className="tr"><span style={{flex:2,cursor:'pointer'}} onClick={()=>{setSelMember(c.email);setView('detail')}}><strong>{c.name}</strong><br/><span className="email-sm">{c.email}</span></span><span style={{flex:1}}><Badge tier={tier}/></span><span style={{flex:1}} className="text-r tab-num">{c.hrs.toFixed(1)}h</span><span style={{flex:1}} className="text-r tab-num">{c.cnt}</span><span style={{flex:1}} className="text-c"><TierSel value={tier} onChange={t=>updateTier(c.email,t,c.name)}/></span></div>);})}</div>
+    </div>}
+
+    {/* CONFIG */}
+    {view==="tiers"&&<div className="content">
+      <h2 className="section-head">Tier Configuration</h2><div className="tbl"><div className="th"><span style={{flex:2}}>Tier</span><span style={{flex:1}} className="text-r">Monthly</span><span style={{flex:1}} className="text-r">Included</span><span style={{flex:1}} className="text-r">Overage</span><span style={{flex:1}} className="text-r">Pro Shop</span></div>
+        {tierCfg.map(tc=>(<div key={tc.tier} className="tr"><span style={{flex:2}}><Badge tier={tc.tier}/></span><span style={{flex:1}} className="text-r tab-num">${Number(tc.monthly_fee).toFixed(0)}/mo</span><span style={{flex:1}} className="text-r tab-num">{Number(tc.included_hours)>=99999?"Unlimited":Number(tc.included_hours)+"h"}</span><span style={{flex:1}} className="text-r tab-num">${Number(tc.overage_rate)}/hr</span><span style={{flex:1}} className="text-r tab-num">{tc.pro_shop_discount}% off</span></div>))}</div>
+      <h2 className="section-head" style={{marginTop:24}}>Members ({members.length})</h2><div className="tbl"><div className="th"><span style={{flex:2}}>Member</span><span style={{flex:1}}>Tier</span><span style={{flex:1}} className="text-r">Rate</span><span style={{flex:1}}>Stripe</span></div>
+        {members.map(m=>(<div key={m.email} className="tr"><span style={{flex:2}}><strong>{m.name}</strong><br/><span className="email-sm">{m.email}</span></span><span style={{flex:1}}><TierSel value={m.tier} onChange={t=>updateTier(m.email,t,m.name)}/></span><span style={{flex:1}} className="text-r tab-num">{m.monthly_rate?`$${Number(m.monthly_rate).toFixed(0)}`:"—"}</span><span style={{flex:1}}>{m.stripe_customer_id?<span className="email-sm" title={m.stripe_customer_id}>{m.stripe_customer_id.slice(0,14)}…</span>:<button className="btn primary" style={{fontSize:10}} onClick={()=>linkStripe(m.email,m.name)} disabled={linking===m.email}>{linking===m.email?"…":"Link"}</button>}</span></div>))}</div>
+    </div>}
+
+    {/* DETAIL */}
+    {view==="detail"&&selData&&<div className="content">
+      <div className="detail-header"><div><h2 style={{margin:0,fontSize:18}}>{selData.customer?.name||selMember}</h2><span className="email-sm">{selMember}</span>{selData.member?.stripe_customer_id&&<span className="muted" style={{marginLeft:8}}>Stripe ✓</span>}</div>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}><button className="btn primary" onClick={()=>openAdd(selMember)}>+ Booking</button><TierSel value={selData.member?.tier||'Non-Member'} onChange={t=>updateTier(selMember,t,selData.customer?.name)}/></div></div>
+
+      <h3 className="section-head">Monthly Breakdown</h3><div className="tbl"><div className="th"><span style={{flex:1}}>Month</span><span style={{flex:1}} className="text-r">Hours</span><span style={{flex:1}} className="text-r">Allot</span><span style={{flex:1}} className="text-r">Over</span><span style={{flex:1}} className="text-r">Charge</span><span style={{flex:1}} className="text-r">Status</span></div>
+        {selData.usage.map(u=>{const ho=Number(u.overage_charge)>0;const pd=isPaid(u.customer_email,u.billing_month);const mr=members.find(m=>m.email===u.customer_email);const hs=!!mr?.stripe_customer_id;return(
+          <div key={u.billing_month} className="tr"><span style={{flex:1}}>{mL(u.billing_month)}</span><span style={{flex:1}} className="text-r tab-num">{hrs(u.total_hours)}</span><span style={{flex:1}} className="text-r tab-num">{allD(u.included_hours)}</span><span style={{flex:1}} className={`text-r tab-num ${Number(u.overage_hours)>0?'red':''}`}>{Number(u.overage_hours)>0?hrs(u.overage_hours):"—"}</span><span style={{flex:1}} className={`text-r tab-num ${ho?'red bold':''}`}>{ho?dlr(u.overage_charge):"—"}</span>
+          <span style={{flex:1}} className="text-r">{ho&&pd&&<span className="badge" style={{background:'#4a7c59',fontSize:9}}>PAID</span>}{ho&&!pd&&hs&&<button className="btn primary" style={{fontSize:10}} disabled={saving} onClick={(e)=>{e.stopPropagation();setChgTgt({email:u.customer_email,month:u.billing_month,amount:Number(u.overage_charge),stripe_customer_id:mr.stripe_customer_id,name:u.customer_name})}}>Charge {dlr(u.overage_charge)}</button>}{ho&&!pd&&!hs&&<span className="muted" style={{fontSize:10}}>No Stripe</span>}{!ho&&<span className="muted">—</span>}</span></div>);})}</div>
+
+      <h3 className="section-head" style={{marginTop:20}}><span>Bookings</span><span style={{display:'flex',gap:6,alignItems:'center'}}>
+        <select className="tier-sel" style={{fontSize:10}} value={bayFilter} onChange={e=>setBayFilter(e.target.value)}><option value="all">All Bays</option>{BAYS.map(b=><option key={b}>{b}</option>)}</select>
+        {selData.cancelledCount>0&&<button className="btn" style={{fontSize:10}} onClick={()=>setShowCanc(!showCanc)}>{showCanc?"Hide":"Show"} {selData.cancelledCount} canc.</button>}
+        <button className="btn primary" style={{fontSize:10}} onClick={()=>openAdd(selMember)}>+ Add</button>
+      </span></h3>
+      <div className="tbl"><div className="th">
+        <span style={{width:24}}><input type="checkbox" className="chk" checked={selected.size>0&&selected.size===selData.bookings.filter(b=>b.booking_status!=="Cancelled").length} onChange={()=>selectAll(selData.bookings.filter(b=>b.booking_status!=="Cancelled").map(b=>b.booking_id))}/></span>
+        <span style={{flex:2}}>Date</span><span style={{flex:1}}>Bay</span><span style={{flex:1}} className="text-r">Duration</span><span style={{flex:1}} className="text-r">Actions</span></div>
+        {selData.bookings.map((b,i)=>{const d=new Date(b.booking_start),e=new Date(b.booking_end);const ic=b.booking_status==="Cancelled";const im=(b.booking_id||"").startsWith("manual_");return(
+          <div key={b.booking_id||i} className={`tr ${ic?'cancelled':''} ${selected.has(b.booking_id)?'selected':''}`}>
+            <span style={{width:24}}>{!ic&&<input type="checkbox" className="chk" checked={selected.has(b.booking_id)} onChange={()=>toggleSelect(b.booking_id)}/>}</span>
+            <span style={{flex:2}}>{fD(d)} {fT(d)}–{fT(e)}{im&&<span className="badge badge-sm" style={{background:'var(--gold)',marginLeft:6}}>MANUAL</span>}</span>
+            <span style={{flex:1}}>{b.bay}</span><span style={{flex:1}} className="text-r tab-num">{hrs(b.duration_hours)}</span>
+            <span style={{flex:1,display:'flex',gap:4,justifyContent:'flex-end'}}>{ic?<><button className="btn" style={{fontSize:10}} onClick={()=>restoreBk(b)} disabled={saving}>Restore</button><button className="btn danger" style={{fontSize:10}} onClick={()=>setDelTgt(b)} disabled={saving}>Delete</button></>:<><button className="btn" style={{fontSize:10}} onClick={()=>setEditBk(b)} disabled={saving}>Edit</button><button className="btn danger" style={{fontSize:10}} onClick={()=>setCancTgt(b)} disabled={saving}>Cancel</button></>}</span></div>);})}
+      </div>
+      {selected.size>0&&<div className="bulk-bar"><span>{selected.size} selected</span><button onClick={bulkCancel}>Cancel Selected</button><button className="bulk-danger" onClick={bulkDelete}>Delete Selected</button><button onClick={()=>setSelected(new Set())}>Clear</button></div>}
+    </div>}
+
+    {/* MODALS */}
+    <BookingForm open={addOpen||!!editBk} onClose={()=>{setAddOpen(false);setEditBk(null)}} onSave={saveBk} booking={editBk} customers={custList} presetEmail={addEmail}/>
+    <Confirm open={!!cancTgt} onClose={()=>setCancTgt(null)} onOk={cancelBooking} title="Cancel Booking" msg={cancTgt?`Cancel ${cancTgt.customer_name}'s booking on ${fD(new Date(cancTgt.booking_start))}?`:""} detail="Monthly totals will update." label="Cancel Booking" danger/>
+    <Confirm open={!!delTgt} onClose={()=>setDelTgt(null)} onOk={deleteBooking} title="Delete" msg="Permanently delete? Cannot undo." detail={delTgt?`${delTgt.customer_name} — ${fD(new Date(delTgt.booking_start))}`:""} label="Delete" danger/>
+    <Confirm open={!!chgTgt} onClose={()=>setChgTgt(null)} onOk={chargeOverage} title="Charge Card" msg={chgTgt?`Charge ${chgTgt.name||chgTgt.email} $${chgTgt.amount.toFixed(2)} for ${mL(chgTgt.month)} overage?`:""} detail={chgTgt?`Card on file via Stripe`:""} label={`Charge $${chgTgt?chgTgt.amount.toFixed(2):'0'}`}/>
+    <SettingsPanel open={settingsOpen} onClose={()=>setSettingsOpen(false)} settings={settings} onChange={setSettings}/>
+    {toast.el}
+  </div>);
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+  </script>
+</body>
+</html>
