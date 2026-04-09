@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hour Golf — Admin Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'IBM Plex Mono', monospace; background: #f5f3ef; color: #2a2a2a; -webkit-font-smoothing: antialiased; }
+    .header { background: #1a472a; color: #fff; padding: 20px 24px; }
+    .header-inner { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto; }
+    .logo { font-size: 18px; letter-spacing: 6px; font-weight: 700; }
+    .logo-sub { font-size: 11px; opacity: 0.6; letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+    .header-stats { display: flex; gap: 20px; align-items: center; }
+    .stat-box { display: flex; flex-direction: column; align-items: center; }
+    .stat-val { font-size: 22px; font-weight: 700; }
+    .stat-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; }
+    .refresh-btn { padding: 8px 14px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; color: #fff; cursor: pointer; font-size: 12px; font-family: inherit; margin-left: 16px; }
+    .refresh-btn:hover { background: rgba(255,255,255,0.25); }
+    .nav { display: flex; border-bottom: 2px solid #1a472a; background: #fff; max-width: 1200px; margin: 0 auto; overflow-x: auto; }
+    .nav-btn { padding: 12px 16px; border: none; background: transparent; cursor: pointer; font-size: 11px; font-family: inherit; color: #888; letter-spacing: 1px; white-space: nowrap; }
+    .nav-btn.active { color: #1a472a; font-weight: 700; border-bottom: 2px solid #1a472a; margin-bottom: -2px; }
+    .nav-btn .nav-count { background: #1a472a; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 10px; margin-left: 4px; }
+    .content { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .month-sel { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; }
+    .mo-btn { padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; background: #fff; cursor: pointer; font-size: 11px; font-family: inherit; }
+    .mo-btn.active { border-color: #1a472a; background: #1a472a; color: #fff; font-weight: 700; }
+    .summary { display: flex; gap: 20px; padding: 16px 20px; background: #fff; border-radius: 8px; margin-bottom: 24px; border: 1px solid #e0ddd6; flex-wrap: wrap; }
+    .sum-item { display: flex; flex-direction: column; min-width: 80px; }
+    .sum-val { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .sum-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
+    .section-head { font-size: 13px; text-transform: uppercase; letter-spacing: 2px; color: #1a472a; margin: 0 0 12px; border-bottom: 1px solid #1a472a; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .table { background: #fff; border-radius: 8px; border: 1px solid #e0ddd6; overflow: hidden; margin-bottom: 16px; }
+    .t-head { display: flex; padding: 10px 16px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; border-bottom: 1px solid #e0ddd6; gap: 8px; }
+    .t-row { display: flex; padding: 12px 16px; border-bottom: 1px solid #f0ede6; align-items: center; gap: 8px; font-size: 13px; }
+    .t-row:last-child { border-bottom: none; }
+    .t-row.clickable { cursor: pointer; }
+    .t-row.clickable:hover { background: #faf9f6; }
+    .t-row.cancelled { opacity: 0.45; text-decoration: line-through; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 3px; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .badge-sm { font-size: 8px; padding: 2px 6px; }
+    .tier-select { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; font-family: inherit; background: #fff; }
+    .email-sm { font-size: 11px; color: #999; }
+    .muted { font-size: 11px; color: #999; }
+    .tab-num { font-variant-numeric: tabular-nums; }
+    .text-r { text-align: right; }
+    .text-c { text-align: center; }
+    .red { color: #cc4455; }
+    .green { color: #4a7c59; }
+    .bold { font-weight: 700; }
+    .search-input { width: 100%; padding: 10px 16px; border: 1px solid #e0ddd6; border-radius: 8px; font-size: 14px; font-family: inherit; margin-bottom: 16px; background: #fff; }
+    .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+    .filter-bar select { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; font-family: inherit; background: #fff; }
+    .filter-bar label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
+    .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding: 16px 20px; background: #fff; border-radius: 8px; border: 1px solid #e0ddd6; flex-wrap: wrap; gap: 12px; }
+    .saving-bar { text-align: center; padding: 8px; background: #fffbeb; color: #a67c00; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+    .setup { max-width: 480px; margin: 0 auto; padding: 80px 24px; text-align: center; }
+    .setup-input { width: 100%; padding: 12px 16px; border: 2px solid #1a472a; border-radius: 6px; font-size: 14px; font-family: inherit; margin-bottom: 16px; }
+    .setup-btn { width: 100%; padding: 14px; background: #1a472a; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 700; letter-spacing: 2px; cursor: pointer; font-family: inherit; }
+    .setup-btn:hover { background: #245a35; }
+    .setup-btn:disabled { opacity: 0.5; cursor: default; }
+    .error { color: #c45; font-size: 13px; margin-bottom: 12px; text-align: left; }
+    .act-btn { padding: 4px 10px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-size: 11px; font-family: inherit; letter-spacing: 0.5px; }
+    .act-btn:hover { background: #f5f3ef; }
+    .act-btn.danger { border-color: #cc4455; color: #cc4455; }
+    .act-btn.danger:hover { background: #fef2f2; }
+    .act-btn.primary { border-color: #1a472a; color: #1a472a; font-weight: 700; }
+    .act-btn.primary:hover { background: #1a472a; color: #fff; }
+    .act-btn:disabled { opacity: 0.4; cursor: default; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .modal { background: #fff; border-radius: 12px; padding: 28px; width: 90%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
+    .modal h2 { font-size: 16px; letter-spacing: 2px; text-transform: uppercase; color: #1a472a; margin-bottom: 20px; }
+    .modal-field { margin-bottom: 16px; }
+    .modal-field label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #555; margin-bottom: 6px; }
+    .modal-field input, .modal-field select { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; font-family: inherit; background: #fff; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 24px; }
+    .modal-actions .act-btn { padding: 10px 20px; font-size: 13px; }
+    .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 6px; font-size: 13px; font-family: inherit; font-weight: 500; z-index: 2000; animation: slideUp 0.3s ease; }
+    .toast.success { background: #1a472a; color: #fff; }
+    .toast.error { background: #cc4455; color: #fff; }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .confirm-box { text-align: center; }
+    .confirm-box p { font-size: 14px; line-height: 1.6; margin-bottom: 8px; }
+    .confirm-box .muted { margin-bottom: 20px; display: block; }
+    .bay-lane { margin-bottom: 24px; }
+    .bay-label { font-size: 14px; font-weight: 700; letter-spacing: 2px; color: #1a472a; margin-bottom: 8px; text-transform: uppercase; }
+    .time-slot { display: flex; align-items: stretch; background: #fff; border: 1px solid #e0ddd6; border-radius: 6px; margin-bottom: 4px; overflow: hidden; }
+    .time-slot.now { border-color: #1a472a; border-width: 2px; }
+    .time-slot.past { opacity: 0.5; }
+    .slot-time { width: 130px; padding: 10px 12px; font-size: 12px; font-weight: 700; background: #faf9f6; border-right: 1px solid #e0ddd6; display: flex; align-items: center; font-variant-numeric: tabular-nums; }
+    .slot-info { flex: 1; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
+    .slot-customer { font-size: 13px; font-weight: 500; }
+    .slot-meta { font-size: 11px; color: #999; }
+    .slot-status { display: flex; gap: 6px; align-items: center; }
+    .week-grid { display: grid; grid-template-columns: 80px 1fr 1fr; gap: 1px; background: #e0ddd6; border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
+    .week-header { background: #1a472a; color: #fff; padding: 10px 8px; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; text-align: center; }
+    .week-day-label { background: #fff; padding: 8px; font-size: 11px; font-weight: 700; color: #555; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .week-day-label .day-num { font-size: 18px; font-weight: 700; color: #1a472a; }
+    .week-day-label .day-name { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
+    .week-day-label.today { background: #f0f7f2; }
+    .week-cell { background: #fff; padding: 6px 8px; min-height: 50px; }
+    .week-cell.today { background: #f0f7f2; }
+    .week-booking { font-size: 10px; padding: 3px 6px; margin-bottom: 2px; border-radius: 3px; background: #e8f0eb; color: #1a472a; border-left: 2px solid #1a472a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+    .week-booking:hover { background: #d0e4d5; }
+    .week-nav { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+    .week-nav span { font-size: 14px; font-weight: 700; letter-spacing: 1px; }
+    @media (max-width: 768px) {
+      .t-head, .t-row { font-size: 11px; padding: 8px 12px; }
+      .header-stats { gap: 12px; }
+      .stat-val { font-size: 18px; }
+      .summary { flex-wrap: wrap; gap: 12px; }
+      .modal { width: 95%; padding: 20px; }
+      .week-grid { grid-template-columns: 60px 1fr 1fr; }
+      .slot-time { width: 90px; font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback } = React;
+    const SUPABASE_URL = "https://uxpkqbioxoezjmcoylkw.supabase.co";
+    const TIERS = ["Non-Member", "Patron", "Starter", "Green Jacket", "Unlimited"];
+    const TIER_COLORS = {"Non-Member":"#78716c",Patron:"#4a7c59",Starter:"#2d6a9f","Green Jacket":"#1a472a",Unlimited:"#a67c00"};
+    const BAYS = ["Bay 1", "Bay 2"];
+    const TZ = "America/Los_Angeles";
+
+    function toLocal(iso) { return new Date(iso); }
+    function fmtTime(d) { return d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",timeZone:TZ}); }
+    function fmtDate(d) { return d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",timeZone:TZ}); }
+    function fmtDateLong(d) { return d.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric",timeZone:TZ}); }
+    function fmtDateShort(d) { return d.toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:TZ}); }
+    function localDateStr(d) { return d.toLocaleDateString("en-CA",{timeZone:TZ}); }
+    function todayStr() { return localDateStr(new Date()); }
+    function monthLabel(iso) { const d=new Date(iso); const n=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]; return `${n[d.getUTCMonth()]} ${d.getUTCFullYear()}`; }
+
+    async function supa(key,table,params="") { const r=await fetch(`${SUPABASE_URL}/rest/v1/${table}${params}`,{headers:{apikey:key,Authorization:`Bearer ${key}`,"Content-Type":"application/json",Prefer:"return=representation"}}); if(!r.ok) throw new Error(`${r.status} ${r.statusText}`); return r.json(); }
+    async function supaPost(key,table,data) { const r=await fetch(`${SUPABASE_URL}/rest/v1/${table}`,{method:"POST",headers:{apikey:key,Authorization:`Bearer ${key}`,"Content-Type":"application/json",Prefer:"return=representation,resolution=merge-duplicates"},body:JSON.stringify(data)}); if(!r.ok){const e=await r.text();throw new Error(`${r.status}: ${e}`);}return r.json(); }
+    async function supaPatch(key,table,match,data) { const p=Object.entries(match).map(([k,v])=>`${k}=eq.${encodeURIComponent(v)}`).join("&"); const r=await fetch(`${SUPABASE_URL}/rest/v1/${table}?${p}`,{method:"PATCH",headers:{apikey:key,Authorization:`Bearer ${key}`,"Content-Type":"application/json",Prefer:"return=representation"},body:JSON.stringify(data)}); if(!r.ok)throw new Error(`${r.status} ${r.statusText}`); return r.json(); }
+    async function supaDelete(key,table,match) { const p=Object.entries(match).map(([k,v])=>`${k}=eq.${encodeURIComponent(v)}`).join("&"); const r=await fetch(`${SUPABASE_URL}/rest/v1/${table}?${p}`,{method:"DELETE",headers:{apikey:key,Authorization:`Bearer ${key}`,"Content-Type":"application/json",Prefer:"return=representation"}}); if(!r.ok)throw new Error(`${r.status} ${r.statusText}`); return r.json(); }
+
+    function useToast() { const [t,setT]=useState(null); const show=(msg,type="success")=>{setT({msg,type});setTimeout(()=>setT(null),3000);}; return {show,el:t?React.createElement("div",{className:`toast ${t.type}`},t.msg):null}; }
+
+    function TierBadge({tier}){return <span className="badge" style={{background:TIER_COLORS[tier]||'#888'}}>{tier}</span>;}
+    function TierSelect({value,onChange}){return <select className="tier-select" value={value} onChange={e=>onChange(e.target.value)}>{TIERS.map(t=><option key={t} value={t}>{t}</option>)}</select>;}
+    function hrs(n){return Number(n).toFixed(1)+"h";}
+    function dlr(n){return "$"+Number(n).toFixed(2);}
+    function allowanceDisplay(n){return Number(n)>=99999?"∞":Number(n)+"h";}
+
+    function Modal({open,onClose,children}){if(!open)return null;return <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}><div className="modal">{children}</div></div>;}
+    function ConfirmModal({open,onClose,onConfirm,title,message,detail,confirmLabel="Confirm",danger=false}){
+      return <Modal open={open} onClose={onClose}><div className="confirm-box"><h2 style={{fontSize:16,letterSpacing:2,textTransform:'uppercase',color:danger?'#cc4455':'#1a472a',marginBottom:16}}>{title}</h2><p>{message}</p>{detail&&<span className="muted">{detail}</span>}<div className="modal-actions" style={{justifyContent:'center'}}><button className="act-btn" onClick={onClose}>Nevermind</button><button className={`act-btn ${danger?'danger':'primary'}`} onClick={onConfirm}>{confirmLabel}</button></div></div></Modal>;
+    }
+
+    function BookingFormModal({open,onClose,onSave,booking,customers,presetEmail}){
+      const isEdit=!!booking;
+      const [email,setEmail]=useState(""); const [name,setName]=useState(""); const [date,setDate]=useState(""); const [startTime,setStartTime]=useState("10:00"); const [endTime,setEndTime]=useState("11:00"); const [bay,setBay]=useState("Bay 1"); const [saving,setSaving]=useState(false);
+      useEffect(()=>{
+        if(open&&booking){setEmail(booking.customer_email||"");setName(booking.customer_name||"");const s=toLocal(booking.booking_start),e=toLocal(booking.booking_end);setDate(s.toLocaleDateString("en-CA",{timeZone:TZ}));setStartTime(s.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",timeZone:TZ}));setEndTime(e.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",timeZone:TZ}));setBay(booking.bay||"Bay 1");}
+        else if(open){setEmail(presetEmail||"");setName("");if(presetEmail){const m=customers.find(c=>c.email===presetEmail);if(m)setName(m.name);}setDate(todayStr());setStartTime("10:00");setEndTime("11:00");setBay("Bay 1");}
+      },[open,booking,presetEmail]);
+      function handleEmailChange(v){setEmail(v);const m=customers.find(c=>c.email===v);if(m)setName(m.name);}
+      async function handleSave(){if(!email||!date||!startTime||!endTime)return;setSaving(true);const sD=new Date(`${date}T${startTime}:00`),eD=new Date(`${date}T${endTime}:00`);const dur=Math.max(0,(eD-sD)/3600000);await onSave({customer_email:email.trim().toLowerCase(),customer_name:name.trim()||email.trim(),booking_start:sD.toISOString(),booking_end:eD.toISOString(),duration_hours:Math.round(dur*100)/100,bay,booking_status:"Confirmed",...(isEdit?{}:{booking_id:`manual_${Date.now()}`})});setSaving(false);}
+      return <Modal open={open} onClose={onClose}>
+        <h2>{isEdit?"Edit Booking":"Add Manual Booking"}</h2>
+        <div className="modal-field"><label>Customer Email</label>{isEdit?<input type="text" value={email} disabled style={{opacity:0.6}}/>:<><input type="email" list="cl" value={email} onChange={e=>handleEmailChange(e.target.value)} placeholder="customer@email.com"/><datalist id="cl">{customers.map(c=><option key={c.email} value={c.email}>{c.name}</option>)}</datalist></>}</div>
+        <div className="modal-field"><label>Name</label><input type="text" value={name} onChange={e=>setName(e.target.value)} placeholder="Full name"/></div>
+        <div className="modal-field"><label>Date</label><input type="date" value={date} onChange={e=>setDate(e.target.value)}/></div>
+        <div style={{display:'flex',gap:12}}><div className="modal-field" style={{flex:1}}><label>Start</label><input type="time" value={startTime} onChange={e=>setStartTime(e.target.value)}/></div><div className="modal-field" style={{flex:1}}><label>End</label><input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)}/></div></div>
+        {startTime&&endTime&&date&&<div style={{fontSize:12,color:'#888',marginBottom:12}}>Duration: {Math.max(0,(new Date(`${date}T${endTime}:00`)-new Date(`${date}T${startTime}:00`))/3600000).toFixed(1)}h</div>}
+        <div className="modal-field"><label>Bay</label><select value={bay} onChange={e=>setBay(e.target.value)}>{BAYS.map(b=><option key={b} value={b}>{b}</option>)}</select></div>
+        <div className="modal-actions"><button className="act-btn" onClick={onClose}>Cancel</button><button className="act-btn primary" onClick={handleSave} disabled={saving||!email||!date}>{saving?"Saving...":isEdit?"Save Changes":"Add Booking"}</button></div>
+      </Modal>;
+    }
+
+    function App(){
+      const [apiKey,setApiKey]=useState(localStorage.getItem("hg-key")||"");
+      const [keyInput,setKeyInput]=useState(localStorage.getItem("hg-key")||"");
+      const [connected,setConnected]=useState(false); const [error,setError]=useState(""); const [loading,setLoading]=useState(false);
+      const [members,setMembers]=useState([]); const [bookings,setBookings]=useState([]); const [tierConfig,setTierConfig]=useState([]);
+      const [monthlyUsage,setMonthlyUsage]=useState([]); const [payments,setPayments]=useState([]);
+      const [view,setView]=useState("today"); const [selectedMonth,setSelectedMonth]=useState(null); const [selectedMember,setSelectedMember]=useState(null);
+      const [search,setSearch]=useState(""); const [saving,setSaving]=useState(false); const [showCancelled,setShowCancelled]=useState(false);
+      const [addModalOpen,setAddModalOpen]=useState(false); const [addPresetEmail,setAddPresetEmail]=useState("");
+      const [editBooking,setEditBooking]=useState(null); const [cancelTarget,setCancelTarget]=useState(null);
+      const [deleteTarget,setDeleteTarget]=useState(null); const [chargeTarget,setChargeTarget]=useState(null);
+      const [linkingStripe,setLinkingStripe]=useState(null); const [weekOffset,setWeekOffset]=useState(0);
+      const [custSort,setCustSort]=useState("hours"); const [custTierFilter,setCustTierFilter]=useState("all");
+      const toast=useToast();
+
+      const connect=useCallback(async(key)=>{
+        if(!key)return;setError("");setLoading(true);
+        try{const [m,b,tc,mu,py]=await Promise.all([supa(key,"members","?order=name"),supa(key,"bookings","?order=booking_start.desc&limit=5000"),supa(key,"tier_config","?order=display_order"),supa(key,"monthly_usage","?order=billing_month.desc,overage_charge.desc"),supa(key,"payments","?order=created_at.desc").catch(()=>[])]);
+        setMembers(m);setBookings(b);setTierConfig(tc);setMonthlyUsage(mu);setPayments(py);setConnected(true);setApiKey(key);localStorage.setItem("hg-key",key);}catch(e){setError(`Connection failed: ${e.message}`);setConnected(false);}setLoading(false);
+      },[]);
+      useEffect(()=>{if(apiKey)connect(apiKey);},[]);
+      const refresh=()=>connect(apiKey);
+      useEffect(()=>{if(!connected)return;const iv=setInterval(refresh,60000);return()=>clearInterval(iv);},[connected,apiKey]);
+
+      async function handleCancelBooking(){if(!cancelTarget)return;setSaving(true);try{await supaPatch(apiKey,"bookings",{booking_id:cancelTarget.booking_id},{booking_status:"Cancelled"});toast.show("Booking cancelled");setCancelTarget(null);await refresh();}catch(e){toast.show(`Failed: ${e.message}`,"error");}setSaving(false);}
+      async function handleDeleteBooking(){if(!deleteTarget)return;setSaving(true);try{await supaDelete(apiKey,"bookings",{booking_id:deleteTarget.booking_id});toast.show("Booking deleted");setDeleteTarget(null);await refresh();}catch(e){toast.show(`Failed: ${e.message}`,"error");}setSaving(false);}
+      async function handleSaveBooking(data){setSaving(true);try{if(editBooking){await supaPatch(apiKey,"bookings",{booking_id:editBooking.booking_id},data);toast.show("Booking updated");setEditBooking(null);}else{await supaPost(apiKey,"bookings",data);toast.show("Booking added");setAddModalOpen(false);}await refresh();}catch(e){toast.show(`Failed: ${e.message}`,"error");}setSaving(false);}
+      async function handleRestoreBooking(b){setSaving(true);try{await supaPatch(apiKey,"bookings",{booking_id:b.booking_id},{booking_status:"Confirmed"});toast.show("Restored");await refresh();}catch(e){toast.show(`Failed: ${e.message}`,"error");}setSaving(false);}
+      async function updateTier(email,tier,name){setSaving(true);try{const ex=members.find(m=>m.email===email);if(ex)await supaPatch(apiKey,"members",{email},{tier});else await supaPost(apiKey,"members",{email,name:name||email,tier});toast.show(`${name||email} → ${tier}`);await refresh();}catch(e){toast.show(`Failed: ${e.message}`,"error");}setSaving(false);}
+
+      async function handleChargeOverage(){if(!chargeTarget)return;setSaving(true);try{const resp=await fetch("/api/stripe-charge",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${apiKey}`},body:JSON.stringify({stripe_customer_id:chargeTarget.stripe_customer_id,amount_cents:Math.round(chargeTarget.amount*100),description:`Hour Golf overage — ${monthLabel(chargeTarget.month)}`,member_email:chargeTarget.email,billing_month:chargeTarget.month})});const data=await resp.json();if(!resp.ok)throw new Error(data.detail||data.error);await supaPost(apiKey,"payments",{member_email:chargeTarget.email,billing_month:chargeTarget.month,amount_cents:Math.round(chargeTarget.amount*100),stripe_payment_intent_id:data.payment_intent_id,status:"succeeded",description:`Overage — ${monthLabel(chargeTarget.month)}`});toast.show(`Charged $${chargeTarget.amount.toFixed(2)}`);setChargeTarget(null);await refresh();}catch(e){toast.show(`Charge failed: ${e.message}`,"error");}setSaving(false);}
+      async function handleLinkStripe(email,name){setLinkingStripe(email);try{const resp=await fetch("/api/stripe-lookup",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${apiKey}`},body:JSON.stringify({email})});const data=await resp.json();if(!resp.ok)throw new Error(data.detail||data.error);if(!data.found||data.customers.length===0){toast.show(`No Stripe customer for ${email}`,"error");setLinkingStripe(null);return;}await supaPatch(apiKey,"members",{email},{stripe_customer_id:data.customers[0].id});toast.show(`Linked ${name||email}`);await refresh();}catch(e){toast.show(`Link failed: ${e.message}`,"error");}setLinkingStripe(null);}
+      function isOveragePaid(email,month){return payments.some(p=>p.member_email===email&&p.billing_month===month&&p.status==="succeeded");}
+
+      const activeBookings=useMemo(()=>bookings.filter(b=>b.booking_status!=="Cancelled"),[bookings]);
+      const allMonths=useMemo(()=>{const s=new Set(monthlyUsage.map(r=>r.billing_month));return [...s].sort().reverse();},[monthlyUsage]);
+      const activeMonth=selectedMonth||allMonths[0]||"";
+      const currentData=useMemo(()=>monthlyUsage.filter(r=>r.billing_month===activeMonth),[monthlyUsage,activeMonth]);
+      const membersMonth=currentData.filter(r=>r.tier!=="Non-Member");
+      const nonMembers=currentData.filter(r=>r.tier==="Non-Member");
+      const totalOverage=membersMonth.reduce((s,r)=>s+Number(r.overage_charge||0),0);
+      const totalMemberHrs=membersMonth.reduce((s,r)=>s+Number(r.total_hours||0),0);
+
+      const allCustomers=useMemo(()=>{const map={};activeBookings.forEach(b=>{if(!map[b.customer_email])map[b.customer_email]={email:b.customer_email,name:b.customer_name,hrs:0,cnt:0};map[b.customer_email].hrs+=Number(b.duration_hours||0);map[b.customer_email].cnt++;if(b.customer_name)map[b.customer_email].name=b.customer_name;});return Object.values(map);},[activeBookings]);
+      const customerList=useMemo(()=>{const map={};bookings.forEach(b=>{if(!map[b.customer_email])map[b.customer_email]={email:b.customer_email,name:b.customer_name};if(b.customer_name)map[b.customer_email].name=b.customer_name;});return Object.values(map).sort((a,b)=>(a.name||'').localeCompare(b.name||''));},[bookings]);
+
+      const todayBookings=useMemo(()=>{const today=todayStr();return activeBookings.filter(b=>localDateStr(toLocal(b.booking_start))===today).sort((a,b)=>new Date(a.booking_start)-new Date(b.booking_start));},[activeBookings]);
+      const todayByBay=useMemo(()=>{const r={};BAYS.forEach(bay=>{r[bay]=todayBookings.filter(b=>b.bay===bay);});return r;},[todayBookings]);
+      const now=new Date();
+      function bookingStatus(b){const s=toLocal(b.booking_start),e=toLocal(b.booking_end);if(now>=s&&now<=e)return "now";if(now<s)return "upcoming";return "past";}
+
+      const weekDays=useMemo(()=>{const days=[];const base=new Date();base.setDate(base.getDate()-base.getDay()+(weekOffset*7));for(let i=0;i<7;i++){const d=new Date(base);d.setDate(base.getDate()+i);days.push(d);}return days;},[weekOffset]);
+      const weekBookings=useMemo(()=>{const r={};weekDays.forEach(d=>{const ds=localDateStr(d);BAYS.forEach(bay=>{r[`${ds}-${bay}`]=activeBookings.filter(b=>localDateStr(toLocal(b.booking_start))===ds&&b.bay===bay).sort((a,b)=>new Date(a.booking_start)-new Date(b.booking_start));});});return r;},[weekDays,activeBookings]);
+
+      const todayHours=todayBookings.reduce((s,b)=>s+Number(b.duration_hours||0),0);
+      const todayRevenue=useMemo(()=>todayBookings.reduce((s,b)=>{const m=members.find(x=>x.email===b.customer_email);if(m&&m.tier!=="Non-Member")return s;return s+Number(b.duration_hours||0)*60;},0),[todayBookings,members]);
+
+      const filteredCustomers=useMemo(()=>{let list=[...allCustomers];const q=search.toLowerCase();if(q)list=list.filter(c=>(c.name||'').toLowerCase().includes(q)||c.email.toLowerCase().includes(q));if(custTierFilter!=="all")list=list.filter(c=>{const m=members.find(x=>x.email===c.email);return (m?.tier||"Non-Member")===custTierFilter;});if(custSort==="hours")list.sort((a,b)=>b.hrs-a.hrs);else if(custSort==="name")list.sort((a,b)=>(a.name||'').localeCompare(b.name||''));else if(custSort==="sessions")list.sort((a,b)=>b.cnt-a.cnt);return list;},[allCustomers,search,custSort,custTierFilter,members]);
+
+      const selData=useMemo(()=>{if(!selectedMember)return null;const mb=bookings.filter(b=>b.customer_email===selectedMember);return{member:members.find(m=>m.email===selectedMember),bookings:showCancelled?mb:mb.filter(b=>b.booking_status!=="Cancelled"),cancelledCount:mb.filter(b=>b.booking_status==="Cancelled").length,usage:monthlyUsage.filter(r=>r.customer_email===selectedMember),customer:allCustomers.find(c=>c.email===selectedMember)};},[selectedMember,members,bookings,monthlyUsage,allCustomers,showCancelled]);
+
+      if(!connected)return <div className="setup"><div className="logo" style={{fontSize:28,color:'#1a472a'}}>HOUR GOLF</div><div className="logo-sub" style={{color:'#888',marginBottom:32}}>Admin Dashboard</div><label style={{display:'block',fontSize:12,fontWeight:700,letterSpacing:1,textTransform:'uppercase',color:'#555',marginBottom:8,textAlign:'left'}}>Supabase API Key</label><input className="setup-input" type="password" value={keyInput} onChange={e=>setKeyInput(e.target.value)} placeholder="eyJhbGciOiJIUzI1NiIs..."/>{error&&<p className="error">{error}</p>}<button className="setup-btn" onClick={()=>connect(keyInput)} disabled={!keyInput||loading}>{loading?"Connecting...":"Connect"}</button></div>;
+
+      function openAdd(email){setAddPresetEmail(email||"");setEditBooking(null);setAddModalOpen(true);}
+
+      return (<div>
+        <header className="header"><div className="header-inner"><div><div className="logo">HOUR GOLF</div><div className="logo-sub">Admin Dashboard</div></div><div className="header-stats">
+          <div className="stat-box"><span className="stat-val">{todayBookings.length}</span><span className="stat-lbl">Today</span></div>
+          <div className="stat-box"><span className="stat-val">{todayHours.toFixed(1)}h</span><span className="stat-lbl">Bay Hrs</span></div>
+          <div className="stat-box"><span className="stat-val">{members.length}</span><span className="stat-lbl">Members</span></div>
+          <div className="stat-box"><span className="stat-val">{activeBookings.length}</span><span className="stat-lbl">All Time</span></div>
+          <button className="act-btn primary" style={{color:'#fff',borderColor:'rgba(255,255,255,0.3)',fontSize:11}} onClick={()=>openAdd()}>+ Booking</button>
+          <button className="refresh-btn" onClick={refresh} disabled={loading}>{loading?"↻":"↻"}</button>
+        </div></div></header>
+
+        <nav className="nav">{[["today","Today",todayBookings.length],["week","Week"],["overview","Monthly"],["customers","Customers"],["tiers","Config"]].map(([k,l,cnt])=>(<button key={k} className={`nav-btn ${view===k?'active':''}`} onClick={()=>{setView(k);setSelectedMember(null)}}>{l}{cnt>0&&<span className="nav-count">{cnt}</span>}</button>))}
+        {selData&&<button className={`nav-btn ${view==='detail'?'active':''}`} onClick={()=>setView('detail')}>{selData.customer?.name||selectedMember}</button>}</nav>
+
+        {saving&&<div className="saving-bar">Saving...</div>}
+
+        {view==="today"&&(<div className="content">
+          <div className="summary">
+            <div className="sum-item"><span className="sum-val">{todayBookings.length}</span><span className="sum-lbl">Bookings</span></div>
+            <div className="sum-item"><span className="sum-val">{todayHours.toFixed(1)}h</span><span className="sum-lbl">Bay Hours</span></div>
+            <div className="sum-item"><span className="sum-val">${todayRevenue.toFixed(0)}</span><span className="sum-lbl">Est Revenue</span></div>
+            <div className="sum-item"><span className="sum-val">{todayBookings.filter(b=>bookingStatus(b)==="upcoming").length}</span><span className="sum-lbl">Upcoming</span></div>
+          </div>
+          {BAYS.map(bay=>(<div key={bay} className="bay-lane"><div className="bay-label">{bay} — {fmtDateLong(new Date())}</div>
+            {todayByBay[bay].length===0&&<div className="time-slot"><div className="slot-time">—</div><div className="slot-info"><span className="muted">No bookings</span></div></div>}
+            {todayByBay[bay].map(b=>{const s=toLocal(b.booking_start),e=toLocal(b.booking_end);const st=bookingStatus(b);const mem=members.find(x=>x.email===b.customer_email);return(
+              <div key={b.booking_id} className={`time-slot ${st}`}><div className="slot-time">{fmtTime(s)}–{fmtTime(e)}</div><div className="slot-info"><div>
+                <div className="slot-customer" style={{cursor:'pointer'}} onClick={()=>{setSelectedMember(b.customer_email);setView('detail')}}>{b.customer_name}</div>
+                <div className="slot-meta">{hrs(b.duration_hours)} {mem&&mem.tier!=='Non-Member'&&<TierBadge tier={mem.tier}/>}</div></div>
+                <div className="slot-status">{st==="now"&&<span className="badge" style={{background:'#1a472a',fontSize:9}}>NOW</span>}{st==="upcoming"&&<span className="badge badge-sm" style={{background:'#2d6a9f'}}>NEXT</span>}
+                <button className="act-btn" style={{fontSize:10}} onClick={()=>setEditBooking(b)}>Edit</button><button className="act-btn danger" style={{fontSize:10}} onClick={()=>setCancelTarget(b)}>Cancel</button></div></div></div>);})}
+          </div>))}
+        </div>)}
+
+        {view==="week"&&(<div className="content">
+          <div className="week-nav"><button className="act-btn" onClick={()=>setWeekOffset(w=>w-1)}>← Prev</button><button className="act-btn" onClick={()=>setWeekOffset(0)}>This Week</button><button className="act-btn" onClick={()=>setWeekOffset(w=>w+1)}>Next →</button><span style={{marginLeft:8}}>{fmtDateShort(weekDays[0])} – {fmtDateShort(weekDays[6])}</span></div>
+          <div className="week-grid"><div className="week-header">Day</div>{BAYS.map(b=><div key={b} className="week-header">{b}</div>)}
+            {weekDays.map(d=>{const ds=localDateStr(d);const isT=ds===todayStr();return React.createElement(React.Fragment,{key:ds},
+              <div className={`week-day-label ${isT?'today':''}`}><span className="day-name">{d.toLocaleDateString("en-US",{weekday:"short",timeZone:TZ})}</span><span className="day-num">{d.toLocaleDateString("en-US",{day:"numeric",timeZone:TZ})}</span></div>,
+              ...BAYS.map(bay=>{const bks=weekBookings[`${ds}-${bay}`]||[];return <div key={bay} className={`week-cell ${isT?'today':''}`}>{bks.map(b=><div key={b.booking_id} className="week-booking" onClick={()=>{setSelectedMember(b.customer_email);setView('detail')}} title={`${b.customer_name} ${fmtTime(toLocal(b.booking_start))}–${fmtTime(toLocal(b.booking_end))}`}>{fmtTime(toLocal(b.booking_start))} {b.customer_name?.split(' ')[0]}</div>)}</div>;})
+            );})}
+          </div>
+        </div>)}
+
+        {view==="overview"&&(<div className="content">
+          <div className="month-sel">{allMonths.map(m=><button key={m} className={`mo-btn ${m===activeMonth?'active':''}`} onClick={()=>setSelectedMonth(m)}>{monthLabel(m)}</button>)}</div>
+          {membersMonth.length>0&&<div className="summary"><div className="sum-item"><span className="sum-val">{totalMemberHrs.toFixed(1)}h</span><span className="sum-lbl">Member Hours</span></div><div className="sum-item"><span className={`sum-val ${totalOverage>0?'red':'green'}`}>{dlr(totalOverage)}</span><span className="sum-lbl">Overage Due</span></div><div className="sum-item"><span className="sum-val">{membersMonth.filter(r=>Number(r.overage_hours)>0).length}</span><span className="sum-lbl">Over Allotment</span></div></div>}
+          {membersMonth.length>0&&<><h2 className="section-head">Members — {monthLabel(activeMonth)}</h2><div className="table"><div className="t-head"><span style={{flex:2}}>Member</span><span style={{flex:1}}>Tier</span><span style={{flex:1}} className="text-r">Used</span><span style={{flex:1}} className="text-r">Allotment</span><span style={{flex:1}} className="text-r">Overage</span><span style={{flex:1}} className="text-r">Charge</span><span style={{flex:1}} className="text-r">Status</span></div>
+            {membersMonth.map(r=>{const ho=Number(r.overage_charge)>0;const pd=isOveragePaid(r.customer_email,r.billing_month);return(<div key={r.customer_email} className="t-row clickable" onClick={()=>{setSelectedMember(r.customer_email);setView('detail')}}><span style={{flex:2}}><strong>{r.customer_name}</strong><br/><span className="email-sm">{r.customer_email}</span></span><span style={{flex:1}}><TierBadge tier={r.tier}/></span><span style={{flex:1}} className="text-r tab-num">{hrs(r.total_hours)}</span><span style={{flex:1}} className="text-r tab-num">{allowanceDisplay(r.included_hours)}</span><span style={{flex:1}} className={`text-r tab-num ${Number(r.overage_hours)>0?'red':''}`}>{Number(r.overage_hours)>0?hrs(r.overage_hours):"—"}</span><span style={{flex:1}} className={`text-r tab-num ${ho?'red bold':''}`}>{ho?dlr(r.overage_charge):"—"}</span><span style={{flex:1}} className="text-r">{ho&&pd&&<span className="badge" style={{background:'#4a7c59',fontSize:9}}>PAID</span>}{ho&&!pd&&<span className="badge" style={{background:'#cc4455',fontSize:9}}>UNPAID</span>}{!ho&&<span className="muted">—</span>}</span></div>);})}</div></>}
+          <h2 className="section-head" style={{marginTop:32}}>Non-Members — {monthLabel(activeMonth)}</h2><div className="table"><div className="t-head"><span style={{flex:2}}>Customer</span><span style={{flex:1}} className="text-r">Hours</span><span style={{flex:1}} className="text-r">Sessions</span><span style={{flex:1}} className="text-r">Revenue</span><span style={{flex:1}} className="text-c">Assign</span></div>
+            {nonMembers.slice(0,25).map(r=>(<div key={r.customer_email} className="t-row"><span style={{flex:2,cursor:'pointer'}} onClick={()=>{setSelectedMember(r.customer_email);setView('detail')}}><strong>{r.customer_name}</strong><br/><span className="email-sm">{r.customer_email}</span></span><span style={{flex:1}} className="text-r tab-num">{hrs(r.total_hours)}</span><span style={{flex:1}} className="text-r tab-num">{r.booking_count}</span><span style={{flex:1}} className="text-r tab-num">${(Number(r.total_hours)*60).toFixed(0)}</span><span style={{flex:1}} className="text-c"><select className="tier-select" value="Non-Member" onChange={e=>updateTier(r.customer_email,e.target.value,r.customer_name)}><option value="Non-Member">—</option>{TIERS.filter(t=>t!=='Non-Member').map(t=><option key={t} value={t}>{t}</option>)}</select></span></div>))}</div>
+        </div>)}
+
+        {view==="customers"&&(<div className="content">
+          <input className="search-input" type="text" placeholder="Search by name or email..." value={search} onChange={e=>setSearch(e.target.value)}/>
+          <div className="filter-bar"><label>Sort:</label><select value={custSort} onChange={e=>setCustSort(e.target.value)}><option value="hours">Total Hours</option><option value="sessions">Sessions</option><option value="name">Name</option></select><label style={{marginLeft:12}}>Tier:</label><select value={custTierFilter} onChange={e=>setCustTierFilter(e.target.value)}><option value="all">All</option>{TIERS.map(t=><option key={t} value={t}>{t}</option>)}</select><span className="muted" style={{marginLeft:12}}>{filteredCustomers.length} results</span></div>
+          <div className="table"><div className="t-head"><span style={{flex:2}}>Customer</span><span style={{flex:1}}>Tier</span><span style={{flex:1}} className="text-r">Total Hours</span><span style={{flex:1}} className="text-r">Sessions</span><span style={{flex:1}} className="text-c">Assign</span></div>
+            {filteredCustomers.map(c=>{const m=members.find(x=>x.email===c.email);const tier=m?.tier||'Non-Member';return(<div key={c.email} className="t-row"><span style={{flex:2,cursor:'pointer'}} onClick={()=>{setSelectedMember(c.email);setView('detail')}}><strong>{c.name}</strong><br/><span className="email-sm">{c.email}</span></span><span style={{flex:1}}><TierBadge tier={tier}/></span><span style={{flex:1}} className="text-r tab-num">{c.hrs.toFixed(1)}h</span><span style={{flex:1}} className="text-r tab-num">{c.cnt}</span><span style={{flex:1}} className="text-c"><TierSelect value={tier} onChange={t=>updateTier(c.email,t,c.name)}/></span></div>);})}</div>
+        </div>)}
+
+        {view==="tiers"&&(<div className="content">
+          <h2 className="section-head">Tier Configuration</h2><div className="table"><div className="t-head"><span style={{flex:2}}>Tier</span><span style={{flex:1}} className="text-r">Monthly</span><span style={{flex:1}} className="text-r">Included</span><span style={{flex:1}} className="text-r">Overage</span><span style={{flex:1}} className="text-r">Discount</span></div>
+            {tierConfig.map(tc=>(<div key={tc.tier} className="t-row"><span style={{flex:2}}><TierBadge tier={tc.tier}/></span><span style={{flex:1}} className="text-r tab-num">${Number(tc.monthly_fee).toFixed(0)}/mo</span><span style={{flex:1}} className="text-r tab-num">{Number(tc.included_hours)>=99999?"Unlimited":Number(tc.included_hours)+"h"}</span><span style={{flex:1}} className="text-r tab-num">${Number(tc.overage_rate)}/hr</span><span style={{flex:1}} className="text-r tab-num">{tc.pro_shop_discount}%</span></div>))}</div>
+          <h2 className="section-head" style={{marginTop:32}}>Current Members</h2><div className="table"><div className="t-head"><span style={{flex:2}}>Member</span><span style={{flex:1}}>Tier</span><span style={{flex:1}} className="text-r">Rate</span><span style={{flex:1}}>Stripe</span></div>
+            {members.map(m=>(<div key={m.email} className="t-row"><span style={{flex:2}}><strong>{m.name}</strong><br/><span className="email-sm">{m.email}</span></span><span style={{flex:1}}><TierSelect value={m.tier} onChange={t=>updateTier(m.email,t,m.name)}/></span><span style={{flex:1}} className="text-r tab-num">{m.monthly_rate?`$${Number(m.monthly_rate).toFixed(0)}`:"—"}</span><span style={{flex:1}}>{m.stripe_customer_id?<span className="email-sm">{m.stripe_customer_id.slice(0,14)}...</span>:<button className="act-btn primary" style={{fontSize:10}} onClick={()=>handleLinkStripe(m.email,m.name)} disabled={linkingStripe===m.email}>{linkingStripe===m.email?"...":"Link Stripe"}</button>}</span></div>))}</div>
+        </div>)}
+
+        {view==="detail"&&selData&&(<div className="content">
+          <div className="detail-header"><div><h2 style={{margin:0,fontSize:18}}>{selData.customer?.name||selectedMember}</h2><span className="email-sm">{selectedMember}</span>{selData.member?.stripe_customer_id&&<span className="muted" style={{marginLeft:8}}>Stripe: {selData.member.stripe_customer_id.slice(0,14)}...</span>}</div>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}><button className="act-btn primary" onClick={()=>openAdd(selectedMember)}>+ Add Booking</button><TierSelect value={selData.member?.tier||'Non-Member'} onChange={t=>updateTier(selectedMember,t,selData.customer?.name)}/></div></div>
+
+          <h3 className="section-head">Monthly Breakdown</h3><div className="table"><div className="t-head"><span style={{flex:1}}>Month</span><span style={{flex:1}} className="text-r">Hours</span><span style={{flex:1}} className="text-r">Allotment</span><span style={{flex:1}} className="text-r">Overage</span><span style={{flex:1}} className="text-r">Charge</span><span style={{flex:1}} className="text-r">Status</span></div>
+            {selData.usage.map(u=>{const ho=Number(u.overage_charge)>0;const pd=isOveragePaid(u.customer_email,u.billing_month);const mr=members.find(m=>m.email===u.customer_email);const hs=!!mr?.stripe_customer_id;return(
+              <div key={u.billing_month} className="t-row"><span style={{flex:1}}>{monthLabel(u.billing_month)}</span><span style={{flex:1}} className="text-r tab-num">{hrs(u.total_hours)}</span><span style={{flex:1}} className="text-r tab-num">{allowanceDisplay(u.included_hours)}</span><span style={{flex:1}} className={`text-r tab-num ${Number(u.overage_hours)>0?'red':''}`}>{Number(u.overage_hours)>0?hrs(u.overage_hours):"—"}</span><span style={{flex:1}} className={`text-r tab-num ${ho?'red bold':''}`}>{ho?dlr(u.overage_charge):"—"}</span>
+              <span style={{flex:1}} className="text-r">{ho&&pd&&<span className="badge" style={{background:'#4a7c59',fontSize:9}}>PAID</span>}{ho&&!pd&&hs&&<button className="act-btn primary" style={{fontSize:10}} disabled={saving} onClick={()=>setChargeTarget({email:u.customer_email,month:u.billing_month,amount:Number(u.overage_charge),stripe_customer_id:mr.stripe_customer_id,name:u.customer_name})}>Charge {dlr(u.overage_charge)}</button>}{ho&&!pd&&!hs&&<span className="muted" style={{fontSize:10}}>No Stripe</span>}{!ho&&<span className="muted">—</span>}</span></div>);})}</div>
+
+          <h3 className="section-head" style={{marginTop:24}}><span>All Bookings</span><span style={{display:'flex',gap:8,alignItems:'center'}}>{selData.cancelledCount>0&&<button className="act-btn" style={{fontSize:10}} onClick={()=>setShowCancelled(!showCancelled)}>{showCancelled?"Hide":"Show"} {selData.cancelledCount} cancelled</button>}<button className="act-btn primary" style={{fontSize:10}} onClick={()=>openAdd(selectedMember)}>+ Add</button></span></h3>
+          <div className="table"><div className="t-head"><span style={{flex:2}}>Date</span><span style={{flex:1}}>Bay</span><span style={{flex:1}} className="text-r">Duration</span><span style={{flex:1}} className="text-r">Actions</span></div>
+            {selData.bookings.map((b,i)=>{const d=toLocal(b.booking_start),e=toLocal(b.booking_end);const ic=b.booking_status==="Cancelled";const im=(b.booking_id||"").startsWith("manual_");return(
+              <div key={b.booking_id||i} className={`t-row ${ic?'cancelled':''}`}><span style={{flex:2}}>{fmtDate(d)} {fmtTime(d)}–{fmtTime(e)}{im&&<span className="badge badge-sm" style={{background:'#a67c00',marginLeft:6}}>MANUAL</span>}</span><span style={{flex:1}}>{b.bay}</span><span style={{flex:1}} className="text-r tab-num">{hrs(b.duration_hours)}</span>
+              <span style={{flex:1,display:'flex',gap:4,justifyContent:'flex-end'}}>{ic?<><button className="act-btn" style={{fontSize:10}} onClick={()=>handleRestoreBooking(b)} disabled={saving}>Restore</button><button className="act-btn danger" style={{fontSize:10}} onClick={()=>setDeleteTarget(b)} disabled={saving}>Delete</button></>:<><button className="act-btn" style={{fontSize:10}} onClick={()=>setEditBooking(b)} disabled={saving}>Edit</button><button className="act-btn danger" style={{fontSize:10}} onClick={()=>setCancelTarget(b)} disabled={saving}>Cancel</button></>}</span></div>);})}</div>
+        </div>)}
+
+        <BookingFormModal open={addModalOpen||!!editBooking} onClose={()=>{setAddModalOpen(false);setEditBooking(null)}} onSave={handleSaveBooking} booking={editBooking} customers={customerList} presetEmail={addPresetEmail}/>
+        <ConfirmModal open={!!cancelTarget} onClose={()=>setCancelTarget(null)} onConfirm={handleCancelBooking} title="Cancel Booking" message={cancelTarget?`Cancel ${cancelTarget.customer_name}'s booking on ${fmtDate(toLocal(cancelTarget.booking_start))}?`:""} detail="Monthly totals will update. You can restore later." confirmLabel="Cancel Booking" danger/>
+        <ConfirmModal open={!!deleteTarget} onClose={()=>setDeleteTarget(null)} onConfirm={handleDeleteBooking} title="Permanently Delete" message="Permanently delete this booking? Cannot be undone." detail={deleteTarget?`${deleteTarget.customer_name} — ${fmtDate(toLocal(deleteTarget.booking_start))}`:""} confirmLabel="Delete Forever" danger/>
+        <ConfirmModal open={!!chargeTarget} onClose={()=>setChargeTarget(null)} onConfirm={handleChargeOverage} title="Charge Card" message={chargeTarget?`Charge ${chargeTarget.name||chargeTarget.email} $${chargeTarget.amount.toFixed(2)} for ${monthLabel(chargeTarget.month)} overage?`:""} detail={chargeTarget?`Card on file via Stripe (${chargeTarget.stripe_customer_id.slice(0,14)}...)`:""} confirmLabel={`Charge $${chargeTarget?chargeTarget.amount.toFixed(2):'0'}`}/>
+        {toast.el}
+      </div>);
+    }
+    ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+  </script>
+</body>
+</html>
