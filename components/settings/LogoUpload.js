@@ -1,5 +1,4 @@
 import { useState, useRef } from "react";
-import { SUPABASE_URL } from "../../lib/constants";
 
 export default function LogoUpload({ settings, updateSetting, apiKey }) {
   const [uploading, setUploading] = useState(false);
@@ -11,27 +10,26 @@ export default function LogoUpload({ settings, updateSetting, apiKey }) {
     setUploading(true);
     setError("");
     try {
-      const ext = file.name.split(".").pop();
+      const ext = (file.name.split(".").pop() || "png").toLowerCase();
       const filename = `logo_${Date.now()}.${ext}`;
 
-      const resp = await fetch(`${SUPABASE_URL}/storage/v1/object/logos/${filename}`, {
+      // Route through our server-side endpoint, which uses the service role
+      // key to bypass storage RLS. The endpoint verifies the caller's JWT.
+      const resp = await fetch(`/api/upload-logo?filename=${encodeURIComponent(filename)}`, {
         method: "POST",
         headers: {
-          apikey: apiKey,
           Authorization: `Bearer ${apiKey}`,
-          "Content-Type": file.type,
-          "x-upsert": "true",
+          "Content-Type": file.type || "application/octet-stream",
         },
         body: file,
       });
 
+      const data = await resp.json().catch(() => ({}));
       if (!resp.ok) {
-        const text = await resp.text();
-        throw new Error(text);
+        throw new Error(data.detail || data.error || `Upload failed (${resp.status})`);
       }
 
-      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/logos/${filename}`;
-      updateSetting("logoUrl", publicUrl);
+      updateSetting("logoUrl", data.url);
     } catch (e) {
       setError(e.message || "Upload failed");
     }
