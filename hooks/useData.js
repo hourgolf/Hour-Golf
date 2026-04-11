@@ -39,7 +39,12 @@ export function useData(apiKey, connected) {
     }
   }, [setAll]);
 
-  // Auto-refresh every 60s
+  // Initial fetch when connected becomes true (after login or session restore)
+  useEffect(() => {
+    if (connected) refresh();
+  }, [connected, refresh]);
+
+  // Auto-refresh every 60s while connected
   useEffect(() => {
     if (!connected) return;
     const iv = setInterval(refresh, 60000);

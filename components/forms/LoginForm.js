@@ -1,10 +1,13 @@
 import { useState } from "react";
 
-export default function LoginForm({ onConnect, loading, error }) {
-  const [keyIn, setKeyIn] = useState(() => {
-    if (typeof window !== "undefined") return localStorage.getItem("hg-key") || "";
-    return "";
-  });
+export default function LoginForm({ onLogin, loading, error }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  function submit() {
+    if (!email || !password || loading) return;
+    onLogin(email, password);
+  }
 
   return (
     <div className="setup">
@@ -13,15 +16,24 @@ export default function LoginForm({ onConnect, loading, error }) {
         ADMIN DASHBOARD
       </div>
       <input
+        type="email"
+        autoComplete="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Email"
+        onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+      />
+      <input
         type="password"
-        value={keyIn}
-        onChange={(e) => setKeyIn(e.target.value)}
-        placeholder="Supabase API Key"
-        onKeyDown={(e) => { if (e.key === "Enter" && keyIn) onConnect(keyIn); }}
+        autoComplete="current-password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="Password"
+        onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
       />
       {error && <p className="err">{error}</p>}
-      <button onClick={() => onConnect(keyIn)} disabled={!keyIn || loading}>
-        {loading ? "..." : "Connect"}
+      <button onClick={submit} disabled={!email || !password || loading}>
+        {loading ? "..." : "Sign In"}
       </button>
     </div>
   );

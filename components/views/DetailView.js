@@ -29,14 +29,25 @@ export default function DetailView({
       allCust[b.customer_email].cnt++;
       if (b.customer_name) allCust[b.customer_email].name = b.customer_name;
     });
+    // The monthly_usage view returns columns as `email`/`name`, but older
+    // code expects `customer_email`/`customer_name`. Normalize so the rest
+    // of this component (and the Charge button) keeps working with either.
+    const usageRows = usage
+      .filter((r) => (r.customer_email || r.email) === selMember)
+      .map((r) => ({
+        ...r,
+        customer_email: r.customer_email || r.email || "",
+        customer_name: r.customer_name || r.name || "",
+      }));
     return {
       member: members.find((m) => m.email === selMember),
       bookings: filtered,
       cancelledCount: mb.filter((b) => b.booking_status === "Cancelled").length,
-      usage: usage.filter((r) => r.customer_email === selMember),
+      usage: usageRows,
       customer: allCust[selMember],
     };
   }, [selMember, members, bookings, usage, showCanc, bayFilter]);
+
 
   function isPaid(email, month) {
     return payments.some((p) => p.member_email === email && p.billing_month === month && p.status === "succeeded");

@@ -3,7 +3,7 @@ import ThemeCustomizer from "./ThemeCustomizer";
 import FontSelector from "./FontSelector";
 import LogoUpload from "./LogoUpload";
 
-export default function SettingsPanel({ open, onClose, settings, updateSetting, apiKey, onOpenSync }) {
+export default function SettingsPanel({ open, onClose, settings, updateSetting, apiKey, user, onLogout, onOpenSync }) {
   if (!open) return null;
 
   const checkLabelStyle = {
@@ -97,6 +97,25 @@ export default function SettingsPanel({ open, onClose, settings, updateSetting, 
           {"\u21C5"} Sync Bookings
         </button>
       </div>
+
+      {user && (
+        <div className="mf">
+          <label>Account</label>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
+            Signed in as {user.email}
+          </div>
+          <button
+            className="btn"
+            style={{ width: "100%", padding: "10px 12px", fontSize: 13 }}
+            onClick={async () => {
+              if (onLogout) await onLogout();
+              onClose();
+            }}
+          >
+            Sign Out
+          </button>
+        </div>
+      )}
 
       <div className="macts">
         <button className="btn primary" onClick={onClose}>Done</button>

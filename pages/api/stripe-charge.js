@@ -1,13 +1,17 @@
 import Stripe from "stripe";
+import { verifyAdmin } from "../../lib/api-helpers";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
-  const authHeader = req.headers.authorization || "";
-  const token = authHeader.replace("Bearer ", "");
-  if (token !== process.env.SUPABASE_ANON_KEY) return res.status(401).json({ error: "Unauthorized" });
+  const { user, reason } = await verifyAdmin(req);
+  if (!user) {
+    console.error("stripe-charge verifyAdmin failed:", reason);
+    return res.status(401).json({ error: "Unauthorized", detail: reason });
+  }
+
 
   const { stripe_customer_id, amount_cents, description, member_email, billing_month } = req.body;
 
