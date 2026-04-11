@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { supaPost, supaPatch, supaDelete } from "../lib/supabase";
 import { mL, lds, tds } from "../lib/format";
 import { useToast } from "../hooks/useToast";
@@ -25,15 +25,15 @@ import ConfigView from "../components/views/ConfigView";
 import DetailView from "../components/views/DetailView";
 
 export default function Dashboard() {
-  // Auth
-  const { apiKey, connected, loading, error, connect } = useAuth();
+  // Auth (email/password against Supabase Auth, gated by admins table)
+  const { apiKey, user, connected, authLoading, loading, error, login, logout } = useAuth();
 
   // Data
   const data = useData(apiKey, connected);
-  const { members, bookings, tierCfg, usage, payments, saving, setSaving, setAll, refresh } = data;
+  const { members, bookings, tierCfg, usage, payments, saving, setSaving, refresh } = data;
 
-  // Settings
-  const { settings, updateSetting } = useSettings();
+  // Settings (cloud-synced when connected, localStorage when not)
+  const { settings, updateSetting } = useSettings({ user, apiKey, connected });
 
   // Toast
   const { toast, show: showToast } = useToast();
@@ -58,19 +58,6 @@ export default function Dashboard() {
   const [chgTgt, setChgTgt] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
-
-  // Connect handler
-  function handleConnect(key) {
-    connect(key, (d) => setAll(d));
-  }
-
-  // Auto-connect on mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("hg-key");
-      if (saved) handleConnect(saved);
-    }
-  }, []);
 
   // Customer list for booking form autocomplete
   const custList = useMemo(() => {
@@ -285,13 +272,18 @@ export default function Dashboard() {
   });
 
   // --- Render ---
+
+  // While restoring session on mount, render nothing (avoids login flash)
+  if (authLoading) {
+    return <div className="setup"><div style={{ color: "var(--text-muted)", fontSize: 12 }}>Loading...</div></div>;
+  }
+
   if (!connected) {
-    return <LoginForm onConnect={handleConnect} loading={loading} error={error} />;
+    return <LoginForm onLogin={login} loading={loading} error={error} />;
   }
 
   return (
     <div>
-            <div className="sticky-top">
       <div className="sticky-top">
         <Header
           todayCount={todayBk.length}
@@ -317,8 +309,6 @@ export default function Dashboard() {
           onClearDetail={() => { setSelMember(null); }}
         />
       </div>
-
-
 
       {saving && <div className="saving">Saving...</div>}
 
@@ -456,9 +446,10 @@ export default function Dashboard() {
         settings={settings}
         updateSetting={updateSetting}
         apiKey={apiKey}
+        user={user}
+        onLogout={logout}
         onOpenSync={() => setSyncOpen(true)}
       />
-
 
       <SyncModal
         open={syncOpen}
