@@ -5,7 +5,7 @@ const DEFAULTS = {
   theme: "augusta",
   customColor: "",
   font: "'IBM Plex Mono', monospace",
-  fontSize: 13,
+  fontSize: 16,
   dark: false,
   density: "comfortable",
   logoUrl: "",
@@ -13,7 +13,7 @@ const DEFAULTS = {
   showLogo: true,
   showTitle: true,
   showSubtitle: true,
-  headerBtnSize: 11,
+  headerBtnSize: 16,
 };
 
 function loadSettings() {
@@ -26,7 +26,7 @@ function loadSettings() {
       theme: s.theme || DEFAULTS.theme,
       customColor: s.customColor || DEFAULTS.customColor,
       font: s.font || DEFAULTS.font,
-      fontSize: s.fontSize || DEFAULTS.fontSize,
+      fontSize: DEFAULTS.fontSize,
       dark: !!s.dark,
       density: s.density || DEFAULTS.density,
       logoUrl: s.logoUrl || DEFAULTS.logoUrl,
@@ -34,7 +34,7 @@ function loadSettings() {
       showLogo: s.showLogo !== undefined ? s.showLogo : true,
       showTitle: s.showTitle !== undefined ? s.showTitle : true,
       showSubtitle: s.showSubtitle !== undefined ? s.showSubtitle : true,
-      headerBtnSize: s.headerBtnSize || DEFAULTS.headerBtnSize,
+      headerBtnSize: DEFAULTS.headerBtnSize,
     };
   } catch {
     return DEFAULTS;
@@ -51,13 +51,11 @@ export function useSettings() {
   const [settings, setSettings] = useState(DEFAULTS);
   const [hydrated, setHydrated] = useState(false);
 
-  // Load from localStorage only after client-side mount
   useEffect(() => {
     setSettings(loadSettings());
     setHydrated(true);
   }, []);
 
-  // Apply settings whenever they change (but only after hydration)
   useEffect(() => {
     if (!hydrated) return;
     saveSettings(settings);
@@ -66,7 +64,7 @@ export function useSettings() {
     document.documentElement.style.setProperty("--primary-light", primaryColor + "cc");
     document.documentElement.style.setProperty("--font", settings.font);
     document.documentElement.style.setProperty("--font-size", settings.fontSize + "px");
-    document.documentElement.style.setProperty("--hdr-btn-size", (settings.headerBtnSize || 11) + "px");
+    document.documentElement.style.setProperty("--hdr-btn-size", (settings.headerBtnSize || 16) + "px");
     document.body.style.fontFamily = settings.font;
     document.body.style.fontSize = settings.fontSize + "px";
     document.documentElement.setAttribute("data-theme", settings.dark ? "dark" : "light");
