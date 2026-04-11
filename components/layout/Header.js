@@ -1,6 +1,6 @@
 export default function Header({
   todayCount, todayHours, memberCount,
-  onAddBooking, onSync, onRefresh, onSettings, onHome,
+  onAddBooking, onRefresh, onSettings, onHome,
   loading, logoUrl, logoScale,
   showLogo, showTitle, showSubtitle,
 }) {
@@ -20,17 +20,17 @@ export default function Header({
         >
           {logoVisible && (
             <img
+              key={logoUrl}
               src={logoUrl}
               alt="Logo"
-              style={{ maxHeight: logoScale || 36, display: "block", flexShrink: 0 }}
+              className="hdr-logo-img"
+              style={{ maxHeight: logoScale || 36 }}
             />
           )}
-          {(titleVisible || subVisible) && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-              {titleVisible && <div className="logo">HOUR GOLF</div>}
-              {subVisible && <div className="logo-sub">Admin Dashboard</div>}
-            </div>
-          )}
+          <div className="hdr-title-block">
+            {titleVisible && <div className="logo">HOUR GOLF</div>}
+            {subVisible && <div className="logo-sub">Admin Dashboard</div>}
+          </div>
         </button>
         <div className="header-stats">
           <div className="stat-box">
@@ -46,7 +46,6 @@ export default function Header({
             <span className="stat-lbl">Members</span>
           </div>
           <button className="hdr-btn" onClick={onAddBooking}>+ Booking</button>
-          <button className="hdr-btn" onClick={onSync}>{"\u21C5"} Sync</button>
           <button className="hdr-btn" onClick={onHome} title="Home">{"\u2302"} Home</button>
           <button className="hdr-btn" onClick={onRefresh} disabled={loading} title="Refresh">{"\u21BB"}</button>
           <button className="hdr-btn" onClick={onSettings} title="Settings">{"\u2699"}</button>
