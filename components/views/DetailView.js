@@ -56,12 +56,32 @@ export default function DetailView({
 
   return (
     <div className="content">
-      <div className="detail-header">
+            <div className="detail-header">
         <div>
           <h2 style={{ margin: 0, fontSize: 18 }}>{selData.customer?.name || selMember}</h2>
-          <span className="email-sm">{selMember}</span>
-          {selData.member?.stripe_customer_id && <span className="muted" style={{ marginLeft: 8 }}>Stripe &#10003;</span>}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
+            <a
+              href={`mailto:${selMember}`}
+              className="email-sm"
+              style={{ color: "var(--primary)", textDecoration: "underline" }}
+              title="Send email"
+            >
+              {"\u2709"} {selMember}
+            </a>
+            {selData.member?.phone && (
+              <a
+                href={`sms:${selData.member.phone.replace(/[^\d+]/g, "")}`}
+                className="email-sm"
+                style={{ color: "var(--primary)", textDecoration: "underline" }}
+                title="Send text message"
+              >
+                {"\u260E"} {selData.member.phone}
+              </a>
+            )}
+            {selData.member?.stripe_customer_id && <span className="muted">Stripe &#10003;</span>}
+          </div>
         </div>
+
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <button className="btn primary" onClick={() => onAddBooking(selMember)}>+ Booking</button>
           <TierSelect value={selData.member?.tier || "Non-Member"} onChange={(t) => onUpdateTier(selMember, t, selData.customer?.name)} />
