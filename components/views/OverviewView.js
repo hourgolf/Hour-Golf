@@ -4,15 +4,78 @@ import { mL, hrs, dlr, allD } from "../../lib/format";
 import Badge from "../ui/Badge";
 
 export default function OverviewView({
-  usage, payments, members,
+  usage, payments, members, bookings,
   selMonth, setSelMonth,
   onSelectMember, onUpdateTier,
 }) {
-  const allMonths = useMemo(() => [...new Set(usage.map((r) => r.billing_month))].sort().reverse(), [usage]);
+  const activeBk = useMemo(
+    () => (bookings || []).filter((b) => b.booking_status !== "Cancelled"),
+    [bookings]
+  );
+
+  // Build month list from BOTH the usage view and the bookings table so we
+  // always have months even if the view is empty for the current month.
+  const allMonths = useMemo(() => {
+    const set = new Set();
+    activeBk.forEach((b) => {
+      const d = new Date(b.booking_start);
+      if (!isNaN(d)) {
+        set.add(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-01T00:00:00+00:00`);
+      }
+    });
+    usage.forEach((r) => { if (r.billing_month) set.add(r.billing_month); });
+    return [...set].sort().reverse();
+  }, [activeBk, usage]);
+
   const actMonth = selMonth || allMonths[0] || "";
-  const curData = useMemo(() => usage.filter((r) => r.billing_month === actMonth), [usage, actMonth]);
-  const memMonth = curData.filter((r) => r.tier !== "Non-Member");
-  const nonMem = curData.filter((r) => r.tier === "Non-Member");
+
+  // Normalize the monthly_usage view to handle both old and new column names.
+  // The new view returns `name` / `email` from members; old code expected
+  // `customer_name` / `customer_email`.
+  const curData = useMemo(
+    () => usage
+      .filter((r) => r.billing_month === actMonth)
+      .map((r) => ({
+        ...r,
+        customer_email: r.customer_email || r.email || "",
+        customer_name: r.customer_name || r.name || "",
+      })),
+    [usage, actMonth]
+  );
+
+  const memMonth = curData.filter((r) => r.tier && r.tier !== "Non-Member");
+
+  // Non-members must be computed from bookings since the new view only
+  // joins from members and excludes anyone who isn't a tracked member.
+  const nonMem = useMemo(() => {
+    if (!actMonth) return [];
+    const monthDate = new Date(actMonth);
+    const yr = monthDate.getUTCFullYear();
+    const mo = monthDate.getUTCMonth();
+    const memberSet = new Set(
+      members.filter((m) => m.tier && m.tier !== "Non-Member").map((m) => m.email)
+    );
+    const stats = {};
+    activeBk.forEach((b) => {
+      if (memberSet.has(b.customer_email)) return;
+      const bs = new Date(b.booking_start);
+      if (isNaN(bs) || bs.getUTCFullYear() !== yr || bs.getUTCMonth() !== mo) return;
+      if (!stats[b.customer_email]) {
+        stats[b.customer_email] = {
+          customer_email: b.customer_email,
+          customer_name: b.customer_name,
+          total_hours: 0,
+          booking_count: 0,
+          tier: "Non-Member",
+        };
+      }
+      stats[b.customer_email].total_hours += Number(b.duration_hours || 0);
+      stats[b.customer_email].booking_count += 1;
+      if (b.customer_name) stats[b.customer_email].customer_name = b.customer_name;
+    });
+    return Object.values(stats).sort((a, b) => b.total_hours - a.total_hours);
+  }, [activeBk, members, actMonth]);
+
   const totOver = memMonth.reduce((s, r) => s + Number(r.overage_charge || 0), 0);
   const totHrs = memMonth.reduce((s, r) => s + Number(r.total_hours || 0), 0);
 
