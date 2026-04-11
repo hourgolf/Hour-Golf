@@ -6,8 +6,12 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const admin = await verifyAdmin(req);
-  if (!admin) return res.status(401).json({ error: "Unauthorized" });
+  const { user, reason } = await verifyAdmin(req);
+  if (!user) {
+    console.error("stripe-lookup verifyAdmin failed:", reason);
+    return res.status(401).json({ error: "Unauthorized", detail: reason });
+  }
+
 
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Missing email" });
