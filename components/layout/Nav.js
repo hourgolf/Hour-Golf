@@ -1,7 +1,7 @@
 const TABS = [
   { key: "today", label: "Today", countKey: "todayCount" },
-  { key: "week", label: "Week" },
-  { key: "overview", label: "Monthly" },
+  { key: "week", label: "Calendar" },
+  { key: "overview", label: "Usage" },
   { key: "customers", label: "Customers" },
   { key: "tiers", label: "Config" },
 ];
