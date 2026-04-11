@@ -291,30 +291,34 @@ export default function Dashboard() {
 
   return (
     <div>
-      <Header
-        todayCount={todayBk.length}
-        todayHours={todayHours}
-        memberCount={members.length}
-        onAddBooking={() => openAdd()}
-        onSync={() => setSyncOpen(true)}
-        onRefresh={refresh}
-        onSettings={() => setSettingsOpen(true)}
-        onHome={() => { setSelMember(null); setView("today"); }}
-        loading={loading}
-        logoUrl={settings.logoUrl}
-        logoScale={settings.logoScale}
-        showLogo={settings.showLogo}
-        showTitle={settings.showTitle}
-        showSubtitle={settings.showSubtitle}
-      />
+            <div className="sticky-top">
+      <div className="sticky-top">
+        <Header
+          todayCount={todayBk.length}
+          todayHours={todayHours}
+          memberCount={members.length}
+          onAddBooking={() => openAdd()}
+          onRefresh={refresh}
+          onSettings={() => setSettingsOpen(true)}
+          onHome={() => { setSelMember(null); setView("today"); }}
+          loading={loading}
+          logoUrl={settings.logoUrl}
+          logoScale={settings.logoScale}
+          showLogo={settings.showLogo}
+          showTitle={settings.showTitle}
+          showSubtitle={settings.showSubtitle}
+        />
 
-      <Nav
-        view={view}
-        setView={setView}
-        todayCount={todayBk.length}
-        detailName={detailName}
-        onClearDetail={() => { setSelMember(null); }}
-      />
+        <Nav
+          view={view}
+          setView={setView}
+          todayCount={todayBk.length}
+          detailName={detailName}
+          onClearDetail={() => { setSelMember(null); }}
+        />
+      </div>
+
+
 
       {saving && <div className="saving">Saving...</div>}
 
@@ -452,7 +456,9 @@ export default function Dashboard() {
         settings={settings}
         updateSetting={updateSetting}
         apiKey={apiKey}
+        onOpenSync={() => setSyncOpen(true)}
       />
+
 
       <SyncModal
         open={syncOpen}
