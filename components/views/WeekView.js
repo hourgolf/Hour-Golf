@@ -1,61 +1,89 @@
 import { useMemo, Fragment } from "react";
 import { BAYS, TZ } from "../../lib/constants";
-import { fT, fDS, lds, tds } from "../../lib/format";
+import { fT, lds, tds } from "../../lib/format";
 
 export default function WeekView({ bookings, weekOff, setWeekOff, onSelectMember }) {
-  const activeBk = useMemo(() => bookings.filter((b) => b.booking_status !== "Cancelled"), [bookings]);
+  const activeBk = useMemo(
+    () => bookings.filter((b) => b.booking_status !== "Cancelled"),
+    [bookings]
+  );
 
-  const weekDays = useMemo(() => {
-    const d = [];
-    const base = new Date();
-    base.setDate(base.getDate() - base.getDay() + weekOff * 7);
-    for (let i = 0; i < 7; i++) {
-      const x = new Date(base);
-      x.setDate(base.getDate() + i);
-      d.push(x);
+  // weekOff is reused as a month offset (0 = current month, -1 = prev, +1 = next)
+  const monthDays = useMemo(() => {
+    const today = new Date();
+    const base = new Date(today.getFullYear(), today.getMonth() + weekOff, 1);
+    const year = base.getFullYear();
+    const month = base.getMonth();
+    const last = new Date(year, month + 1, 0).getDate();
+    const out = [];
+    for (let day = 1; day <= last; day++) {
+      out.push(new Date(year, month, day));
     }
-    return d;
+    return out;
   }, [weekOff]);
 
-  const weekBk = useMemo(() => {
+  const monthLabel = useMemo(() => {
+    if (!monthDays.length) return "";
+    return monthDays[0].toLocaleDateString("en-US", {
+      month: "long",
+      year: "numeric",
+      timeZone: TZ,
+    });
+  }, [monthDays]);
+
+  const monthBk = useMemo(() => {
     const r = {};
-    weekDays.forEach((d) => {
+    monthDays.forEach((d) => {
       const ds = lds(d);
       BAYS.forEach((bay) => {
         r[`${ds}-${bay}`] = activeBk
-          .filter((b) => lds(new Date(b.booking_start)) === ds && b.bay === bay)
+          .filter(
+            (b) => lds(new Date(b.booking_start)) === ds && b.bay === bay
+          )
           .sort((a, b) => new Date(a.booking_start) - new Date(b.booking_start));
       });
     });
     return r;
-  }, [weekDays, activeBk]);
+  }, [monthDays, activeBk]);
 
   const today = tds();
 
   return (
     <div className="content">
       <div className="wk-nav">
-        <button className="btn" onClick={() => setWeekOff((w) => w - 1)}>&larr; Prev</button>
-        <button className="btn" onClick={() => setWeekOff(0)}>This Week</button>
-        <button className="btn" onClick={() => setWeekOff((w) => w + 1)}>Next &rarr;</button>
-        <span style={{ marginLeft: 8 }}>{fDS(weekDays[0])} &ndash; {fDS(weekDays[6])}</span>
+        <button className="btn" onClick={() => setWeekOff((w) => w - 1)}>
+          &larr; Prev
+        </button>
+        <button className="btn" onClick={() => setWeekOff(0)}>
+          This Month
+        </button>
+        <button className="btn" onClick={() => setWeekOff((w) => w + 1)}>
+          Next &rarr;
+        </button>
+        <span style={{ marginLeft: 8 }}>{monthLabel}</span>
       </div>
 
       <div className="wk-grid">
         <div className="wk-h">Day</div>
-        {BAYS.map((b) => <div key={b} className="wk-h">{b}</div>)}
+        {BAYS.map((b) => (
+          <div key={b} className="wk-h">{b}</div>
+        ))}
 
-        {weekDays.map((d) => {
+        {monthDays.map((d) => {
           const ds = lds(d);
           const isToday = ds === today;
           return (
             <Fragment key={ds}>
               <div className={`wk-d ${isToday ? "today" : ""}`}>
-                <span className="dl">{d.toLocaleDateString("en-US", { weekday: "short", timeZone: TZ })}</span>
-                <span className="dn">{d.toLocaleDateString("en-US", { day: "numeric", timeZone: TZ })}</span>
+                <span className="dl">
+                  {d.toLocaleDateString("en-US", { weekday: "short", timeZone: TZ })}
+                </span>
+                <span className="dn">
+                  {d.toLocaleDateString("en-US", { day: "numeric", timeZone: TZ })}
+                </span>
               </div>
               {BAYS.map((bay) => {
-                const bks = weekBk[`${ds}-${bay}`] || [];
+                const bks = monthBk[`${ds}-${bay}`] || [];
                 return (
                   <div key={bay} className={`wk-c ${isToday ? "today" : ""}`}>
                     {bks.map((b) => (
