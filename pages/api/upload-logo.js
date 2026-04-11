@@ -13,8 +13,11 @@ export const config = {
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
-  const admin = await verifyAdmin(req);
-  if (!admin) return res.status(401).json({ error: "Unauthorized" });
+  const { user, reason } = await verifyAdmin(req);
+  if (!user) {
+    console.error("upload-logo verifyAdmin failed:", reason);
+    return res.status(401).json({ error: "Unauthorized", detail: reason });
+  }
 
   // Sanitize the filename so a malicious caller can't traverse paths.
   const raw = String(req.query.filename || "");
