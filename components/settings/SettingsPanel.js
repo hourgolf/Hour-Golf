@@ -3,7 +3,7 @@ import ThemeCustomizer from "./ThemeCustomizer";
 import FontSelector from "./FontSelector";
 import LogoUpload from "./LogoUpload";
 
-export default function SettingsPanel({ open, onClose, settings, updateSetting, apiKey }) {
+export default function SettingsPanel({ open, onClose, settings, updateSetting, apiKey, onOpenSync }) {
   if (!open) return null;
 
   const checkLabelStyle = {
@@ -85,16 +85,17 @@ export default function SettingsPanel({ open, onClose, settings, updateSetting, 
       </div>
 
       <div className="mf">
-        <label>Header Button Size &mdash; {settings.headerBtnSize || 11}px</label>
-        <input
-          type="range"
-          min={10}
-          max={18}
-          step={1}
-          value={settings.headerBtnSize || 11}
-          onChange={(e) => updateSetting("headerBtnSize", Number(e.target.value))}
-          style={{ width: "100%", accentColor: "var(--primary)" }}
-        />
+        <label>Data Sync</label>
+        <button
+          className="btn"
+          style={{ width: "100%", padding: "10px 12px", fontSize: 13 }}
+          onClick={() => {
+            if (onOpenSync) onOpenSync();
+            onClose();
+          }}
+        >
+          {"\u21C5"} Sync Bookings
+        </button>
       </div>
 
       <div className="macts">
