@@ -14,7 +14,9 @@ export default async function handler(req, res) {
   }
 
   const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://uxpkqbioxoezjmcoylkw.supabase.co";
-  const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
+  // Use the service role key so writes succeed even after RLS is enabled.
+  // Falls back to the anon key during the migration window.
+  const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
   try {
     // Accept single booking or array
