@@ -344,6 +344,7 @@ export default function Dashboard() {
           usage={usage}
           payments={payments}
           members={members}
+          bookings={bookings}
           selMonth={selMonth}
           setSelMonth={setSelMonth}
           onSelectMember={selectMember}
