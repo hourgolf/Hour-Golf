@@ -1,0 +1,57 @@
+export default function Header({
+  todayCount, todayHours, memberCount,
+  onAddBooking, onSync, onRefresh, onSettings, onHome,
+  loading, logoUrl, logoScale,
+  showLogo, showTitle, showSubtitle,
+}) {
+  const logoVisible = showLogo !== false && !!logoUrl;
+  const titleVisible = showTitle !== false;
+  const subVisible = showSubtitle !== false;
+
+  return (
+    <header className="header">
+      <div className="header-inner">
+        <button
+          type="button"
+          className="logo-btn"
+          onClick={onHome}
+          aria-label="Home"
+          title="Go to Dashboard"
+        >
+          {logoVisible && (
+            <img
+              src={logoUrl}
+              alt="Logo"
+              style={{ maxHeight: logoScale || 36, display: "block", flexShrink: 0 }}
+            />
+          )}
+          {(titleVisible || subVisible) && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+              {titleVisible && <div className="logo">HOUR GOLF</div>}
+              {subVisible && <div className="logo-sub">Admin Dashboard</div>}
+            </div>
+          )}
+        </button>
+        <div className="header-stats">
+          <div className="stat-box">
+            <span className="stat-val">{todayCount}</span>
+            <span className="stat-lbl">Today</span>
+          </div>
+          <div className="stat-box">
+            <span className="stat-val">{todayHours.toFixed(1)}h</span>
+            <span className="stat-lbl">Bay Hrs</span>
+          </div>
+          <div className="stat-box">
+            <span className="stat-val">{memberCount}</span>
+            <span className="stat-lbl">Members</span>
+          </div>
+          <button className="hdr-btn" onClick={onAddBooking}>+ Booking</button>
+          <button className="hdr-btn" onClick={onSync}>{"\u21C5"} Sync</button>
+          <button className="hdr-btn" onClick={onHome} title="Home">{"\u2302"} Home</button>
+          <button className="hdr-btn" onClick={onRefresh} disabled={loading} title="Refresh">{"\u21BB"}</button>
+          <button className="hdr-btn" onClick={onSettings} title="Settings">{"\u2699"}</button>
+        </div>
+      </div>
+    </header>
+  );
+}

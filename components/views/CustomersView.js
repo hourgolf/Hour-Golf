@@ -1,0 +1,90 @@
+import { useMemo } from "react";
+import { TIERS } from "../../lib/constants";
+import Badge from "../ui/Badge";
+import TierSelect from "../ui/TierSelect";
+
+export default function CustomersView({
+  bookings, members,
+  search, setSearch,
+  cSort, setCSort,
+  cTier, setCTier,
+  onSelectMember, onUpdateTier,
+}) {
+  const activeBk = useMemo(() => bookings.filter((b) => b.booking_status !== "Cancelled"), [bookings]);
+
+  const allCust = useMemo(() => {
+    const m = {};
+    activeBk.forEach((b) => {
+      if (!m[b.customer_email]) m[b.customer_email] = { email: b.customer_email, name: b.customer_name, hrs: 0, cnt: 0 };
+      m[b.customer_email].hrs += Number(b.duration_hours || 0);
+      m[b.customer_email].cnt++;
+      if (b.customer_name) m[b.customer_email].name = b.customer_name;
+    });
+    return Object.values(m);
+  }, [activeBk]);
+
+  const filtCust = useMemo(() => {
+    let l = [...allCust];
+    const q = search.toLowerCase();
+    if (q) l = l.filter((c) => (c.name || "").toLowerCase().includes(q) || c.email.toLowerCase().includes(q));
+    if (cTier !== "all") l = l.filter((c) => { const m = members.find((x) => x.email === c.email); return (m?.tier || "Non-Member") === cTier; });
+    if (cSort === "hours") l.sort((a, b) => b.hrs - a.hrs);
+    else if (cSort === "name") l.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    else l.sort((a, b) => b.cnt - a.cnt);
+    return l;
+  }, [allCust, search, cSort, cTier, members]);
+
+  return (
+    <div className="content">
+      <input
+        className="search"
+        type="text"
+        placeholder="Search name or email... (keyboard shortcut: /)"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+      <div className="fbar">
+        <label>Sort:</label>
+        <select value={cSort} onChange={(e) => setCSort(e.target.value)}>
+          <option value="hours">Hours</option>
+          <option value="sessions">Sessions</option>
+          <option value="name">Name</option>
+        </select>
+        <label style={{ marginLeft: 12 }}>Tier:</label>
+        <select value={cTier} onChange={(e) => setCTier(e.target.value)}>
+          <option value="all">All</option>
+          {TIERS.map((t) => <option key={t}>{t}</option>)}
+        </select>
+        <span className="muted" style={{ marginLeft: 12 }}>{filtCust.length} results</span>
+      </div>
+
+      <div className="tbl">
+        <div className="th">
+          <span style={{ flex: 2 }}>Customer</span>
+          <span style={{ flex: 1 }}>Tier</span>
+          <span style={{ flex: 1 }} className="text-r">Hours</span>
+          <span style={{ flex: 1 }} className="text-r">Sessions</span>
+          <span style={{ flex: 1 }} className="text-c">Assign</span>
+        </div>
+        {filtCust.map((c) => {
+          const m = members.find((x) => x.email === c.email);
+          const tier = m?.tier || "Non-Member";
+          return (
+            <div key={c.email} className="tr">
+              <span style={{ flex: 2, cursor: "pointer" }} onClick={() => onSelectMember(c.email)}>
+                <strong>{c.name}</strong><br />
+                <span className="email-sm">{c.email}</span>
+              </span>
+              <span style={{ flex: 1 }}><Badge tier={tier} /></span>
+              <span style={{ flex: 1 }} className="text-r tab-num">{c.hrs.toFixed(1)}h</span>
+              <span style={{ flex: 1 }} className="text-r tab-num">{c.cnt}</span>
+              <span style={{ flex: 1 }} className="text-c">
+                <TierSelect value={tier} onChange={(t) => onUpdateTier(c.email, t, c.name)} />
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
