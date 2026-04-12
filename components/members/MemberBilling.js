@@ -300,7 +300,7 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
         ) : payments.length === 0 ? (
           <div className="mem-empty">No payment history</div>
         ) : (
-          <table className="mem-billing-table">
+          <div className="mem-table-scroll"><table className="mem-billing-table">
             <thead>
               <tr>
                 <th>Date</th>
@@ -325,7 +325,7 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
     </>
