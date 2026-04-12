@@ -116,7 +116,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
               {BAYS.map((b) => <option key={b}>{b}</option>)}
             </select>
           </div>
-          <div style={{ display: "flex", gap: 12 }}>
+          <div className="mem-time-row" style={{ display: "flex", gap: 12 }}>
             <div className="mem-form-row" style={{ flex: 1 }}>
               <label>Start</label>
               <select value={bookStart} onChange={(e) => setBookStart(e.target.value)}>
