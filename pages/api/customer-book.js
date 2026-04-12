@@ -53,7 +53,32 @@ export default async function handler(req, res) {
     if (!resp.ok) throw new Error(await resp.text());
 
     const data = await resp.json();
-    return res.status(200).json({ success: true, booking: data[0] });
+    const booked = data[0];
+
+    // Send booking confirmation email (fire-and-forget)
+    try {
+      const sDate = new Date(booked.booking_start);
+      const eDate = new Date(booked.booking_end);
+      const TZ = "America/Los_Angeles";
+      await fetch(`${req.headers.origin || "http://localhost:3000"}/api/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          template_key: "booking_confirmation",
+          to_email: booked.customer_email,
+          variables: {
+            customer_name: booked.customer_name || booked.customer_email,
+            date: sDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: TZ }),
+            start_time: sDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: TZ }),
+            end_time: eDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: TZ }),
+            bay: booked.bay,
+            duration: Number(booked.duration_hours).toFixed(1),
+          },
+        }),
+      });
+    } catch (_) { /* email is best-effort, don't fail the booking */ }
+
+    return res.status(200).json({ success: true, booking: booked });
   } catch (e) {
     console.error("Customer book error:", e);
     return res.status(500).json({ error: "Booking failed", detail: e.message });
