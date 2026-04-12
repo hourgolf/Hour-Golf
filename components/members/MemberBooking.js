@@ -63,6 +63,10 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || d.detail || "Booking failed");
       showToast("Booking confirmed!");
+      // Reset form so the just-booked slot doesn't trigger a conflict error
+      setBookStart("10:00");
+      setBookEnd("11:00");
+      setBookBay("Bay 1");
       // Refresh availability
       fetch(`/api/customer-availability?date=${bookDate}`, { credentials: "include" })
         .then((r) => r.json())
