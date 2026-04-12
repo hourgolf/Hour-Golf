@@ -99,7 +99,9 @@ export default async function handler(req, res) {
         name: member.name,
         tier: member.tier,
         phone: member.phone || "",
+        hasPaymentMethod: !!member.stripe_customer_id,
         needsAccountSetup,
+
       },
       tierConfig,
     });
