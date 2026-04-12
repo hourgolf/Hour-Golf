@@ -11,6 +11,7 @@ for (let h = 7; h <= 21; h++) {
 
 export default function MemberBooking({ member, tierConfig, refresh, showToast }) {
   const isNonMember = member.tier === "Non-Member";
+  const hasCard = member.hasPaymentMethod;
 
   const HOURS = useMemo(() => {
     if (isNonMember) return ALL_HOURS.filter((h) => h >= "10:00" && h <= "20:00");
@@ -89,7 +90,14 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
 
   return (
     <>
-      {isNonMember && (
+      {!hasCard && (
+        <div className="mem-info-banner" style={{ background: "#fef2f2", borderColor: "#f0c0c0", color: "#993333" }}>
+          {"\u26a0\ufe0f"} A payment method is required before booking.{" "}
+          <a href="/members/billing" style={{ color: "#993333" }}>Add a card on the Billing page</a> to get started.
+        </div>
+      )}
+
+      {isNonMember && hasCard && (
         <div className="mem-info-banner">
           {"\u23f0"} Non-member bookings available <strong>10 AM {"\u2013"} 8 PM</strong>.{" "}
           <a href="/members/billing">Upgrade your membership</a> for 24/7 access.
@@ -163,7 +171,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
           <button
             className="mem-book-btn"
             onClick={handleBook}
-            disabled={booking || slotConflict || bookDuration <= 0 || !termsAccepted}
+            disabled={booking || slotConflict || bookDuration <= 0 || !termsAccepted || !hasCard}
           >
             {booking ? "Booking..." : "Confirm Booking"}
           </button>
