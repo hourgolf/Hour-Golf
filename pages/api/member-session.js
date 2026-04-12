@@ -50,12 +50,15 @@ export default async function handler(req, res) {
       } catch (_) { /* ignore */ }
     }
 
+    const needsAccountSetup = !member.password_hash || !member.terms_accepted_at;
+
     return res.status(200).json({
       member: {
         email: member.email,
         name: member.name,
         tier: member.tier,
         phone: member.phone || "",
+        needsAccountSetup,
       },
       tierConfig,
     });
