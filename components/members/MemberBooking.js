@@ -91,7 +91,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
     <>
       {isNonMember && (
         <div className="mem-info-banner">
-          \u23f0 Non-member bookings available <strong>10 AM \u2013 8 PM</strong>.{" "}
+          {"\u23f0"} Non-member bookings available <strong>10 AM {"\u2013"} 8 PM</strong>.{" "}
           <a href="/members/billing">Upgrade your membership</a> for 24/7 access.
         </div>
       )}
