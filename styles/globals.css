@@ -352,7 +352,7 @@ html { overflow-y: scroll; }
   /* Nav compact */
   .nav { padding: 0 14px; }
   .nav-btn { padding: 10px 12px; font-size: 14px; letter-spacing: 0.5px; }
-
+}
 
 /* Responsive — portal */
 @media (max-width: 600px) {
