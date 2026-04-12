@@ -63,7 +63,9 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
   const totalHours = Number(usage?.total_hours || 0);
   const includedHours = Number(usage?.included_hours || tierConfig?.included_hours || 0);
   const isUnlimited = includedHours >= 99999;
-  const remaining = isUnlimited ? Infinity : Math.max(0, includedHours - totalHours);
+  const bonusRemaining = Number(usage?.effective_bonus_remaining || 0);
+  const monthlyRemaining = isUnlimited ? Infinity : Math.max(0, includedHours - totalHours);
+  const remaining = isUnlimited ? Infinity : monthlyRemaining + bonusRemaining;
   const overageHours = Number(usage?.overage_hours || 0);
   const overageRate = Number(tierConfig?.overage_rate || 60);
 
@@ -91,6 +93,12 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
           <div className="mem-card-val">{isUnlimited ? "\u221E" : `${includedHours}h`}</div>
           <div className="mem-card-lbl">Monthly Allowance</div>
         </div>
+        {bonusRemaining > 0 && (
+          <div className="mem-card" style={{ borderColor: "#2d6a9f" }}>
+            <div className="mem-card-val" style={{ color: "#2d6a9f" }}>{fmt(bonusRemaining)}h</div>
+            <div className="mem-card-lbl">Bonus Hours</div>
+          </div>
+        )}
         {overageHours > 0 && (
           <div className="mem-card" style={{ borderColor: "#cc4455" }}>
             <div className="mem-card-val" style={{ color: "#cc4455" }}>{fmt(overageHours)}h</div>
