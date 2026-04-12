@@ -47,7 +47,7 @@ body {
   -webkit-font-smoothing: antialiased;
   transition: background 0.2s, color 0.2s;
 }
-
+html { overflow-y: scroll; }
 /* Sticky header + nav wrapper */
 .sticky-top { position: sticky; top: 0; z-index: 100; }
 
@@ -68,8 +68,8 @@ body {
 .hdr-title-block { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 
 /* Nav */
-.nav { display: flex; border-bottom: 2px solid var(--primary); background: var(--surface); max-width: 1200px; margin: 0 auto; overflow-x: auto; }
-.nav-btn { padding: 12px 18px; border: none; background: transparent; cursor: pointer; font-size: 14px; font-family: var(--font); color: var(--text-muted); letter-spacing: 1px; white-space: nowrap; }
+.nav { display: flex; border-bottom: 2px solid var(--primary); background: var(--surface); overflow-x: auto; padding: 0 24px; }
+.nav-btn { padding: 12px 18px; border: none; background: transparent; cursor: pointer; font-size: 16px; font-family: var(--font); color: var(--text-muted); letter-spacing: 1px; white-space: nowrap; }
 .nav-btn.active { color: var(--primary); font-weight: 700; border-bottom: 2px solid var(--primary); margin-bottom: -2px; }
 .nav-btn .cnt { background: var(--primary); color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 4px; }
 .sticky-top .nav { background: var(--surface); }
@@ -350,8 +350,8 @@ body {
   .wk-d .dn { font-size: 14px; }
   .wk-d .dl { font-size: 8px; }
   /* Nav compact */
-  .nav-btn { padding: 10px 12px; font-size: 12px; letter-spacing: 0.5px; }
-}
+  .nav { padding: 0 14px; }
+  .nav-btn { padding: 10px 12px; font-size: 14px; letter-spacing: 0.5px; }
 
 
 /* Responsive — portal */
@@ -638,7 +638,7 @@ body {
 
 /* Heatmap */
 .rpt-heat-wrap { overflow-x: auto; margin-bottom: 24px; }
-.rpt-heat { display: inline-flex; flex-direction: column; gap: 2px; min-width: 600px; }
+.rpt-heat { display: flex; flex-direction: column; gap: 2px; width: 100%; }
 .rpt-heat-row { display: flex; gap: 2px; }
 .rpt-heat-header .rpt-heat-cell { font-weight: 600; background: none !important; }
 .rpt-heat-dow {
