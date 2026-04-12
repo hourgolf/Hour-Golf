@@ -74,7 +74,6 @@ body {
 .nav-btn .cnt { background: var(--primary); color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 4px; }
 .sticky-top .nav { background: var(--surface); }
 
-
 /* Content */
 .content { max-width: 1200px; margin: 0 auto; padding: 20px; }
 
@@ -218,7 +217,6 @@ body {
 .wk-b:hover { opacity: 0.8; }
 .wk-nav { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 .wk-nav span { font-size: 14px; font-weight: 700; }
-
 
 /* Confirm dialog */
 .confirm-box { text-align: center; }
@@ -448,6 +446,29 @@ body {
 .mem-toast.success { background: var(--primary, #1a472a); color: #fff; }
 .mem-toast.error { background: #cc4455; color: #fff; }
 
+/* Cancel button */
+.mem-cancel-btn { padding: 4px 10px; background: transparent; border: 1px solid #cc4455; border-radius: 4px; color: #cc4455; cursor: pointer; font-size: 11px; font-family: inherit; font-weight: 600; transition: all 0.15s; }
+.mem-cancel-btn:hover { background: #cc4455; color: #fff; }
+.mem-cancel-btn:disabled { opacity: 0.5; cursor: default; }
+.mem-cancel-yes { background: #cc4455; color: #fff; border-color: #cc4455; }
+.mem-cancel-confirm { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding: 10px 12px; background: #fef2f2; border-radius: 6px; font-size: 13px; }
+
+/* Info banner */
+.mem-info-banner { background: #fffbeb; border: 1px solid #f0e6c0; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: #8b6914; }
+.mem-info-banner a { color: #006044; font-weight: 600; text-decoration: underline; }
+
+/* Tier cards (membership selection) */
+.mem-tier-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.mem-tier-card { background: var(--surface, #fff); border: 2px solid var(--border, #e5e5e0); border-radius: 10px; padding: 20px; text-align: center; transition: border-color 0.15s; }
+.mem-tier-card.current { border-color: #006044; background: #f0f7f2; }
+.mem-tier-card-name { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.mem-tier-card-price { font-size: 24px; font-weight: 700; color: #006044; }
+.mem-tier-card-period { font-size: 12px; color: var(--text-muted, #888); margin-bottom: 12px; }
+.mem-tier-card-features { font-size: 12px; color: var(--text-muted, #888); margin-bottom: 16px; line-height: 1.6; }
+.mem-sub-status { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.mem-sub-status.active { background: #f0f7f2; color: #4a7c59; }
+.mem-sub-status.cancelling { background: #fffbeb; color: #a67c00; }
+
 /* Responsive — member portal */
 @media (max-width: 600px) {
   .mem-cards { grid-template-columns: 1fr 1fr; }
@@ -455,4 +476,6 @@ body {
   .mem-avail-grid { font-size: 10px; grid-template-columns: 60px 1fr 1fr; }
   .mem-header-inner { flex-wrap: wrap; gap: 8px; }
   .mem-nav-btn { padding: 10px 14px; font-size: 12px; }
+  .mem-tier-grid { grid-template-columns: 1fr; }
+  .mem-cancel-confirm { flex-direction: column; gap: 8px; }
 }
