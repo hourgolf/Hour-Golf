@@ -23,6 +23,7 @@ import OverviewView from "../components/views/OverviewView";
 import CustomersView from "../components/views/CustomersView";
 import ConfigView from "../components/views/ConfigView";
 import DetailView from "../components/views/DetailView";
+import ReportsView from "../components/views/ReportsView";
 
 export default function Dashboard() {
   // Auth (email/password against Supabase Auth, gated by admins table)
@@ -370,6 +371,15 @@ export default function Dashboard() {
           onSaveTier={saveTier}
           onSelectMember={selectMember}
           jwt={apiKey}
+        />
+      )}
+
+      {view === "reports" && (
+        <ReportsView
+          members={members}
+          bookings={bookings}
+          tierCfg={tierCfg}
+          payments={payments}
         />
       )}
 
