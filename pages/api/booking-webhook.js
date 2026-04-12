@@ -2,6 +2,8 @@
 // Zapier calls this instead of Supabase directly.
 // This endpoint handles the insert and lets Supabase triggers do duration calc.
 
+import { sendBookingConfirmation } from "../../lib/email";
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
@@ -15,7 +17,6 @@ export default async function handler(req, res) {
 
   const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://uxpkqbioxoezjmcoylkw.supabase.co";
   // Use the service role key so writes succeed even after RLS is enabled.
-  // Falls back to the anon key during the migration window.
   const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
   try {
@@ -60,28 +61,13 @@ export default async function handler(req, res) {
 
         // Send booking confirmation email (fire-and-forget)
         if (booked && record.booking_status === "Confirmed") {
-          try {
-            const TZ = "America/Los_Angeles";
-            const sDate = new Date(booked.booking_start);
-            const eDate = new Date(booked.booking_end);
-            const origin = req.headers.origin || req.headers.referer?.replace(/\/$/, "") || "https://hour-golf.vercel.app";
-            fetch(`${origin}/api/send-email`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                template_key: "booking_confirmation",
-                to_email: booked.customer_email,
-                variables: {
-                  customer_name: booked.customer_name || booked.customer_email,
-                  date: sDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: TZ }),
-                  start_time: sDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: TZ }),
-                  end_time: eDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: TZ }),
-                  bay: booked.bay,
-                  duration: Number(booked.duration_hours).toFixed(1),
-                },
-              }),
-            }).catch(() => {});
-          } catch (_) { /* email is best-effort */ }
+          sendBookingConfirmation({
+            to: booked.customer_email,
+            customerName: booked.customer_name || booked.customer_email,
+            bay: booked.bay,
+            bookingStart: booked.booking_start,
+            bookingEnd: booked.booking_end,
+          }).catch(() => {});
         }
       } else {
         const err = await resp.text();
