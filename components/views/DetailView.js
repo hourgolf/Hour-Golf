@@ -169,7 +169,7 @@ export default function DetailView({
       </div>
 
       <h3 className="section-head">Monthly Breakdown</h3>
-      <div className="tbl">
+      <div className="admin-table-scroll"><div className="tbl">
         <div className="th">
           <span style={{ flex: 1 }}>Month</span>
           <span style={{ flex: 1 }} className="text-r">Hours</span>
@@ -221,7 +221,7 @@ export default function DetailView({
             </div>
           );
         })}
-      </div>
+      </div></div>
 
       <h3 className="section-head" style={{ marginTop: 20 }}>
         <span>Bookings</span>
@@ -239,7 +239,7 @@ export default function DetailView({
         </span>
       </h3>
 
-      <div className="tbl">
+      <div className="admin-table-scroll"><div className="tbl">
         <div className="th">
           <span style={{ width: 24 }}>
             <input
@@ -286,7 +286,7 @@ export default function DetailView({
             </div>
           );
         })}
-      </div>
+      </div></div>
 
       <BulkBar
         count={selected.size}
