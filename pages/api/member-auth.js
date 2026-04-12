@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
 
 export default async function handler(req, res) {
@@ -7,7 +8,7 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
-  const { email } = req.body || {};
+  const { email, password } = req.body || {};
   if (!email) return res.status(400).json({ error: "Email required" });
 
   const cleanEmail = email.toLowerCase().trim();
@@ -21,15 +22,28 @@ export default async function handler(req, res) {
     if (!memberResp.ok) throw new Error("Member lookup failed");
     const members = await memberResp.json();
     if (!members.length) {
-      return res.status(404).json({ error: "No member found with that email" });
+      return res.status(404).json({ error: "No account found with that email" });
     }
     const member = members[0];
 
-    // 2) Generate session token
+    // 2) Password verification
+    if (member.password_hash) {
+      // Member has a password — require it
+      if (!password) {
+        return res.status(401).json({ error: "Password required" });
+      }
+      const valid = await bcrypt.compare(password, member.password_hash);
+      if (!valid) {
+        return res.status(401).json({ error: "Incorrect password" });
+      }
+    }
+    // If no password_hash, allow login (legacy member — will be prompted to set password)
+
+    // 3) Generate session token
     const sessionToken = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-    // 3) Store token in members table
+    // 4) Store token in members table
     const updateResp = await fetch(
       `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}`,
       {
@@ -48,7 +62,7 @@ export default async function handler(req, res) {
     );
     if (!updateResp.ok) throw new Error("Failed to create session");
 
-    // 4) Load tier config
+    // 5) Load tier config
     let tierConfig = null;
     if (member.tier) {
       try {
@@ -63,7 +77,7 @@ export default async function handler(req, res) {
       } catch (_) { /* ignore */ }
     }
 
-    // 5) Set httpOnly cookie
+    // 6) Set httpOnly cookie
     const isSecure = process.env.NODE_ENV === "production";
     const cookie = [
       `hg-member-token=${sessionToken}`,
@@ -75,13 +89,17 @@ export default async function handler(req, res) {
     if (isSecure) cookie.push("Secure");
     res.setHeader("Set-Cookie", cookie.join("; "));
 
-    // 6) Return member data
+    // 7) Check if legacy member needs account setup
+    const needsAccountSetup = !member.password_hash || !member.terms_accepted_at;
+
+    // 8) Return member data
     return res.status(200).json({
       member: {
         email: member.email,
         name: member.name,
         tier: member.tier,
         phone: member.phone || "",
+        needsAccountSetup,
       },
       tierConfig,
     });
