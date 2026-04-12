@@ -320,6 +320,40 @@ body {
   .profile-grid { grid-template-columns: 1fr; }
 }
 
+@media (max-width: 600px) {
+  /* Admin header compact */
+  .header { padding: 10px 14px; }
+  .header-inner { gap: 8px; }
+  .header-stats { gap: 6px; }
+  .stat-box { min-width: auto; }
+  .stat-val { font-size: 14px; }
+  .stat-lbl { font-size: 8px; letter-spacing: 0.5px; }
+  .hdr-btn { padding: 6px 8px; font-size: 13px; }
+  .hdr-btn-text { display: none; }
+  .logo { font-size: 14px; letter-spacing: 4px; }
+  .logo-sub { font-size: 8px; letter-spacing: 1px; }
+  .hdr-logo-img { max-height: 28px !important; }
+  /* Admin content */
+  .content { padding: 14px; }
+  .summary { padding: 12px 14px; gap: 12px; }
+  .sum-val { font-size: 18px; }
+  /* Admin tables */
+  .th, .tr { font-size: 10px; padding: 6px 8px; gap: 4px; }
+  .detail-header { padding: 12px 14px; gap: 8px; }
+  /* Today view slots */
+  .slot-t { width: 70px; font-size: 9px; padding: 8px 6px; }
+  .slot-c { font-size: 11px; }
+  .slot-m { font-size: 9px; }
+  /* Calendar */
+  .wk-grid { grid-template-columns: 40px 1fr 1fr; }
+  .wk-b { font-size: 9px; padding: 2px 4px; }
+  .wk-d .dn { font-size: 14px; }
+  .wk-d .dl { font-size: 8px; }
+  /* Nav compact */
+  .nav-btn { padding: 10px 12px; font-size: 12px; letter-spacing: 0.5px; }
+}
+
+
 /* Responsive — portal */
 @media (max-width: 600px) {
   .portal-cards { grid-template-columns: 1fr 1fr; }
@@ -365,8 +399,9 @@ body {
 
 /* Nav */
 .mem-nav { background: var(--surface, #fff); border-bottom: 2px solid var(--primary, #1a472a); }
-.mem-nav-inner { display: flex; max-width: 960px; margin: 0 auto; }
-.mem-nav-btn { padding: 12px 20px; border: none; background: transparent; cursor: pointer; font-size: 13px; font-family: inherit; color: var(--text-muted, #888); font-weight: 500; transition: color 0.15s; }
+.mem-nav-inner { display: flex; max-width: 960px; margin: 0 auto; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.mem-nav-inner::-webkit-scrollbar { display: none; }
+.mem-nav-btn { padding: 12px 20px; border: none; background: transparent; cursor: pointer; font-size: 13px; font-family: inherit; color: var(--text-muted, #888); font-weight: 500; transition: color 0.15s; white-space: nowrap; }
 .mem-nav-btn:hover { color: var(--text, #1a1a1a); }
 .mem-nav-btn.active { color: var(--primary, #1a472a); font-weight: 700; border-bottom: 2px solid var(--primary, #1a472a); margin-bottom: -2px; }
 
@@ -481,14 +516,42 @@ body {
 .mem-punch-orig { font-size: 13px; color: var(--text-muted, #888); margin-top: 2px; }
 .mem-punch-rate { font-size: 11px; color: var(--text-dim, #999); margin-top: 6px; }
 
+/* Scroll wrappers for mobile tables */
+.mem-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.admin-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+
 /* Responsive — member portal */
 @media (max-width: 600px) {
   .mem-cards { grid-template-columns: 1fr 1fr; }
-  .mem-punch-grid { grid-template-columns: 1fr; }
   .mem-credit-grid { grid-template-columns: 1fr 1fr; }
+  .mem-punch-grid { grid-template-columns: 1fr; }
   .mem-avail-grid { font-size: 10px; grid-template-columns: 60px 1fr 1fr; }
-  .mem-header-inner { flex-wrap: wrap; gap: 8px; }
+  .mem-header-inner { flex-wrap: wrap; gap: 6px; }
+  .mem-header-name { font-size: 11px; }
+  .mem-tier-badge { font-size: 9px; padding: 2px 6px; }
   .mem-nav-btn { padding: 10px 14px; font-size: 12px; }
   .mem-tier-grid { grid-template-columns: 1fr; }
-  .mem-cancel-confirm { flex-direction: column; gap: 8px; }
+  .mem-cancel-confirm { flex-direction: column; gap: 8px; text-align: center; }
+  .mem-content { padding: 16px; }
+  .mem-section { padding: 14px; }
+  .mem-time-row { flex-direction: column !important; gap: 0 !important; }
+  .mem-time-row .mem-form-row { flex: none !important; }
+  .mem-billing-table { font-size: 11px; }
+  .mem-billing-table th, .mem-billing-table td { padding: 6px 4px; }
+  .mem-book-btn { font-size: 13px; padding: 12px; }
+  .mem-avail-cell { padding: 4px 4px; }
+  .mem-avail-time { padding: 4px 6px; }
+}
+
+/* Extra small phones */
+@media (max-width: 400px) {
+  .mem-cards { grid-template-columns: 1fr; }
+  .mem-card-val { font-size: 24px; }
+  .mem-avail-grid { grid-template-columns: 50px 1fr 1fr; font-size: 9px; }
+  .mem-section-head { font-size: 11px; letter-spacing: 1px; }
+  .mem-header-right { gap: 6px; }
+  .mem-punch-card { padding: 18px 12px 12px; }
+  .mem-punch-hrs { font-size: 16px; }
+  .mem-punch-price { font-size: 18px; }
 }
