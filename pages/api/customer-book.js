@@ -23,6 +23,26 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Non-member time restriction: 10 AM - 8 PM only
+    const cleanEmail = email.toLowerCase().trim();
+    let memberTier = "Non-Member";
+    try {
+      const memberResp = await fetch(
+        `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&select=tier`,
+        { headers: { apikey: key, Authorization: `Bearer ${key}` } }
+      );
+      if (memberResp.ok) {
+        const rows = await memberResp.json();
+        if (rows.length) memberTier = rows[0].tier || "Non-Member";
+      }
+    } catch (_) { /* default to Non-Member */ }
+
+    if (memberTier === "Non-Member") {
+      if (startTime < "10:00" || endTime > "20:00") {
+        return res.status(400).json({ error: "Non-member bookings are restricted to 10:00 AM - 8:00 PM. Upgrade your membership for 24/7 access." });
+      }
+    }
+
     const sD = pacificToUTC(date, startTime);
     const eD = pacificToUTC(date, endTime);
     const bookingStartISO = sD.toISOString();
