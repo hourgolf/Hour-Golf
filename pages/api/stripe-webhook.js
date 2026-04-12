@@ -43,6 +43,30 @@ export default async function handler(req, res) {
       // --- Checkout completed (subscription OR punch pass) ---
       case "checkout.session.completed": {
         const session = event.data.object;
+        // --- Payment method setup ---
+        if (session.metadata?.type === "payment_setup") {
+          const memberEmail = session.metadata.member_email;
+          if (memberEmail && session.customer) {
+            await fetch(
+              `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(memberEmail)}`,
+              {
+                method: "PATCH",
+                headers: {
+                  apikey: key, Authorization: `Bearer ${key}`,
+                  "Content-Type": "application/json",
+                  Prefer: "return=representation",
+                },
+                body: JSON.stringify({
+                  stripe_customer_id: session.customer,
+                  updated_at: new Date().toISOString(),
+                }),
+              }
+            );
+            console.log(`Payment method setup complete for ${memberEmail}`);
+          }
+          break;
+        }
+
 
         // --- Punch pass (one-time payment) ---
         if (session.metadata?.type === "punch_pass") {
