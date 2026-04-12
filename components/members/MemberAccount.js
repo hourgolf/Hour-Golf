@@ -5,6 +5,7 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast }
   const [phone, setPhone] = useState(member.phone || "");
   const [prefs, setPrefs] = useState({
     email_booking_confirmations: true,
+    email_cancellations: true,
     email_reminders: true,
     email_billing: true,
   });
@@ -41,6 +42,7 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast }
           phone,
           preferences: {
             email_booking_confirmations: prefs.email_booking_confirmations,
+            email_cancellations: prefs.email_cancellations,
             email_reminders: prefs.email_reminders,
             email_billing: prefs.email_billing,
           },
@@ -117,6 +119,13 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast }
             <div className="mem-toggle-sub">Receive an email when your booking is confirmed</div>
           </div>
           <div className={`mem-toggle-switch ${prefs.email_booking_confirmations ? "on" : ""}`} />
+        </div>
+        <div className="mem-toggle" onClick={() => togglePref("email_cancellations")}>
+          <div>
+            <div className="mem-toggle-label">Cancellation Confirmations</div>
+            <div className="mem-toggle-sub">Receive an email when you cancel a booking</div>
+          </div>
+          <div className={`mem-toggle-switch ${prefs.email_cancellations ? "on" : ""}`} />
         </div>
         <div className="mem-toggle" onClick={() => togglePref("email_reminders")}>
           <div>
