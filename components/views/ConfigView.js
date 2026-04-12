@@ -100,7 +100,88 @@ function TierEditModal({ open, onClose, tier, onSave }) {
   );
 }
 
-export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStripe, onSaveTier, onSelectMember }) {
+function EmailConfigSection({ jwt }) {
+  const [configs, setConfigs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(null);
+
+  useEffect(() => { loadConfigs(); }, []);
+
+  async function loadConfigs() {
+    setLoading(true);
+    try {
+      const SUPABASE_URL = "https://uxpkqbioxoezjmcoylkw.supabase.co";
+      const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/email_config?order=template_key.asc`, {
+        headers: { apikey: ANON_KEY, Authorization: `Bearer ${jwt || ANON_KEY}` },
+      });
+      if (r.ok) setConfigs(await r.json());
+    } catch (_) {}
+    setLoading(false);
+  }
+
+  async function updateConfig(id, field, value) {
+    setSaving(id);
+    try {
+      const SUPABASE_URL = "https://uxpkqbioxoezjmcoylkw.supabase.co";
+      const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+      await fetch(`${SUPABASE_URL}/rest/v1/email_config?id=eq.${id}`, {
+        method: "PATCH",
+        headers: {
+          apikey: ANON_KEY, Authorization: `Bearer ${jwt || ANON_KEY}`,
+          "Content-Type": "application/json", Prefer: "return=representation",
+        },
+        body: JSON.stringify({ [field]: value, updated_at: new Date().toISOString() }),
+      });
+      setConfigs((prev) => prev.map((c) => c.id === id ? { ...c, [field]: value } : c));
+    } catch (_) {}
+    setSaving(null);
+  }
+
+  if (loading) return <div style={{ padding: 12, color: "var(--text-muted)" }}>Loading email config...</div>;
+
+  return (
+    <div className="tbl">
+      <div className="th">
+        <span style={{ flex: 2 }}>Email Type</span>
+        <span style={{ flex: 3 }}>Resend Template ID</span>
+        <span style={{ flex: 1, textAlign: "center" }}>Active</span>
+      </div>
+      {configs.map((c) => (
+        <div key={c.id} className="tr" style={{ alignItems: "center" }}>
+          <span style={{ flex: 2, textTransform: "capitalize" }}>
+            {c.template_key.replace(/_/g, " ")}
+          </span>
+          <span style={{ flex: 3 }}>
+            <input
+              style={{ width: "100%", padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 12, fontFamily: "inherit", background: "var(--surface)", color: "var(--text)", boxSizing: "border-box" }}
+              value={c.resend_template_id || ""}
+              placeholder="Paste Resend template ID (optional)"
+              onChange={(e) => {
+                setConfigs((prev) => prev.map((x) => x.id === c.id ? { ...x, resend_template_id: e.target.value } : x));
+              }}
+              onBlur={(e) => updateConfig(c.id, "resend_template_id", e.target.value)}
+            />
+          </span>
+          <span style={{ flex: 1, textAlign: "center" }}>
+            <input
+              type="checkbox"
+              className="chk"
+              checked={c.is_active}
+              onChange={(e) => updateConfig(c.id, "is_active", e.target.checked)}
+              style={{ width: 16, height: 16 }}
+            />
+          </span>
+        </div>
+      ))}
+      <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8, padding: "0 4px" }}>
+        Design email templates in your <a href="https://resend.com/emails" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)" }}>Resend dashboard</a>, then paste the template ID here. If no template ID is set, a default branded email will be used.
+      </p>
+    </div>
+  );
+}
+
+export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStripe, onSaveTier, onSelectMember, jwt }) {
   const [linking, setLinking] = useState(null);
   const [editTier, setEditTier] = useState(null);
   const [addTier, setAddTier] = useState(false);
@@ -187,6 +268,9 @@ export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStrip
           </div>
         ))}
       </div>
+
+      <h2 className="section-head" style={{ marginTop: 24 }}>Email Settings</h2>
+      <EmailConfigSection jwt={jwt} />
 
       <TierEditModal
         open={!!editTier || addTier}
