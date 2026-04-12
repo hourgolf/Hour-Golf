@@ -243,7 +243,8 @@ export default function MemberLayout({ activeTab, children }) {
               <button
                 className="mem-btn mem-btn-primary mem-btn-full"
                 onClick={handleSignup}
-                disabled={formLoading}
+                disabled={formLoading || !signupName.trim() || !signupEmail.trim() || !signupPhone.trim() || !signupBirthday || !signupPassword || signupPassword !== signupConfirm || !signupTerms}
+
               >
                 {formLoading ? "Creating account..." : "Create Account"}
               </button>
