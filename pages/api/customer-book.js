@@ -1,10 +1,9 @@
 import { SUPABASE_URL, getSupabaseKey } from "../../lib/api-helpers";
+import { sendBookingConfirmation } from "../../lib/email";
 
 const TZ = "America/Los_Angeles";
 
 // Convert a date + time the user picked (in Pacific) to a proper UTC Date object.
-// On Vercel the server runs in UTC, so new Date("2026-04-12T10:30:00") would be
-// interpreted as 10:30 UTC instead of 10:30 Pacific. This function fixes that.
 function pacificToUTC(dateStr, timeStr) {
   const naive = new Date(`${dateStr}T${timeStr}:00Z`);
   const utcD = new Date(naive.toLocaleString("en-US", { timeZone: "UTC" }));
@@ -66,27 +65,14 @@ export default async function handler(req, res) {
     const data = await resp.json();
     const booked = data[0];
 
-    // Send booking confirmation email (fire-and-forget)
-    try {
-      const sDate = new Date(booked.booking_start);
-      const eDate = new Date(booked.booking_end);
-      await fetch(`${req.headers.origin || "http://localhost:3000"}/api/send-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          template_key: "booking_confirmation",
-          to_email: booked.customer_email,
-          variables: {
-            customer_name: booked.customer_name || booked.customer_email,
-            date: sDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: TZ }),
-            start_time: sDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: TZ }),
-            end_time: eDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: TZ }),
-            bay: booked.bay,
-            duration: Number(booked.duration_hours).toFixed(1),
-          },
-        }),
-      });
-    } catch (_) { /* email is best-effort, don't fail the booking */ }
+    // Send booking confirmation email immediately (fire-and-forget)
+    sendBookingConfirmation({
+      to: booked.customer_email,
+      customerName: booked.customer_name || booked.customer_email,
+      bay: booked.bay,
+      bookingStart: booked.booking_start,
+      bookingEnd: booked.booking_end,
+    }).catch(() => {});
 
     return res.status(200).json({ success: true, booking: booked });
   } catch (e) {
