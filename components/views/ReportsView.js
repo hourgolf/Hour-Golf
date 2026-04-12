@@ -76,13 +76,11 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
     });
 
     // Member revenue by month (sum tier fees for that month's active members)
-    // Approximate: use current tier assignments projected back
     const mRevByMonth = {};
     const allMonths = new Set();
     activeBk.forEach((b) => {
       allMonths.add(monthKey(new Date(b.booking_start)));
     });
-    // For each month, count bookings by member to see who was active
     const monthMemberHrs = {};
     activeBk.forEach((b) => {
       const k = monthKey(new Date(b.booking_start));
@@ -126,10 +124,7 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
 
   /* ── USAGE data ─────────────────────────────────── */
   const usage = useMemo(() => {
-    // Bay utilization: 2 bays, ~16 operating hours each (6am–10pm)
     const availPerDay = BAYS.length * 16;
-
-    // Daily utilization for last 30 days
     const now = new Date();
     const thirtyAgo = new Date(now);
     thirtyAgo.setDate(thirtyAgo.getDate() - 30);
@@ -146,7 +141,7 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
       ? days.reduce((s, k) => s + dayHrs[k], 0) / days.length / availPerDay * 100
       : 0;
 
-    // Peak hours heatmap: count bookings per (dow, hour)
+    // Peak hours heatmap
     const heat = {};
     DOW_ORDER.forEach((d) => { heat[d] = {}; HOUR_LABELS.forEach((h) => { heat[d][h] = 0; }); });
     activeBk.forEach((b) => {
@@ -183,12 +178,10 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
 
   /* ── MEMBERS data ───────────────────────────────── */
   const memStats = useMemo(() => {
-    // Tier distribution
     const dist = {};
     TIERS.forEach((t) => { dist[t] = 0; });
     (members || []).forEach((m) => { dist[m.tier || "Non-Member"]++; });
 
-    // New signups per month (using join_date or created_at)
     const signupsByMonth = {};
     activeMembers.forEach((m) => {
       const d = m.join_date ? new Date(m.join_date) : m.created_at ? new Date(m.created_at) : null;
@@ -199,7 +192,6 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
     const signupMonths = Object.keys(signupsByMonth).sort().slice(-6);
     const signupTrend = signupMonths.map((k) => ({ month: k, label: monthLabel(k), count: signupsByMonth[k] }));
 
-    // Active in last 30 days (had a booking)
     const now = new Date();
     const thirtyAgo = new Date(now);
     thirtyAgo.setDate(thirtyAgo.getDate() - 30);
@@ -209,7 +201,6 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
     });
     const activeRecent = activeMembers.filter((m) => recentEmails.has(m.email)).length;
 
-    // Average bookings per member (all time)
     const memberBkCounts = {};
     const memberEmails = new Set(activeMembers.map((m) => m.email));
     activeBk.forEach((b) => {
@@ -221,7 +212,6 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
       ? Object.values(memberBkCounts).reduce((s, v) => s + v, 0) / activeMembers.length
       : 0;
 
-    // Top members by hours
     const memberHrs = {};
     activeBk.forEach((b) => {
       if (!memberEmails.has(b.customer_email)) return;
@@ -240,11 +230,9 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
 
   /* ── PUNCH PASS data ────────────────────────────── */
   const passStats = useMemo(() => {
-    // Bonus hours across members
     const withBonus = activeMembers.filter((m) => Number(m.bonus_hours || 0) > 0);
     const totalBonus = activeMembers.reduce((s, m) => s + Number(m.bonus_hours || 0), 0);
 
-    // Distribution by tier
     const bonusByTier = {};
     TIERS.filter((t) => t !== "Non-Member").forEach((t) => { bonusByTier[t] = 0; });
     activeMembers.forEach((m) => {
@@ -253,7 +241,6 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
       }
     });
 
-    // Members with most bonus hours
     const topBonus = [...activeMembers]
       .filter((m) => Number(m.bonus_hours || 0) > 0)
       .sort((a, b) => Number(b.bonus_hours) - Number(a.bonus_hours))
@@ -282,7 +269,6 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
     const maxTrend = Math.max(1, ...revenue.trend.map((t) => t.total));
     return (
       <>
-        {/* KPI cards */}
         <div className="rpt-kpis">
           <div className="rpt-kpi">
             <div className="rpt-kpi-val">{dlr(revenue.mrr)}</div>
@@ -298,7 +284,6 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
           </div>
         </div>
 
-        {/* Revenue by tier */}
         <h3 className="rpt-sub-head">Revenue by Tier</h3>
         <div className="rpt-bars">
           {TIERS.filter((t) => t !== "Non-Member").map((t) => (
@@ -313,7 +298,6 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
           ))}
         </div>
 
-        {/* Monthly trend */}
         <h3 className="rpt-sub-head">Monthly Revenue Trend</h3>
         {revenue.trend.length > 0 ? (
           <div className="rpt-chart">
@@ -324,11 +308,10 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
                     className="rpt-chart-bar"
                     style={{ height: `${(t.total / maxTrend) * 100}%` }}
                     title={`Membership: ${dlr(t.membership)}\nNon-Member: ${dlr(t.nonMember)}\nOverage: ${dlr(t.overage)}`}
-                  >
-                    <span className="rpt-chart-bar-val">{dlr(t.total)}</span>
-                  </div>
+                  />
                 </div>
                 <div className="rpt-chart-lbl">{t.label}</div>
+                <div className="rpt-chart-amt">{dlr(t.total)}</div>
               </div>
             ))}
           </div>
@@ -359,7 +342,6 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
           </div>
         </div>
 
-        {/* By bay */}
         <h3 className="rpt-sub-head">Hours by Bay</h3>
         <div className="rpt-bars">
           {BAYS.map((bay) => (
@@ -374,24 +356,21 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
           ))}
         </div>
 
-        {/* Booking trend */}
         <h3 className="rpt-sub-head">Monthly Bookings</h3>
         {usage.bkTrend.length > 0 ? (
           <div className="rpt-chart">
             {usage.bkTrend.map((t) => (
               <div key={t.month} className="rpt-chart-col">
                 <div className="rpt-chart-bar-wrap">
-                  <div className="rpt-chart-bar" style={{ height: `${(t.count / maxBk) * 100}%` }}>
-                    <span className="rpt-chart-bar-val">{t.count}</span>
-                  </div>
+                  <div className="rpt-chart-bar" style={{ height: `${(t.count / maxBk) * 100}%` }} />
                 </div>
                 <div className="rpt-chart-lbl">{t.label}</div>
+                <div className="rpt-chart-amt">{t.count}</div>
               </div>
             ))}
           </div>
         ) : <p className="muted">No data yet</p>}
 
-        {/* Peak hours heatmap */}
         <h3 className="rpt-sub-head">Peak Hours Heatmap</h3>
         <div className="rpt-heat-wrap">
           <div className="rpt-heat">
@@ -452,7 +431,6 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
           </div>
         </div>
 
-        {/* Tier distribution */}
         <h3 className="rpt-sub-head">Tier Distribution</h3>
         <div className="rpt-bars">
           {TIERS.map((t) => (
@@ -467,24 +445,21 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
           ))}
         </div>
 
-        {/* New signups */}
         <h3 className="rpt-sub-head">New Member Signups</h3>
         {memStats.signupTrend.length > 0 ? (
           <div className="rpt-chart">
             {memStats.signupTrend.map((t) => (
               <div key={t.month} className="rpt-chart-col">
                 <div className="rpt-chart-bar-wrap">
-                  <div className="rpt-chart-bar" style={{ height: `${(t.count / maxSignup) * 100}%` }}>
-                    <span className="rpt-chart-bar-val">{t.count}</span>
-                  </div>
+                  <div className="rpt-chart-bar" style={{ height: `${(t.count / maxSignup) * 100}%` }} />
                 </div>
                 <div className="rpt-chart-lbl">{t.label}</div>
+                <div className="rpt-chart-amt">{t.count}</div>
               </div>
             ))}
           </div>
         ) : <p className="muted">No signup data yet</p>}
 
-        {/* Top members */}
         <h3 className="rpt-sub-head">Top Members by Hours</h3>
         <div className="tbl">
           <div className="th">
@@ -529,7 +504,6 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
           </div>
         </div>
 
-        {/* By tier */}
         <h3 className="rpt-sub-head">Bonus Hours by Tier</h3>
         <div className="rpt-bars">
           {TIERS.filter((t) => t !== "Non-Member").map((t) => (
@@ -544,7 +518,6 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
           ))}
         </div>
 
-        {/* Top holders */}
         {passStats.topBonus.length > 0 && (
           <>
             <h3 className="rpt-sub-head">Top Bonus Hour Holders</h3>
