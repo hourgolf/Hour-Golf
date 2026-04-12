@@ -11,6 +11,7 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
+  const [settingUpCard, setSettingUpCard] = useState(false);
 
   // Subscription state
   const [tiers, setTiers] = useState([]);
@@ -36,6 +37,11 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
       if (params.get("purchased")) {
         showToast(`${params.get("purchased")} bonus hour${params.get("purchased") === "1" ? "" : "s"} added to your account!`);
         window.history.replaceState({}, "", "/members/billing");
+      }
+      if (params.get("card_added")) {
+        showToast("Payment method added successfully!");
+        window.history.replaceState({}, "", "/members/billing");
+        refresh();
       }
     }
   }, []);
@@ -142,11 +148,62 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
     }
   }
 
+  async function handleSetupPayment() {
+    setSettingUpCard(true);
+    try {
+      const r = await fetch("/api/member-setup-payment", {
+        method: "POST",
+        credentials: "include",
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Failed");
+      window.location.href = d.url;
+    } catch (err) {
+      showToast(err.message, "error");
+      setSettingUpCard(false);
+    }
+  }
+
   const hasSubscription = subscription && subscription.status === "active";
   const isCancelling = subscription?.cancel_at_period_end;
+  const hasCard = member.hasPaymentMethod;
 
   return (
     <>
+      {/* Payment Method */}
+      <div className="mem-section">
+        <div className="mem-section-head">Payment Method</div>
+        {hasCard ? (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <span style={{ color: "#4a7c59", fontWeight: 600 }}>{"\u2713"} Card on file</span>
+              <div style={{ fontSize: 12, color: "var(--text-muted, #888)", marginTop: 2 }}>Your payment method is set up</div>
+            </div>
+            <button
+              className="mem-btn-sm"
+              style={{ color: "var(--text)", border: "1px solid var(--border)", background: "var(--surface)" }}
+              onClick={handleSetupPayment}
+              disabled={settingUpCard}
+            >
+              {settingUpCard ? "..." : "Update Card"}
+            </button>
+          </div>
+        ) : (
+          <div style={{ textAlign: "center", padding: "12px 0" }}>
+            <p style={{ fontSize: 14, color: "#993333", marginBottom: 12 }}>
+              {"\u26a0\ufe0f"} No payment method on file. A card is required to make bookings.
+            </p>
+            <button
+              className="mem-btn mem-btn-primary"
+              onClick={handleSetupPayment}
+              disabled={settingUpCard}
+            >
+              {settingUpCard ? "Setting up..." : "Add Payment Method"}
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Membership Section */}
       <div className="mem-section">
         <div className="mem-section-head">Membership</div>
