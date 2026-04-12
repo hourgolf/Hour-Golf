@@ -15,6 +15,10 @@ export default function DetailView({
   onBulkCancel, onBulkDelete, onRefresh,
 }) {
   const [selected, setSelected] = useState(new Set());
+  const [adjustAmt, setAdjustAmt] = useState("");
+  const [adjustReason, setAdjustReason] = useState("");
+  const [adjusting, setAdjusting] = useState(false);
+  const [showAdjust, setShowAdjust] = useState(false);
 
   const selData = useMemo(() => {
     if (!selMember) return null;
@@ -48,7 +52,6 @@ export default function DetailView({
     };
   }, [selMember, members, bookings, usage, showCanc, bayFilter]);
 
-
   function isPaid(email, month) {
     return payments.some((p) => p.member_email === email && p.billing_month === month && p.status === "succeeded");
   }
@@ -67,7 +70,7 @@ export default function DetailView({
 
   return (
     <div className="content">
-            <div className="detail-header">
+      <div className="detail-header">
         <div>
           <h2 style={{ margin: 0, fontSize: 18 }}>{selData.customer?.name || selMember}</h2>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
@@ -92,7 +95,6 @@ export default function DetailView({
             {selData.member?.stripe_customer_id && <span className="muted">Stripe &#10003;</span>}
           </div>
         </div>
-
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <button className="btn primary" onClick={() => onAddBooking(selMember)}>+ Booking</button>
           <TierSelect value={selData.member?.tier || "Non-Member"} onChange={(t) => onUpdateTier(selMember, t, selData.customer?.name)} />
@@ -100,6 +102,71 @@ export default function DetailView({
       </div>
 
       <MemberProfileForm member={selData.member} apiKey={apiKey} onSaved={onRefresh} />
+
+      {/* Bonus Hours */}
+      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "14px 16px", marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)" }}>Bonus Hours</span>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "var(--blue, #2d6a9f)", fontVariantNumeric: "tabular-nums" }}>
+              {Number(selData.member?.bonus_hours || 0).toFixed(1)}h
+            </div>
+          </div>
+          <button className="btn primary" onClick={() => { setShowAdjust(!showAdjust); setAdjustAmt(""); setAdjustReason(""); }}>
+            {showAdjust ? "Cancel" : "Adjust"}
+          </button>
+        </div>
+        {showAdjust && (
+          <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+            <div>
+              <label style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>Hours (+/-)</label>
+              <input
+                type="number"
+                step="0.5"
+                value={adjustAmt}
+                onChange={(e) => setAdjustAmt(e.target.value)}
+                placeholder="e.g. 5 or -2"
+                style={{ width: 100, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, fontFamily: "var(--font)", background: "var(--surface)", color: "var(--text)" }}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 120 }}>
+              <label style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>Reason</label>
+              <input
+                type="text"
+                value={adjustReason}
+                onChange={(e) => setAdjustReason(e.target.value)}
+                placeholder="e.g. Prize, correction"
+                style={{ width: "100%", padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, fontFamily: "var(--font)", background: "var(--surface)", color: "var(--text)" }}
+              />
+            </div>
+            <button
+              className="btn primary"
+              disabled={adjusting || !adjustAmt || Number(adjustAmt) === 0}
+              onClick={async () => {
+                setAdjusting(true);
+                try {
+                  const r = await fetch("/api/admin-adjust-hours", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+                    body: JSON.stringify({ member_email: selMember, adjustment: Number(adjustAmt), reason: adjustReason }),
+                  });
+                  const d = await r.json();
+                  if (!r.ok) throw new Error(d.error || "Failed");
+                  setShowAdjust(false);
+                  setAdjustAmt("");
+                  setAdjustReason("");
+                  onRefresh();
+                } catch (e) {
+                  alert(e.message);
+                }
+                setAdjusting(false);
+              }}
+            >
+              {adjusting ? "..." : "Save"}
+            </button>
+          </div>
+        )}
+      </div>
 
       <h3 className="section-head">Monthly Breakdown</h3>
       <div className="tbl">
