@@ -555,3 +555,118 @@ body {
   .mem-punch-hrs { font-size: 16px; }
   .mem-punch-price { font-size: 18px; }
 }
+/* ── Reports ─────────────────────────────────────── */
+.rpt-tabs {
+  display: flex; gap: 4px; padding: 12px 0 16px;
+  border-bottom: 1px solid var(--border); margin-bottom: 20px;
+  overflow-x: auto;
+}
+.rpt-tab {
+  padding: 6px 16px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-muted); font-size: 12px;
+  font-weight: 600; cursor: pointer; white-space: nowrap; transition: all .15s;
+}
+.rpt-tab.active {
+  background: var(--primary); color: #fff; border-color: var(--primary);
+}
+
+/* KPI cards */
+.rpt-kpis {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px;
+}
+.rpt-kpi {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 20px 16px; text-align: center;
+}
+.rpt-kpi-val {
+  font-size: 28px; font-weight: 700; color: var(--text); line-height: 1.1;
+}
+.rpt-kpi-lbl {
+  font-size: 11px; color: var(--text-muted); margin-top: 6px; text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+/* Section headers */
+.rpt-sub-head {
+  font-size: 13px; font-weight: 700; color: var(--text); margin: 24px 0 12px;
+  text-transform: uppercase; letter-spacing: .5px;
+}
+
+/* Horizontal bars */
+.rpt-bars { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+.rpt-bar-row { display: flex; align-items: center; gap: 10px; }
+.rpt-bar-label {
+  width: 140px; font-size: 12px; font-weight: 600; color: var(--text);
+  text-align: right; flex-shrink: 0;
+}
+.rpt-bar-track {
+  flex: 1; height: 22px; background: var(--bg); border-radius: 4px; overflow: hidden;
+}
+.rpt-bar-fill {
+  height: 100%; border-radius: 4px; transition: width .4s ease;
+}
+.rpt-bar-val {
+  width: 80px; font-size: 12px; font-weight: 600; color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* Vertical bar chart */
+.rpt-chart {
+  display: flex; align-items: flex-end; gap: 8px; height: 200px;
+  padding: 0 0 0 0; margin-bottom: 24px;
+}
+.rpt-chart-col {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  height: 100%;
+}
+.rpt-chart-bar-wrap {
+  flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center;
+}
+.rpt-chart-bar {
+  width: 100%; max-width: 48px; background: var(--primary); border-radius: 4px 4px 0 0;
+  min-height: 4px; position: relative; transition: height .4s ease;
+  display: flex; align-items: flex-start; justify-content: center;
+}
+.rpt-chart-bar-val {
+  font-size: 10px; font-weight: 700; color: #fff; padding-top: 4px;
+  white-space: nowrap;
+}
+.rpt-chart-lbl {
+  font-size: 10px; color: var(--text-muted); margin-top: 6px; text-align: center;
+  white-space: nowrap;
+}
+
+/* Heatmap */
+.rpt-heat-wrap { overflow-x: auto; margin-bottom: 24px; }
+.rpt-heat { display: inline-flex; flex-direction: column; gap: 2px; min-width: 600px; }
+.rpt-heat-row { display: flex; gap: 2px; }
+.rpt-heat-header .rpt-heat-cell { font-weight: 600; background: none !important; }
+.rpt-heat-dow {
+  width: 36px; font-size: 10px; font-weight: 600; color: var(--text-muted);
+  display: flex; align-items: center; flex-shrink: 0;
+}
+.rpt-heat-cell {
+  flex: 1; min-width: 32px; height: 28px; border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 600; transition: background .2s;
+}
+.rpt-heat-hlbl { font-size: 9px; color: var(--text-dim); }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .rpt-kpis { grid-template-columns: 1fr; }
+  .rpt-kpi-val { font-size: 22px; }
+  .rpt-bar-label { width: 90px; font-size: 10px; }
+  .rpt-bar-val { width: 60px; font-size: 10px; }
+  .rpt-chart { height: 150px; }
+  .rpt-chart-bar-val { font-size: 8px; }
+  .rpt-chart-lbl { font-size: 8px; }
+  .rpt-heat-cell { min-width: 24px; height: 22px; font-size: 8px; }
+  .rpt-heat-dow { width: 28px; font-size: 9px; }
+}
+@media (max-width: 400px) {
+  .rpt-tabs { gap: 3px; }
+  .rpt-tab { padding: 5px 10px; font-size: 11px; }
+  .rpt-kpi { padding: 14px 10px; }
+  .rpt-kpi-val { font-size: 20px; }
+}
