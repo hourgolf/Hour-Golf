@@ -40,9 +40,54 @@ export default async function handler(req, res) {
 
   try {
     switch (event.type) {
-      // --- New subscription completed via Checkout ---
+      // --- Checkout completed (subscription OR punch pass) ---
       case "checkout.session.completed": {
         const session = event.data.object;
+
+        // --- Punch pass (one-time payment) ---
+        if (session.metadata?.type === "punch_pass") {
+          const memberEmail = session.metadata.member_email;
+          const hours = Number(session.metadata.hours || 0);
+          if (!memberEmail || !hours) {
+            console.warn("punch_pass checkout missing metadata", session.metadata);
+            break;
+          }
+
+          // Get current bonus_hours
+          const mResp = await fetch(
+            `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(memberEmail)}&select=bonus_hours,bonus_reconciled_month`,
+            { headers: { apikey: key, Authorization: `Bearer ${key}` } }
+          );
+          const mRows = mResp.ok ? await mResp.json() : [];
+          const current = Number(mRows[0]?.bonus_hours || 0);
+          const reconMonth = mRows[0]?.bonus_reconciled_month;
+
+          // Increment bonus_hours
+          const now = new Date();
+          const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+          await fetch(
+            `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(memberEmail)}`,
+            {
+              method: "PATCH",
+              headers: {
+                apikey: key, Authorization: `Bearer ${key}`,
+                "Content-Type": "application/json",
+                Prefer: "return=representation",
+              },
+              body: JSON.stringify({
+                bonus_hours: current + hours,
+                bonus_reconciled_month: reconMonth || currentMonth,
+                stripe_customer_id: session.customer || undefined,
+                updated_at: now.toISOString(),
+              }),
+            }
+          );
+
+          console.log(`Punch pass: ${memberEmail} +${hours}h (${current} → ${current + hours})`);
+          break;
+        }
+
+        // --- Subscription checkout ---
         if (session.mode !== "subscription") break;
 
         const memberEmail = session.metadata?.member_email;
