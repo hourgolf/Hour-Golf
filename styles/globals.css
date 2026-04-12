@@ -469,9 +469,22 @@ body {
 .mem-sub-status.active { background: #f0f7f2; color: #4a7c59; }
 .mem-sub-status.cancelling { background: #fffbeb; color: #a67c00; }
 
+
+/* Punch pass cards */
+.mem-punch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
+.mem-punch-card { position: relative; background: var(--surface, #fff); border: 2px solid var(--border, #e5e5e0); border-radius: 10px; padding: 24px 16px 16px; cursor: pointer; text-align: center; font-family: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
+.mem-punch-card:hover { border-color: #2d6a9f; box-shadow: 0 2px 8px rgba(45,106,159,0.12); }
+.mem-punch-card:disabled { opacity: 0.5; cursor: default; }
+.mem-punch-tag { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #2d6a9f; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
+.mem-punch-hrs { font-size: 18px; font-weight: 700; color: var(--text, #1a1a1a); margin-bottom: 4px; }
+.mem-punch-price { font-size: 22px; font-weight: 700; color: #2d6a9f; }
+.mem-punch-orig { font-size: 13px; color: var(--text-muted, #888); margin-top: 2px; }
+.mem-punch-rate { font-size: 11px; color: var(--text-dim, #999); margin-top: 6px; }
+
 /* Responsive — member portal */
 @media (max-width: 600px) {
   .mem-cards { grid-template-columns: 1fr 1fr; }
+  .mem-punch-grid { grid-template-columns: 1fr; }
   .mem-credit-grid { grid-template-columns: 1fr 1fr; }
   .mem-avail-grid { font-size: 10px; grid-template-columns: 60px 1fr 1fr; }
   .mem-header-inner { flex-wrap: wrap; gap: 8px; }
