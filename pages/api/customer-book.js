@@ -24,17 +24,25 @@ export default async function handler(req, res) {
   try {
     const cleanEmail = email.toLowerCase().trim();
     let memberTier = "Non-Member";
+    let hasPaymentMethod = false;
     try {
       const memberResp = await fetch(
-        `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&select=tier`,
+        `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&select=tier,stripe_customer_id`,
+
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       );
       if (memberResp.ok) {
         const rows = await memberResp.json();
-        if (rows.length) memberTier = rows[0].tier || "Non-Member";
+        if (rows.length) {
+          memberTier = rows[0].tier || "Non-Member";
+          hasPaymentMethod = !!rows[0].stripe_customer_id;
+        }
       }
     } catch (_) {}
-
+    // Require payment method on file
+    if (!hasPaymentMethod) {
+      return res.status(403).json({ error: "Please add a payment method before booking. Go to Billing to add a card." });
+    }
     if (memberTier === "Non-Member") {
       if (startTime < "10:00" || endTime > "20:00") {
         return res.status(400).json({ error: "Non-member bookings are restricted to 10:00 AM - 8:00 PM. Upgrade your membership for 24/7 access." });
