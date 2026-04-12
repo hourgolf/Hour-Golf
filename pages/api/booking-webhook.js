@@ -55,7 +55,34 @@ export default async function handler(req, res) {
 
       if (resp.ok) {
         const data = await resp.json();
-        results.push({ booking_id: record.booking_id, status: "ok", duration_hours: data[0]?.duration_hours });
+        const booked = data[0];
+        results.push({ booking_id: record.booking_id, status: "ok", duration_hours: booked?.duration_hours });
+
+        // Send booking confirmation email (fire-and-forget)
+        if (booked && record.booking_status === "Confirmed") {
+          try {
+            const TZ = "America/Los_Angeles";
+            const sDate = new Date(booked.booking_start);
+            const eDate = new Date(booked.booking_end);
+            const origin = req.headers.origin || req.headers.referer?.replace(/\/$/, "") || "https://hour-golf.vercel.app";
+            fetch(`${origin}/api/send-email`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                template_key: "booking_confirmation",
+                to_email: booked.customer_email,
+                variables: {
+                  customer_name: booked.customer_name || booked.customer_email,
+                  date: sDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: TZ }),
+                  start_time: sDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: TZ }),
+                  end_time: eDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: TZ }),
+                  bay: booked.bay,
+                  duration: Number(booked.duration_hours).toFixed(1),
+                },
+              }),
+            }).catch(() => {});
+          } catch (_) { /* email is best-effort */ }
+        }
       } else {
         const err = await resp.text();
         results.push({ booking_id: record.booking_id, status: "error", error: err });
