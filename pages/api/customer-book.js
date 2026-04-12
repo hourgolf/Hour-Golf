@@ -1,5 +1,17 @@
 import { SUPABASE_URL, getSupabaseKey } from "../../lib/api-helpers";
 
+const TZ = "America/Los_Angeles";
+
+// Convert a date + time the user picked (in Pacific) to a proper UTC Date object.
+// On Vercel the server runs in UTC, so new Date("2026-04-12T10:30:00") would be
+// interpreted as 10:30 UTC instead of 10:30 Pacific. This function fixes that.
+function pacificToUTC(dateStr, timeStr) {
+  const naive = new Date(`${dateStr}T${timeStr}:00Z`);
+  const utcD = new Date(naive.toLocaleString("en-US", { timeZone: "UTC" }));
+  const tzD = new Date(naive.toLocaleString("en-US", { timeZone: TZ }));
+  return new Date(naive.getTime() + (utcD - tzD));
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
@@ -12,12 +24,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const bookingStart = `${date}T${startTime}:00`;
-    const bookingEnd = `${date}T${endTime}:00`;
+    const sD = pacificToUTC(date, startTime);
+    const eD = pacificToUTC(date, endTime);
+    const bookingStartISO = sD.toISOString();
+    const bookingEndISO = eD.toISOString();
 
     // Check overlapping bookings
     const conflicts = await fetch(
-      `${SUPABASE_URL}/rest/v1/bookings?bay=eq.${encodeURIComponent(bay)}&booking_status=eq.Confirmed&booking_start=lt.${bookingEnd}&booking_end=gt.${bookingStart}`,
+      `${SUPABASE_URL}/rest/v1/bookings?bay=eq.${encodeURIComponent(bay)}&booking_status=eq.Confirmed&booking_start=lt.${bookingEndISO}&booking_end=gt.${bookingStartISO}`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const conflictData = await conflicts.json();
@@ -26,15 +40,12 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: "Time slot not available", detail: "That bay is already booked during the requested time." });
     }
 
-    const sD = new Date(bookingStart);
-    const eD = new Date(bookingEnd);
-
     const record = {
       booking_id: `portal_${Date.now()}`,
       customer_email: email.toLowerCase().trim(),
       customer_name: name || email,
-      booking_start: sD.toISOString(),
-      booking_end: eD.toISOString(),
+      booking_start: bookingStartISO,
+      booking_end: bookingEndISO,
       duration_hours: Math.round(Math.max(0, (eD - sD) / 3600000) * 100) / 100,
       bay,
       booking_status: "Confirmed",
@@ -59,7 +70,6 @@ export default async function handler(req, res) {
     try {
       const sDate = new Date(booked.booking_start);
       const eDate = new Date(booked.booking_end);
-      const TZ = "America/Los_Angeles";
       await fetch(`${req.headers.origin || "http://localhost:3000"}/api/send-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
