@@ -9,6 +9,8 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
   const [upcoming, setUpcoming] = useState([]);
   const [monthBookings, setMonthBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cancelConfirm, setCancelConfirm] = useState(null); // booking_id being confirmed
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -36,6 +38,26 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
       showToast("Failed to load dashboard data", "error");
     }
     setLoading(false);
+  }
+
+  async function handleCancel(bookingId) {
+    setCancelling(true);
+    try {
+      const r = await fetch("/api/member-cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Cancellation failed");
+      showToast("Booking cancelled");
+      setCancelConfirm(null);
+      await loadData();
+    } catch (e) {
+      showToast(e.message, "error");
+    }
+    setCancelling(false);
   }
 
   const totalHours = Number(usage?.total_hours || 0);
@@ -92,13 +114,53 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
             {upcoming.map((b) => {
               const s = new Date(b.booking_start);
               const e = new Date(b.booking_end);
+              const hoursUntil = (s - new Date()) / 3600000;
+              const canCancel = hoursUntil > 6;
+
               return (
-                <div key={b.booking_id} className="mem-list-item">
-                  <div>
-                    <strong>{fDL(s)}</strong>
-                    <div className="mem-list-sub">{fT(s)} &ndash; {fT(e)} &middot; {b.bay}</div>
+                <div key={b.booking_id} className="mem-list-item" style={{ flexDirection: "column", alignItems: "stretch" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <strong>{fDL(s)}</strong>
+                      <div className="mem-list-sub">{fT(s)} &ndash; {fT(e)} &middot; {b.bay}</div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span className="mem-dur">{Number(b.duration_hours).toFixed(1)}h</span>
+                      {canCancel ? (
+                        <button
+                          className="mem-cancel-btn"
+                          onClick={() => setCancelConfirm(b.booking_id)}
+                          disabled={cancelling}
+                        >
+                          Cancel
+                        </button>
+                      ) : (
+                        <span className="mem-list-sub" style={{ fontSize: 11 }}>Contact us to cancel</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="mem-dur">{Number(b.duration_hours).toFixed(1)}h</div>
+
+                  {cancelConfirm === b.booking_id && (
+                    <div className="mem-cancel-confirm">
+                      <span>Cancel this booking?</span>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          className="mem-cancel-btn mem-cancel-yes"
+                          onClick={() => handleCancel(b.booking_id)}
+                          disabled={cancelling}
+                        >
+                          {cancelling ? "..." : "Yes, cancel"}
+                        </button>
+                        <button
+                          className="mem-btn-sm"
+                          style={{ color: "var(--text)", border: "1px solid var(--border)" }}
+                          onClick={() => setCancelConfirm(null)}
+                        >
+                          No, keep it
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
