@@ -30,7 +30,7 @@ export default function useMemberAuth() {
     setLoading(false);
   }
 
-  async function login(email) {
+  async function login(email, password) {
     setLoading(true);
     setError("");
     try {
@@ -38,7 +38,7 @@ export default function useMemberAuth() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, password }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Login failed");
@@ -49,6 +49,49 @@ export default function useMemberAuth() {
     } catch (e) {
       setError(e.message);
       setLoading(false);
+      return false;
+    }
+  }
+
+  async function signup({ email, password, name, phone, birthday }) {
+    setLoading(true);
+    setError("");
+    try {
+      const r = await fetch("/api/member-signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password, name, phone, birthday }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Signup failed");
+      setMember(d.member);
+      setTierConfig(d.tierConfig);
+      setLoading(false);
+      return true;
+    } catch (e) {
+      setError(e.message);
+      setLoading(false);
+      return false;
+    }
+  }
+
+  async function completeAccount(password) {
+    setError("");
+    try {
+      const r = await fetch("/api/member-complete-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ password }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Failed");
+      // Refresh session to clear needsAccountSetup flag
+      await checkSession();
+      return true;
+    } catch (e) {
+      setError(e.message);
       return false;
     }
   }
@@ -66,5 +109,5 @@ export default function useMemberAuth() {
 
   const refresh = useCallback(checkSession, []);
 
-  return { member, tierConfig, loading, error, login, logout, refresh };
+  return { member, tierConfig, loading, error, login, signup, completeAccount, logout, refresh };
 }
