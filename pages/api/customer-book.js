@@ -3,7 +3,6 @@ import { sendBookingConfirmation } from "../../lib/email";
 
 const TZ = "America/Los_Angeles";
 
-// Convert a date + time the user picked (in Pacific) to a proper UTC Date object.
 function pacificToUTC(dateStr, timeStr) {
   const naive = new Date(`${dateStr}T${timeStr}:00Z`);
   const utcD = new Date(naive.toLocaleString("en-US", { timeZone: "UTC" }));
@@ -17,13 +16,12 @@ export default async function handler(req, res) {
   const key = getSupabaseKey(req);
   if (!key) return res.status(401).json({ error: "API key required" });
 
-  const { email, name, date, startTime, endTime, bay } = req.body;
+  const { email, name, date, startTime, endTime, bay, terms_accepted } = req.body;
   if (!email || !date || !startTime || !endTime || !bay) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
-    // Non-member time restriction: 10 AM - 8 PM only
     const cleanEmail = email.toLowerCase().trim();
     let memberTier = "Non-Member";
     try {
@@ -35,7 +33,7 @@ export default async function handler(req, res) {
         const rows = await memberResp.json();
         if (rows.length) memberTier = rows[0].tier || "Non-Member";
       }
-    } catch (_) { /* default to Non-Member */ }
+    } catch (_) {}
 
     if (memberTier === "Non-Member") {
       if (startTime < "10:00" || endTime > "20:00") {
@@ -48,7 +46,6 @@ export default async function handler(req, res) {
     const bookingStartISO = sD.toISOString();
     const bookingEndISO = eD.toISOString();
 
-    // Check overlapping bookings
     const conflicts = await fetch(
       `${SUPABASE_URL}/rest/v1/bookings?bay=eq.${encodeURIComponent(bay)}&booking_status=eq.Confirmed&booking_start=lt.${bookingEndISO}&booking_end=gt.${bookingStartISO}`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
@@ -68,6 +65,7 @@ export default async function handler(req, res) {
       duration_hours: Math.round(Math.max(0, (eD - sD) / 3600000) * 100) / 100,
       bay,
       booking_status: "Confirmed",
+      terms_accepted_at: terms_accepted ? new Date().toISOString() : null,
     };
 
     const resp = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
@@ -85,7 +83,6 @@ export default async function handler(req, res) {
     const data = await resp.json();
     const booked = data[0];
 
-    // Send booking confirmation email immediately (fire-and-forget)
     sendBookingConfirmation({
       to: booked.customer_email,
       customerName: booked.customer_name || booked.customer_email,
