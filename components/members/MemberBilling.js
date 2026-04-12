@@ -1,7 +1,11 @@
 import { useState, useEffect } from "react";
 import { fD } from "../../lib/format";
 
-const CREDIT_OPTIONS = [1, 2, 5, 10];
+const PUNCH_PASSES = [
+  { hours: 1, discount: 0, label: "1 Hour" },
+  { hours: 5, discount: 0.10, label: "5 Hours", tag: "10% off" },
+  { hours: 10, discount: 0.25, label: "10 Hours", tag: "25% off" },
+];
 
 export default function MemberBilling({ member, tierConfig, refresh, showToast }) {
   const [payments, setPayments] = useState([]);
@@ -21,13 +25,17 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
     loadBilling();
     loadSubscription();
 
-    // Check for subscription success
+    // Check for success redirects
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       if (params.get("subscribed")) {
         showToast(`Welcome! You're now a ${params.get("subscribed")} member.`);
         window.history.replaceState({}, "", "/members/billing");
-        refresh(); // refresh session to get new tier
+        refresh();
+      }
+      if (params.get("purchased")) {
+        showToast(`${params.get("purchased")} bonus hour${params.get("purchased") === "1" ? "" : "s"} added to your account!`);
+        window.history.replaceState({}, "", "/members/billing");
       }
     }
   }, []);
@@ -116,14 +124,14 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
     setChangingTier(false);
   }
 
-  async function handleBuyCredits(hours) {
+  async function handleBuyPunchPass(hours) {
     setPurchasing(true);
     try {
-      const r = await fetch("/api/customer-buy-credits", {
+      const r = await fetch("/api/punch-pass-purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email: member.email, hours }),
+        body: JSON.stringify({ hours }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Failed");
@@ -250,26 +258,39 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
         )}
       </div>
 
-      {/* Buy Credits */}
-      <div className="mem-section">
-        <div className="mem-section-head">Buy Hour Credits</div>
-        <p style={{ fontSize: 13, opacity: 0.7, marginBottom: 12 }}>
-          Purchase additional bay hours at ${overageRate}/hr.
-        </p>
-        <div className="mem-credit-grid">
-          {CREDIT_OPTIONS.map((h) => (
-            <button
-              key={h}
-              className="mem-credit-btn"
-              onClick={() => handleBuyCredits(h)}
-              disabled={purchasing}
-            >
-              <div className="mem-credit-hrs">{h}h</div>
-              <div className="mem-credit-price">${(h * overageRate).toFixed(0)}</div>
-            </button>
-          ))}
+      {/* Punch Passes */}
+      {overageRate > 0 && (
+        <div className="mem-section">
+          <div className="mem-section-head">Buy Hour Passes</div>
+          <p style={{ fontSize: 13, opacity: 0.7, marginBottom: 12 }}>
+            Purchase extra bay hours. Unused hours carry over month to month.
+          </p>
+          <div className="mem-punch-grid">
+            {PUNCH_PASSES.map((p) => {
+              const fullPrice = p.hours * overageRate;
+              const finalPrice = fullPrice * (1 - p.discount);
+              return (
+                <button
+                  key={p.hours}
+                  className="mem-punch-card"
+                  onClick={() => handleBuyPunchPass(p.hours)}
+                  disabled={purchasing}
+                >
+                  {p.tag && <div className="mem-punch-tag">{p.tag}</div>}
+                  <div className="mem-punch-hrs">{p.label}</div>
+                  <div className="mem-punch-price">${Math.round(finalPrice)}</div>
+                  {p.discount > 0 && (
+                    <div className="mem-punch-orig">
+                      <s>${Math.round(fullPrice)}</s>
+                    </div>
+                  )}
+                  <div className="mem-punch-rate">${overageRate}/hr</div>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Payment History */}
       <div className="mem-section">
