@@ -369,6 +369,7 @@ export default function Dashboard() {
           onLinkStripe={linkStripe}
           onSaveTier={saveTier}
           onSelectMember={selectMember}
+          jwt={apiKey}
         />
       )}
 
