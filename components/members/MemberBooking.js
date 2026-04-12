@@ -2,19 +2,27 @@ import { useState, useEffect, useMemo } from "react";
 import { BAYS, TZ } from "../../lib/constants";
 import { fT, fDL } from "../../lib/format";
 
-const HOURS = [];
+const ALL_HOURS = [];
 for (let h = 7; h <= 21; h++) {
   for (let m = 0; m < 60; m += 30) {
-    HOURS.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    ALL_HOURS.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
   }
 }
 
 export default function MemberBooking({ member, tierConfig, refresh, showToast }) {
+  const isNonMember = member.tier === "Non-Member";
+
+  // Non-members: 10:00 AM - 8:00 PM only. Members: full range.
+  const HOURS = useMemo(() => {
+    if (isNonMember) return ALL_HOURS.filter((h) => h >= "10:00" && h <= "20:00");
+    return ALL_HOURS;
+  }, [isNonMember]);
+
   const [bookDate, setBookDate] = useState(() => {
     return new Date().toLocaleDateString("en-CA", { timeZone: TZ });
   });
-  const [bookStart, setBookStart] = useState("10:00");
-  const [bookEnd, setBookEnd] = useState("11:00");
+  const [bookStart, setBookStart] = useState(isNonMember ? "10:00" : "10:00");
+  const [bookEnd, setBookEnd] = useState(isNonMember ? "11:00" : "11:00");
   const [bookBay, setBookBay] = useState("Bay 1");
   const [availability, setAvailability] = useState([]);
   const [booking, setBooking] = useState(false);
@@ -64,8 +72,8 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
       if (!r.ok) throw new Error(d.error || d.detail || "Booking failed");
       showToast("Booking confirmed!");
       // Reset form so the just-booked slot doesn't trigger a conflict error
-      setBookStart("10:00");
-      setBookEnd("11:00");
+      setBookStart(isNonMember ? "10:00" : "10:00");
+      setBookEnd(isNonMember ? "11:00" : "11:00");
       setBookBay("Bay 1");
       // Refresh availability
       fetch(`/api/customer-availability?date=${bookDate}`, { credentials: "include" })
@@ -82,6 +90,13 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
 
   return (
     <>
+      {isNonMember && (
+        <div className="mem-info-banner">
+          \u23f0 Non-member bookings available <strong>10 AM \u2013 8 PM</strong>.{" "}
+          <a href="/members/billing">Upgrade your membership</a> for 24/7 access.
+        </div>
+      )}
+
       <div className="mem-section">
         <div className="mem-section-head">Book a Bay</div>
 
