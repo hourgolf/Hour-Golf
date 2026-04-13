@@ -84,7 +84,7 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
           <div className="mem-card-lbl">Used This Month</div>
         </div>
         <div className="mem-card">
-          <div className="mem-card-val" style={{ color: isUnlimited ? "#a67c00" : remaining <= 2 ? "#cc4455" : "#4a7c59" }}>
+          <div className="mem-card-val" style={{ color: isUnlimited ? "#8BB5A0" : remaining <= 2 ? "#C92F1F" : "#4C8D73" }}>
             {isUnlimited ? "\u221E" : `${fmt(remaining)}h`}
           </div>
           <div className="mem-card-lbl">Remaining</div>
@@ -94,14 +94,14 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
           <div className="mem-card-lbl">Monthly Allowance</div>
         </div>
         {bonusRemaining > 0 && (
-          <div className="mem-card" style={{ borderColor: "#2d6a9f" }}>
-            <div className="mem-card-val" style={{ color: "#2d6a9f" }}>{fmt(bonusRemaining)}h</div>
+          <div className="mem-card" style={{ borderColor: "#8BB5A0" }}>
+            <div className="mem-card-val" style={{ color: "#8BB5A0" }}>{fmt(bonusRemaining)}h</div>
             <div className="mem-card-lbl">Bonus Hours</div>
           </div>
         )}
         {overageHours > 0 && (
-          <div className="mem-card" style={{ borderColor: "#cc4455" }}>
-            <div className="mem-card-val" style={{ color: "#cc4455" }}>{fmt(overageHours)}h</div>
+          <div className="mem-card" style={{ borderColor: "#C92F1F" }}>
+            <div className="mem-card-val" style={{ color: "#C92F1F" }}>{fmt(overageHours)}h</div>
             <div className="mem-card-lbl">Overage (${(overageHours * overageRate).toFixed(2)})</div>
           </div>
         )}
