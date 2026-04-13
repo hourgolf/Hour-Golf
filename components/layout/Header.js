@@ -47,8 +47,8 @@ export default function Header({
           </div>
           <button className="hdr-btn" onClick={onAddBooking}><span className="hdr-btn-icon">+</span><span className="hdr-btn-text"> Booking</span></button>
           <button className="hdr-btn hdr-btn-home" onClick={onHome} title="Home"><span className="hdr-btn-icon">{"\u2302"}</span><span className="hdr-btn-text"> Home</span></button>
-          <button className="hdr-btn" onClick={onRefresh} disabled={loading} title="Refresh">{"\u21BB"}</button>
-          <button className="hdr-btn" onClick={onSettings} title="Settings">{"\u2699"}</button>
+          <button className="hdr-btn" onClick={onRefresh} disabled={loading} title="Refresh">{"\u267A"}</button>
+          <button className="hdr-btn" onClick={onSettings} title="Settings">{"\u26ED"}</button>
         </div>
       </div>
     </header>
