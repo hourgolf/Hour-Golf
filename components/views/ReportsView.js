@@ -393,8 +393,8 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
                       key={h}
                       className="rpt-heat-cell"
                       style={{
-                        background: v ? `rgba(26, 71, 42, ${0.15 + intensity * 0.85})` : "var(--surface)",
-                        color: intensity > 0.5 ? "#fff" : "var(--text-muted)",
+                        background: v ? `rgba(76, 141, 115, ${0.15 + intensity * 0.85})` : "var(--surface)",
+                        color: intensity > 0.5 ? "#EDF3E3" : "var(--text-muted)",
                       }}
                       title={`${dow} ${h > 12 ? h - 12 : h}${h >= 12 ? "pm" : "am"}: ${v} bookings`}
                     >
