@@ -1,4 +1,10 @@
-:root {
+:root @font-face {
+  font-family: 'Biden Bold';
+  src: url('/fonts/biden-bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}{
   --primary: #1a472a;
   --primary-light: #245a35;
   --primary-bg: #f0f7f2;
