@@ -1,7 +1,7 @@
 import { THEMES } from "../../lib/constants";
 
 export default function ThemeCustomizer({ settings, updateSetting }) {
-  const currentColor = settings.customColor || (THEMES[settings.theme] || THEMES.augusta).primary;
+  const currentColor = settings.customColor || (THEMES[settings.theme] || THEMES.brand).primary;
 
   function setColor(hex) {
     updateSetting("customColor", hex);
@@ -18,7 +18,7 @@ export default function ThemeCustomizer({ settings, updateSetting }) {
         />
         <input
           type="text"
-          placeholder="#1a472a"
+          placeholder="#4C8D73"
           value={settings.customColor || currentColor}
           onChange={(e) => {
             const v = e.target.value;
