@@ -91,9 +91,9 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
   return (
     <>
       {!hasCard && (
-        <div className="mem-info-banner" style={{ background: "#fef2f2", borderColor: "#f0c0c0", color: "#993333" }}>
+        <div className="mem-info-banner" style={{ background: "#fef2f2", borderColor: "#f0c0c0", color: "#C92F1F" }}>
           {"\u26a0\ufe0f"} A payment method is required before booking.{" "}
-          <a href="/members/billing" style={{ color: "#993333" }}>Add a card on the Billing page</a> to get started.
+          <a href="/members/billing" style={{ color: "#C92F1F" }}>Add a card on the Billing page</a> to get started.
         </div>
       )}
 
@@ -156,7 +156,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
 
           {bookMsg && <div className="mem-err" style={{ marginTop: 8 }}>{bookMsg}</div>}
 
-          <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "#555", marginTop: 12, cursor: "pointer" }}>
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "var(--text-muted)", marginTop: 12, cursor: "pointer" }}>
             <input
               type="checkbox"
               checked={termsAccepted}
@@ -173,7 +173,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
             onClick={handleBook}
             disabled={booking || slotConflict || bookDuration <= 0 || !termsAccepted || !hasCard}
           >
-            {booking ? "Booking..." : "Confirm Booking"}
+            {booking ? "Booking..." : "Confirm Booking."}
           </button>
         </div>
       </div>
