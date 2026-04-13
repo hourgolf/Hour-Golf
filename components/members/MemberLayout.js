@@ -138,10 +138,14 @@ export default function MemberLayout({ activeTab, children }) {
   // Not logged in — show login or signup form
   if (!member) {
     return (
-      <div className="mem-layout">
-        <div className="mem-login">
+      <div className="mem-layout" style={{ position: "relative", overflow: "hidden" }}>
+        {/* Decorative blobs */}
+        <img src="/blobs/green1.png" alt="" style={{ position: "absolute", top: -80, right: -120, width: 500, opacity: 0.18, pointerEvents: "none", zIndex: 0 }} />
+        <img src="/blobs/pond1.png" alt="" style={{ position: "absolute", bottom: -60, left: -100, width: 420, opacity: 0.14, pointerEvents: "none", zIndex: 0 }} />
+
+        <div className="mem-login" style={{ position: "relative", zIndex: 1 }}>
           <div className="mem-brand">HOUR GOLF</div>
-          <div className="mem-brand-sub">Member Portal</div>
+          <div className="mem-brand-sub">{mode === "login" ? "Welcome Back." : "Join the Club."}</div>
 
           {mode === "login" ? (
             <>
@@ -167,13 +171,13 @@ export default function MemberLayout({ activeTab, children }) {
                 onClick={handleLogin}
                 disabled={!email.trim() || formLoading}
               >
-                {formLoading ? "Signing in..." : "Sign In"}
+                {formLoading ? "Signing in..." : "Sign In."}
               </button>
-              <p style={{ marginTop: 20, fontSize: 13, color: "#888" }}>
+              <p style={{ marginTop: 20, fontSize: 13, color: "var(--text-muted)" }}>
                 Don&rsquo;t have an account?{" "}
                 <button
                   onClick={() => { setMode("signup"); setFormError(""); }}
-                  style={{ background: "none", border: "none", color: "#006044", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", fontSize: 13, textDecoration: "underline" }}
+                  style={{ background: "none", border: "none", color: "var(--primary)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", fontSize: 13, textDecoration: "underline" }}
                 >
                   Sign up
                 </button>
@@ -203,7 +207,7 @@ export default function MemberLayout({ activeTab, children }) {
                 className="mem-input"
               />
               <div style={{ textAlign: "left", marginBottom: 16 }}>
-                <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "#888", display: "block", marginBottom: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: 5 }}>
                   Date of Birth
                 </label>
                 <input
@@ -228,7 +232,7 @@ export default function MemberLayout({ activeTab, children }) {
                 placeholder="Confirm password"
                 className="mem-input"
               />
-              <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "#555", marginBottom: 16, textAlign: "left", cursor: "pointer" }}>
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "var(--text-muted)", marginBottom: 16, textAlign: "left", cursor: "pointer" }}>
                 <input
                   type="checkbox"
                   checked={signupTerms}
@@ -244,15 +248,14 @@ export default function MemberLayout({ activeTab, children }) {
                 className="mem-btn mem-btn-primary mem-btn-full"
                 onClick={handleSignup}
                 disabled={formLoading || !signupName.trim() || !signupEmail.trim() || !signupPhone.trim() || !signupBirthday || !signupPassword || signupPassword !== signupConfirm || !signupTerms}
-
               >
-                {formLoading ? "Creating account..." : "Create Account"}
+                {formLoading ? "Creating account..." : "Create Account."}
               </button>
-              <p style={{ marginTop: 20, fontSize: 13, color: "#888" }}>
+              <p style={{ marginTop: 20, fontSize: 13, color: "var(--text-muted)" }}>
                 Already have an account?{" "}
                 <button
                   onClick={() => { setMode("login"); setFormError(""); }}
-                  style={{ background: "none", border: "none", color: "#006044", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", fontSize: 13, textDecoration: "underline" }}
+                  style={{ background: "none", border: "none", color: "var(--primary)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", fontSize: 13, textDecoration: "underline" }}
                 >
                   Sign in
                 </button>
@@ -271,7 +274,7 @@ export default function MemberLayout({ activeTab, children }) {
         <div className="mem-login">
           <div className="mem-brand">HOUR GOLF</div>
           <div className="mem-brand-sub">Complete Your Account</div>
-          <p style={{ fontSize: 14, color: "#555", marginBottom: 24, lineHeight: 1.5 }}>
+          <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 24, lineHeight: 1.5 }}>
             Welcome back, <strong>{member.name || member.email}</strong>! Please set a password and agree to our policies to continue.
           </p>
           <input
@@ -289,7 +292,7 @@ export default function MemberLayout({ activeTab, children }) {
             placeholder="Confirm password"
             className="mem-input"
           />
-          <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "#555", marginBottom: 16, textAlign: "left", cursor: "pointer" }}>
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "var(--text-muted)", marginBottom: 16, textAlign: "left", cursor: "pointer" }}>
             <input
               type="checkbox"
               checked={completeTerms}
@@ -306,11 +309,11 @@ export default function MemberLayout({ activeTab, children }) {
             onClick={handleComplete}
             disabled={formLoading}
           >
-            {formLoading ? "Saving..." : "Complete Setup"}
+            {formLoading ? "Saving..." : "Complete Setup."}
           </button>
           <button
             onClick={() => { logout(); router.push("/members"); }}
-            style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontFamily: "inherit", fontSize: 12, marginTop: 16 }}
+            style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontFamily: "inherit", fontSize: 12, marginTop: 16 }}
           >
             Sign out
           </button>
@@ -323,23 +326,27 @@ export default function MemberLayout({ activeTab, children }) {
   const tierObj = TIER_COLORS[member.tier] || { bg: "#D1DFCB", text: "#35443B" };
 
   return (
-    <div className="mem-layout">
+    <div className="mem-layout" style={{ position: "relative", overflow: "hidden" }}>
+      {/* Decorative blobs */}
+      <img src="/blobs/green2.png" alt="" style={{ position: "fixed", top: -100, right: -150, width: 550, opacity: 0.12, pointerEvents: "none", zIndex: 0 }} />
+      <img src="/blobs/pond1.png" alt="" style={{ position: "fixed", bottom: -80, left: -120, width: 450, opacity: 0.10, pointerEvents: "none", zIndex: 0 }} />
+
       {/* Header */}
-      <header className="mem-header">
+      <header className="mem-header" style={{ position: "relative", zIndex: 1 }}>
         <div className="mem-header-inner">
           <div className="mem-brand" style={{ fontSize: 16 }}>HOUR GOLF</div>
           <div className="mem-header-right">
             <span className="mem-header-name">{member.name}</span>
             <span className="mem-tier-badge" style={{ background: tierObj.bg, color: tierObj.text }}>{member.tier}</span>
             <button className="mem-btn-sm" onClick={() => { logout(); router.push("/members"); }}>
-              Sign Out
+              Sign Out.
             </button>
           </div>
         </div>
       </header>
 
       {/* Nav */}
-      <nav className="mem-nav">
+      <nav className="mem-nav" style={{ position: "relative", zIndex: 1 }}>
         <div className="mem-nav-inner">
           {NAV_ITEMS.map(({ key, label, href }) => (
             <button
@@ -354,7 +361,7 @@ export default function MemberLayout({ activeTab, children }) {
       </nav>
 
       {/* Content */}
-      <main className="mem-content">
+      <main className="mem-content" style={{ position: "relative", zIndex: 1 }}>
         {typeof children === "function"
           ? children({ member, tierConfig, refresh, showToast })
           : children}
