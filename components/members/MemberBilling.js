@@ -176,7 +176,7 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
         {hasCard ? (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <span style={{ color: "#4a7c59", fontWeight: 600 }}>{"\u2713"} Card on file</span>
+              <span style={{ color: "#4C8D73", fontWeight: 600 }}>{"\u2713"} Card on file</span>
               <div style={{ fontSize: 12, color: "var(--text-muted, #888)", marginTop: 2 }}>Your payment method is set up</div>
             </div>
             <button
@@ -190,7 +190,7 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
           </div>
         ) : (
           <div style={{ textAlign: "center", padding: "12px 0" }}>
-            <p style={{ fontSize: 14, color: "#993333", marginBottom: 12 }}>
+            <p style={{ fontSize: 14, color: "#C92F1F", marginBottom: 12 }}>
               {"\u26a0\ufe0f"} No payment method on file. A card is required to make bookings.
             </p>
             <button
@@ -214,7 +214,7 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
           <>
             {/* Current status */}
             {hasSubscription && (
-              <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--bg, #f5f3ef)", borderRadius: 8 }}>
+              <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--bg, #EDF3E3)", borderRadius: 15 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                   <strong style={{ fontSize: 15 }}>{member.tier} Member</strong>
                   <span className={`mem-sub-status ${isCancelling ? "cancelling" : "active"}`}>
@@ -222,7 +222,7 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
                   </span>
                 </div>
                 {isCancelling && subscription.current_period_end && (
-                  <div style={{ fontSize: 13, color: "#a67c00" }}>
+                  <div style={{ fontSize: 13, color: "#8BB5A0" }}>
                     Membership ends {new Date(subscription.current_period_end * 1000).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
                   </div>
                 )}
