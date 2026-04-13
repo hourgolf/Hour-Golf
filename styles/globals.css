@@ -321,18 +321,21 @@ html { overflow-y: scroll; }
 }
 
 @media (max-width: 600px) {
-  /* Admin header compact */
+  /* Admin header — mobile layout */
   .header { padding: 10px 14px; }
-  .header-inner { gap: 8px; }
-  .header-stats { gap: 6px; }
-  .stat-box { min-width: auto; }
-  .stat-val { font-size: 14px; }
-  .stat-lbl { font-size: 8px; letter-spacing: 0.5px; }
-  .hdr-btn { padding: 6px 8px; font-size: 13px; }
-  .hdr-btn-text { display: none; }
+  .header-inner { flex-direction: column; align-items: stretch; gap: 10px; }
+  .logo-btn { flex: none; gap: 10px; min-height: auto; }
+  .hdr-logo-img { max-height: 28px !important; }
   .logo { font-size: 14px; letter-spacing: 4px; }
   .logo-sub { font-size: 8px; letter-spacing: 1px; }
-  .hdr-logo-img { max-height: 28px !important; }
+  .header-stats { justify-content: space-between; gap: 0; width: 100%; flex-wrap: nowrap; }
+  .stat-box { min-width: auto; flex: 0 0 auto; }
+  .stat-val { font-size: 14px; }
+  .stat-lbl { font-size: 7px; letter-spacing: 0.5px; }
+  .hdr-btn { padding: 6px 10px; font-size: 14px; }
+  .hdr-btn-text { display: none; }
+  .hdr-btn-home { display: none; }
+
   /* Admin content */
   .content { padding: 14px; }
   .summary { padding: 12px 14px; gap: 12px; }
@@ -612,16 +615,15 @@ html { overflow-y: scroll; }
 
 /* Vertical bar chart */
 .rpt-chart {
-  display: flex; align-items: flex-end; gap: 8px; height: 200px;
-  padding: 0 0 0 0; margin-bottom: 24px;
+  display: flex; gap: 8px; margin-bottom: 24px;
 }
 .rpt-chart-col {
   flex: 1; display: flex; flex-direction: column; align-items: center;
-  height: 100%;
 }
 .rpt-chart-bar-wrap {
-  flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center;
+  height: 180px; width: 100%; display: flex; align-items: flex-end; justify-content: center;
 }
+
 .rpt-chart-bar {
   width: 100%; max-width: 48px; background: var(--primary); border-radius: 4px 4px 0 0;
   min-height: 4px; position: relative; transition: height .4s ease;
@@ -659,8 +661,8 @@ html { overflow-y: scroll; }
   .rpt-bar-label { width: 90px; font-size: 10px; }
   .rpt-bar-val { width: 60px; font-size: 10px; }
   .rpt-chart { height: 150px; }
-  .rpt-chart-bar-val { font-size: 8px; }
-  .rpt-chart-lbl { font-size: 8px; }
+  .rpt-chart-lbl { font-size: 11px; }
+  .rpt-chart-amt { font-size: 13px; }
   .rpt-heat-cell { min-width: 24px; height: 22px; font-size: 8px; }
   .rpt-heat-dow { width: 28px; font-size: 9px; }
 }
