@@ -98,15 +98,6 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast }
               placeholder="(555) 123-4567"
             />
           </div>
-          <div className="mem-form-row">
-            <label>Membership Tier</label>
-            <input
-              type="text"
-              value={member.tier}
-              disabled
-              style={{ opacity: 0.6, cursor: "not-allowed" }}
-            />
-          </div>
         </div>
       </div>
 
@@ -150,7 +141,7 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast }
         disabled={saving}
         style={{ marginBottom: 24 }}
       >
-        {saving ? "Saving..." : "Save Changes"}
+        {saving ? "Saving..." : "Save Changes."}
       </button>
     </>
   );
