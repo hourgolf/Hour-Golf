@@ -240,7 +240,8 @@ export default function MemberLayout({ activeTab, children }) {
                   style={{ marginTop: 2, accentColor: "#4C8D73" }}
                 />
                 <span>
-                  I agree to the <strong>Terms &amp; Conditions</strong> and <strong>Club Policies</strong>
+                  I agree to the <a href="https://hour.golf/legal/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Terms &amp; Conditions</a> and <a href="https://hour.golf/terms/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Club Policies</a>
+
                 </span>
               </label>
               {formError && <p className="mem-err">{formError}</p>}
@@ -300,7 +301,8 @@ export default function MemberLayout({ activeTab, children }) {
               style={{ marginTop: 2, accentColor: "#4C8D73" }}
             />
             <span>
-              I agree to the <strong>Terms &amp; Conditions</strong> and <strong>Club Policies</strong>
+              I agree to the <a href="https://hour.golf/legal/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Terms &amp; Conditions</a> and <a href="https://hour.golf/terms/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Club Policies</a>
+
             </span>
           </label>
           {formError && <p className="mem-err">{formError}</p>}
