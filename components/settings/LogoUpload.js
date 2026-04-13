@@ -71,7 +71,7 @@ export default function LogoUpload({ settings, updateSetting, apiKey }) {
             <input
               type="range"
               min={16}
-              max={80}
+              max={160}
               step={2}
               value={settings.logoScale || 36}
               onChange={(e) => updateSetting("logoScale", Number(e.target.value))}
