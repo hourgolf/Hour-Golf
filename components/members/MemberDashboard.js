@@ -75,8 +75,15 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
     return <div className="mem-loading">Loading dashboard...</div>;
   }
 
+  const firstName = (member?.name || "").split(" ")[0] || "there";
+
   return (
     <>
+      {/* Greeting */}
+      <h1 style={{ fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 700, marginBottom: 20, color: "var(--text)" }}>
+        Hey, {firstName}.
+      </h1>
+
       {/* Usage Cards */}
       <div className="mem-cards">
         <div className="mem-card">
@@ -112,7 +119,7 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
         <div className="mem-section-head">
           <span>Upcoming Bookings</span>
           <button className="mem-btn-sm mem-btn-accent" onClick={() => router.push("/members/book")}>
-            + Book a Bay
+            Book a Bay.
           </button>
         </div>
         {upcoming.length === 0 ? (
