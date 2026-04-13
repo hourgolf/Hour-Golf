@@ -4,7 +4,7 @@ import { fT, fDL } from "../../lib/format";
 
 const ALL_HOURS = [];
 for (let h = 7; h <= 21; h++) {
-  for (let m = 0; m < 60; m += 30) {
+  for (let m = 0; m < 60; m += 15) {
     ALL_HOURS.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
   }
 }
@@ -13,6 +13,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
   const isNonMember = member.tier === "Non-Member";
   const hasCard = member.hasPaymentMethod;
 
+  // Non-members: 10:00 AM - 8:00 PM only. Members: full range.
   const HOURS = useMemo(() => {
     if (isNonMember) return ALL_HOURS.filter((h) => h >= "10:00" && h <= "20:00");
     return ALL_HOURS;
@@ -29,6 +30,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
   const [bookMsg, setBookMsg] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
 
+  // Load availability when date changes
   useEffect(() => {
     if (!bookDate) return;
     fetch(`/api/customer-availability?date=${bookDate}`, { credentials: "include" })
@@ -72,10 +74,12 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || d.detail || "Booking failed");
       showToast("Booking confirmed!");
+      // Reset form so the just-booked slot doesn't trigger a conflict error
       setBookStart(isNonMember ? "10:00" : "10:00");
       setBookEnd(isNonMember ? "11:00" : "11:00");
       setBookBay("Bay 1");
       setTermsAccepted(false);
+      // Refresh availability
       fetch(`/api/customer-availability?date=${bookDate}`, { credentials: "include" })
         .then((r) => r.json())
         .then((d) => setAvailability(d.bookings || []))
@@ -91,7 +95,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
   return (
     <>
       {!hasCard && (
-        <div className="mem-info-banner" style={{ background: "#fef2f2", borderColor: "#f0c0c0", color: "#C92F1F" }}>
+        <div className="mem-info-banner" style={{ background: "rgba(201,47,31,0.07)", borderColor: "rgba(201,47,31,0.2)", color: "#C92F1F" }}>
           {"\u26a0\ufe0f"} A payment method is required before booking.{" "}
           <a href="/members/billing" style={{ color: "#C92F1F" }}>Add a card on the Billing page</a> to get started.
         </div>
@@ -161,10 +165,10 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
               type="checkbox"
               checked={termsAccepted}
               onChange={(e) => setTermsAccepted(e.target.checked)}
-              style={{ marginTop: 2, accentColor: "#1a472a" }}
+              style={{ marginTop: 2, accentColor: "#4C8D73" }}
             />
             <span>
-              I agree to the <strong>Terms &amp; Conditions</strong> and <strong>Club Policies</strong>
+              I agree to the <a href="https://hour.golf/legal/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Terms &amp; Conditions</a> and <a href="https://hour.golf/terms/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Club Policies</a>
             </span>
           </label>
 
