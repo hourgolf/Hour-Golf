@@ -15,7 +15,6 @@ import Confirm from "../components/ui/Confirm";
 import LoginForm from "../components/forms/LoginForm";
 import BookingForm from "../components/forms/BookingForm";
 import SyncModal from "../components/forms/SyncModal";
-import SettingsPanel from "../components/settings/SettingsPanel";
 
 import TodayView from "../components/views/TodayView";
 import WeekView from "../components/views/WeekView";
@@ -24,6 +23,7 @@ import CustomersView from "../components/views/CustomersView";
 import ConfigView from "../components/views/ConfigView";
 import DetailView from "../components/views/DetailView";
 import ReportsView from "../components/views/ReportsView";
+import SettingsView from "../components/views/SettingsView";
 
 export default function Dashboard() {
   // Auth (email/password against Supabase Auth, gated by admins table)
@@ -57,7 +57,6 @@ export default function Dashboard() {
   const [cancTgt, setCancTgt] = useState(null);
   const [delTgt, setDelTgt] = useState(null);
   const [chgTgt, setChgTgt] = useState(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
 
   // Customer list for booking form autocomplete
@@ -292,7 +291,7 @@ export default function Dashboard() {
           memberCount={members.length}
           onAddBooking={() => openAdd()}
           onRefresh={refresh}
-          onSettings={() => setSettingsOpen(true)}
+          onSettings={() => setView("settings")}
           onHome={() => { setSelMember(null); setView("today"); }}
           loading={loading}
           logoUrl={settings.logoUrl}
@@ -383,6 +382,17 @@ export default function Dashboard() {
         />
       )}
 
+      {view === "settings" && (
+        <SettingsView
+          settings={settings}
+          updateSetting={updateSetting}
+          apiKey={apiKey}
+          user={user}
+          onLogout={logout}
+          onOpenSync={() => setSyncOpen(true)}
+        />
+      )}
+
       {view === "detail" && (
         <DetailView
           selMember={selMember}
@@ -449,17 +459,6 @@ export default function Dashboard() {
         msg={chgTgt ? `Charge ${chgTgt.name || chgTgt.email} $${chgTgt.amount.toFixed(2)} for ${mL(chgTgt.month)} overage?` : ""}
         detail={chgTgt ? "Card on file via Stripe" : ""}
         label={`Charge $${chgTgt ? chgTgt.amount.toFixed(2) : "0"}`}
-      />
-
-      <SettingsPanel
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        settings={settings}
-        updateSetting={updateSetting}
-        apiKey={apiKey}
-        user={user}
-        onLogout={logout}
-        onOpenSync={() => setSyncOpen(true)}
       />
 
       <SyncModal
