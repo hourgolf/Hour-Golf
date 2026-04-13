@@ -12,6 +12,19 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast }
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Email change
+  const [newEmail, setNewEmail] = useState("");
+  const [emailPassword, setEmailPassword] = useState("");
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+
+  // Password change
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+
   useEffect(() => {
     loadPreferences();
   }, []);
@@ -57,6 +70,60 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast }
     setSaving(false);
   }
 
+  async function handleChangeEmail() {
+    if (!newEmail.trim() || !emailPassword) return;
+    setEmailSaving(true);
+    try {
+      const r = await fetch("/api/member-change-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ newEmail: newEmail.trim(), password: emailPassword }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Failed to update email");
+      showToast("Email updated successfully!");
+      setNewEmail("");
+      setEmailPassword("");
+      setShowEmailForm(false);
+      refresh();
+    } catch (e) {
+      showToast(e.message, "error");
+    }
+    setEmailSaving(false);
+  }
+
+  async function handleChangePassword() {
+    if (!currentPassword || !newPassword || !confirmPassword) return;
+    if (newPassword.length < 8) {
+      showToast("New password must be at least 8 characters", "error");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast("New passwords do not match", "error");
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      const r = await fetch("/api/member-change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Failed to update password");
+      showToast("Password updated successfully!");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setShowPasswordForm(false);
+    } catch (e) {
+      showToast(e.message, "error");
+    }
+    setPasswordSaving(false);
+  }
+
   function togglePref(key) {
     setPrefs((p) => ({ ...p, [key]: !p[key] }));
   }
@@ -99,6 +166,144 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast }
             />
           </div>
         </div>
+        <button
+          className="mem-btn mem-btn-primary"
+          onClick={handleSave}
+          disabled={saving}
+          style={{ marginTop: 16 }}
+        >
+          {saving ? "Saving..." : "Save Changes."}
+        </button>
+      </div>
+
+      {/* Change Email */}
+      <div className="mem-section">
+        <div className="mem-section-head">
+          <span>Email Address</span>
+          {!showEmailForm && (
+            <button
+              className="mem-btn-sm mem-btn-accent"
+              onClick={() => setShowEmailForm(true)}
+            >
+              Change Email.
+            </button>
+          )}
+        </div>
+
+        {showEmailForm ? (
+          <div style={{ maxWidth: 480 }}>
+            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16 }}>
+              Enter your new email address and confirm with your current password.
+            </p>
+            <div className="mem-form-row">
+              <label>New Email</label>
+              <input
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="new@email.com"
+              />
+            </div>
+            <div className="mem-form-row">
+              <label>Confirm Password</label>
+              <input
+                type="password"
+                value={emailPassword}
+                onChange={(e) => setEmailPassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleChangeEmail(); }}
+                placeholder="Enter your current password"
+              />
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button
+                className="mem-btn mem-btn-primary"
+                onClick={handleChangeEmail}
+                disabled={emailSaving || !newEmail.trim() || !emailPassword}
+              >
+                {emailSaving ? "Updating..." : "Update Email."}
+              </button>
+              <button
+                className="mem-btn-sm"
+                style={{ color: "var(--text)", border: "1px solid var(--border)", padding: "10px 18px" }}
+                onClick={() => { setShowEmailForm(false); setNewEmail(""); setEmailPassword(""); }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p style={{ fontSize: 14, color: "var(--text)" }}>
+            {member.email}
+          </p>
+        )}
+      </div>
+
+      {/* Change Password */}
+      <div className="mem-section">
+        <div className="mem-section-head">
+          <span>Password</span>
+          {!showPasswordForm && (
+            <button
+              className="mem-btn-sm mem-btn-accent"
+              onClick={() => setShowPasswordForm(true)}
+            >
+              Change Password.
+            </button>
+          )}
+        </div>
+
+        {showPasswordForm ? (
+          <div style={{ maxWidth: 480 }}>
+            <div className="mem-form-row">
+              <label>Current Password</label>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Enter your current password"
+              />
+            </div>
+            <div className="mem-form-row">
+              <label>New Password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Min 8 characters"
+              />
+            </div>
+            <div className="mem-form-row">
+              <label>Confirm New Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleChangePassword(); }}
+                placeholder="Confirm new password"
+              />
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button
+                className="mem-btn mem-btn-primary"
+                onClick={handleChangePassword}
+                disabled={passwordSaving || !currentPassword || !newPassword || !confirmPassword}
+              >
+                {passwordSaving ? "Updating..." : "Update Password."}
+              </button>
+              <button
+                className="mem-btn-sm"
+                style={{ color: "var(--text)", border: "1px solid var(--border)", padding: "10px 18px" }}
+                onClick={() => { setShowPasswordForm(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p style={{ fontSize: 14, color: "var(--text-muted)" }}>
+            ••••••••
+          </p>
+        )}
       </div>
 
       {/* Email Notifications */}
@@ -133,16 +338,6 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast }
           <div className={`mem-toggle-switch ${prefs.email_billing ? "on" : ""}`} />
         </div>
       </div>
-
-      {/* Save Button */}
-      <button
-        className="mem-btn mem-btn-primary"
-        onClick={handleSave}
-        disabled={saving}
-        style={{ marginBottom: 24 }}
-      >
-        {saving ? "Saving..." : "Save Changes."}
-      </button>
     </>
   );
 }
