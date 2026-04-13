@@ -3,10 +3,10 @@ import { THEMES } from "../lib/constants";
 import { supa, supaPost } from "../lib/supabase";
 
 const DEFAULTS = {
-  theme: "augusta",
+  theme: "brand",
   customColor: "",
-  font: "'IBM Plex Mono', monospace",
-  fontSize: 16,
+  font: "'DM Sans', sans-serif",
+  fontSize: 14,
   dark: false,
   density: "comfortable",
   logoUrl: "",
@@ -98,7 +98,7 @@ export function useSettings({ user, apiKey, connected } = {}) {
   useEffect(() => {
     if (!hydrated) return;
     saveLocal(settings);
-    const primaryColor = settings.customColor || (THEMES[settings.theme] || THEMES.augusta).primary;
+    const primaryColor = settings.customColor || (THEMES[settings.theme] || THEMES.brand).primary;
     document.documentElement.style.setProperty("--primary", primaryColor);
     document.documentElement.style.setProperty("--primary-light", primaryColor + "cc");
     document.documentElement.style.setProperty("--font", settings.font);
