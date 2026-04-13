@@ -292,7 +292,7 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
               label={`${t} (${revenue.byTier[t].count})`}
               value={revenue.byTier[t].total}
               max={maxTier}
-              color={TIER_COLORS[t]}
+              color={(TIER_COLORS[t] || {}).bg}
               subLabel={dlr(revenue.byTier[t].total)}
             />
           ))}
@@ -439,7 +439,7 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
               label={t}
               value={memStats.dist[t]}
               max={maxDist}
-              color={TIER_COLORS[t]}
+              color={(TIER_COLORS[t] || {}).bg}
               subLabel={`${memStats.dist[t]} member${memStats.dist[t] !== 1 ? "s" : ""}`}
             />
           ))}
@@ -512,7 +512,7 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
               label={t}
               value={passStats.bonusByTier[t] || 0}
               max={maxBonus}
-              color={TIER_COLORS[t]}
+              color={(TIER_COLORS[t] || {}).bg}
               subLabel={hrs(passStats.bonusByTier[t] || 0)}
             />
           ))}
