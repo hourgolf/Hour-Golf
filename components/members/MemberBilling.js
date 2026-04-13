@@ -198,7 +198,7 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
               onClick={handleSetupPayment}
               disabled={settingUpCard}
             >
-              {settingUpCard ? "Setting up..." : "Add Payment Method"}
+              {settingUpCard ? "Setting up..." : "Add Payment Method."}
             </button>
           </div>
         )}
@@ -249,7 +249,7 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
                       </div>
 
                       {isCurrent ? (
-                        <span style={{ fontSize: 12, color: "#006044", fontWeight: 600 }}>Current Plan</span>
+                        <span style={{ fontSize: 12, color: "#4C8D73", fontWeight: 600 }}>Current Plan</span>
                       ) : !hasStripePriceId ? (
                         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Contact us</span>
                       ) : hasSubscription ? (
