@@ -33,7 +33,7 @@ export default function LoginForm({ onLogin, loading, error }) {
       />
       {error && <p className="err">{error}</p>}
       <button onClick={submit} disabled={!email || !password || loading}>
-        {loading ? "..." : "Sign In"}
+        {loading ? "..." : "Sign In."}
       </button>
     </div>
   );
