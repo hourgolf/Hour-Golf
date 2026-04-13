@@ -233,7 +233,7 @@ export default function MemberLayout({ activeTab, children }) {
                   type="checkbox"
                   checked={signupTerms}
                   onChange={(e) => setSignupTerms(e.target.checked)}
-                  style={{ marginTop: 2, accentColor: "#1a472a" }}
+                  style={{ marginTop: 2, accentColor: "#4C8D73" }}
                 />
                 <span>
                   I agree to the <strong>Terms &amp; Conditions</strong> and <strong>Club Policies</strong>
@@ -294,7 +294,7 @@ export default function MemberLayout({ activeTab, children }) {
               type="checkbox"
               checked={completeTerms}
               onChange={(e) => setCompleteTerms(e.target.checked)}
-              style={{ marginTop: 2, accentColor: "#1a472a" }}
+              style={{ marginTop: 2, accentColor: "#4C8D73" }}
             />
             <span>
               I agree to the <strong>Terms &amp; Conditions</strong> and <strong>Club Policies</strong>
@@ -320,7 +320,7 @@ export default function MemberLayout({ activeTab, children }) {
   }
 
   // Logged in — render layout with content
-  const tierColor = TIER_COLORS[member.tier] || "var(--primary)";
+  const tierObj = TIER_COLORS[member.tier] || { bg: "#D1DFCB", text: "#35443B" };
 
   return (
     <div className="mem-layout">
@@ -330,7 +330,7 @@ export default function MemberLayout({ activeTab, children }) {
           <div className="mem-brand" style={{ fontSize: 16 }}>HOUR GOLF</div>
           <div className="mem-header-right">
             <span className="mem-header-name">{member.name}</span>
-            <span className="mem-tier-badge" style={{ background: tierColor }}>{member.tier}</span>
+            <span className="mem-tier-badge" style={{ background: tierObj.bg, color: tierObj.text }}>{member.tier}</span>
             <button className="mem-btn-sm" onClick={() => { logout(); router.push("/members"); }}>
               Sign Out
             </button>
