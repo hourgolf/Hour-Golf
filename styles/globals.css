@@ -423,11 +423,11 @@ html { overflow-y: scroll; }
 .mem-btn-sm.mem-btn-accent { background: var(--primary); color: #EDF3E3; border: none; padding: 6px 14px; border-radius: var(--radius); font-family: var(--font-display); font-size: 12px; font-weight: 700; }
 .mem-btn-sm.mem-btn-accent:hover { transform: scale(0.97); }
 
-.mem-header { background: var(--surface); color: var(--text); padding: 14px 24px; border-bottom: 0.5px solid var(--border); }
-.mem-header-inner { display: flex; justify-content: space-between; align-items: center; max-width: 960px; margin: 0 auto; }
+.mem-header { background: var(--surface); color: var(--text); padding: 18px 24px; border-bottom: 0.5px solid var(--border); }
+.mem-header-inner { display: flex; justify-content: space-between; align-items: center; max-width: 960px; margin: 0 auto; padding: 0 24px; }
 .mem-header-right { display: flex; align-items: center; gap: 12px; }
-.mem-header-name { font-family: var(--font-body); font-size: 13px; }
-.mem-tier-badge { padding: 3px 12px; border-radius: var(--radius); font-family: var(--font-display); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.mem-header-name { font-family: var(--font-body); font-size: 18px; }
+.mem-tier-badge { padding: 3px 14px; border-radius: var(--radius); font-family: var(--font-display); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 
 .mem-nav { background: var(--surface); border-bottom: 2px solid var(--primary); overflow: hidden; }
 .mem-nav-inner { display: flex; max-width: 960px; margin: 0 auto; padding: 0 24px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
