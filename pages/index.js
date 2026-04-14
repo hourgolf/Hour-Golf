@@ -22,6 +22,7 @@ import CustomersView from "../components/views/CustomersView";
 import ConfigView from "../components/views/ConfigView";
 import DetailView from "../components/views/DetailView";
 import ReportsView from "../components/views/ReportsView";
+import EventsView from "../components/views/EventsView";
 import SettingsView from "../components/views/SettingsView";
 
 export default function Dashboard() {
@@ -402,6 +403,10 @@ export default function Dashboard() {
           onSelectMember={selectMember}
           onUpdateTier={updateTier}
         />
+      )}
+
+      {view === "events" && (
+        <EventsView apiKey={apiKey} />
       )}
 
       {view === "tiers" && (
