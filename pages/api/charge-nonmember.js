@@ -3,6 +3,28 @@ import { verifyAdmin, SUPABASE_URL, getServiceKey } from "../../lib/api-helpers"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+// Find a Stripe customer by email, return customer ID or null
+async function findStripeCustomer(email) {
+  const customers = await stripe.customers.list({ email, limit: 1 });
+  return customers.data.length > 0 ? customers.data[0].id : null;
+}
+
+// Find a usable payment method on a Stripe customer
+async function findPaymentMethod(customerId) {
+  const customer = await stripe.customers.retrieve(customerId);
+  let pm = customer.invoice_settings?.default_payment_method || customer.default_source;
+
+  if (!pm) {
+    const methods = await stripe.paymentMethods.list({ customer: customerId, type: "card", limit: 5 });
+    if (methods.data.length > 0) pm = methods.data[0].id;
+  }
+  if (!pm) {
+    const full = await stripe.customers.retrieve(customerId, { expand: ["sources"] });
+    if (full.sources?.data?.length > 0) pm = full.sources.data[0].id;
+  }
+  return pm;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
@@ -36,16 +58,32 @@ export default async function handler(req, res) {
     if (!bkRows.length) return res.status(404).json({ error: "Booking not found" });
     const bk = bkRows[0];
 
-    // 3. Get member's stripe_customer_id
+    // 3. Find Stripe customer: check members table first, then search Stripe by email
     const mResp = await fetch(
       `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(bk.customer_email)}&select=stripe_customer_id,name`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
-    if (!mResp.ok) throw new Error(`Member lookup failed: ${mResp.status}`);
-    const mRows = await mResp.json();
-    const member = mRows[0];
-    if (!member?.stripe_customer_id) {
-      return res.status(400).json({ error: "No Stripe customer", detail: `${bk.customer_email} has no payment method on file.` });
+    const mRows = mResp.ok ? await mResp.json() : [];
+    let stripeCustomerId = mRows[0]?.stripe_customer_id || null;
+
+    // Fallback: search Stripe directly by email
+    if (!stripeCustomerId) {
+      stripeCustomerId = await findStripeCustomer(bk.customer_email);
+      // Save it back to members table for future use
+      if (stripeCustomerId && mRows.length > 0) {
+        await fetch(
+          `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(bk.customer_email)}`,
+          {
+            method: "PATCH",
+            headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ stripe_customer_id: stripeCustomerId }),
+          }
+        );
+      }
+    }
+
+    if (!stripeCustomerId) {
+      return res.status(400).json({ error: "No Stripe customer", detail: `No Stripe account found for ${bk.customer_email}.` });
     }
 
     // 4. Get Non-Member overage rate from tier_config
@@ -62,18 +100,8 @@ export default async function handler(req, res) {
     const amountCents = Math.round(hours * rate * 100);
     if (amountCents < 50) return res.status(400).json({ error: "Amount too small to charge" });
 
-    // 6. Find payment method (same logic as stripe-charge.js)
-    const customer = await stripe.customers.retrieve(member.stripe_customer_id);
-    let paymentMethod = customer.invoice_settings?.default_payment_method || customer.default_source;
-
-    if (!paymentMethod) {
-      const methods = await stripe.paymentMethods.list({ customer: member.stripe_customer_id, type: "card", limit: 5 });
-      if (methods.data.length > 0) paymentMethod = methods.data[0].id;
-    }
-    if (!paymentMethod) {
-      const full = await stripe.customers.retrieve(member.stripe_customer_id, { expand: ["sources"] });
-      if (full.sources?.data?.length > 0) paymentMethod = full.sources.data[0].id;
-    }
+    // 6. Find payment method
+    const paymentMethod = await findPaymentMethod(stripeCustomerId);
     if (!paymentMethod) {
       return res.status(400).json({ error: "No payment method found", detail: `No cards attached to ${bk.customer_email}.` });
     }
@@ -83,7 +111,7 @@ export default async function handler(req, res) {
     const pi = await stripe.paymentIntents.create({
       amount: amountCents,
       currency: "usd",
-      customer: member.stripe_customer_id,
+      customer: stripeCustomerId,
       payment_method: paymentMethod,
       off_session: true,
       confirm: true,
