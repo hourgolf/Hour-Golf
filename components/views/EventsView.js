@@ -140,11 +140,64 @@ function EventFormModal({ open, onClose, event, onSave, apiKey }) {
   );
 }
 
+function MemberListModal({ open, onClose, title, members, type }) {
+  if (!open) return null;
+  return (
+    <Modal open={open} onClose={onClose}>
+      <h2>{title}</h2>
+      {members.length === 0 && (
+        <p style={{ color: "var(--text-muted)", textAlign: "center", padding: 16 }}>None yet.</p>
+      )}
+      {members.length > 0 && (
+        <div className="tbl" style={{ marginTop: 8 }}>
+          <div className="th">
+            <span style={{ flex: 2 }}>Member</span>
+            {type === "registered" && <span style={{ flex: 1 }} className="text-r">Status</span>}
+            {type === "registered" && <span style={{ flex: 1 }} className="text-r">Amount</span>}
+            <span style={{ flex: 1 }} className="text-r">Date</span>
+          </div>
+          {members.map((m, i) => (
+            <div key={i} className="tr">
+              <span style={{ flex: 2 }}>
+                <strong>{m.name}</strong><br />
+                <span className="email-sm">{m.email}</span>
+              </span>
+              {type === "registered" && (
+                <span style={{ flex: 1 }} className="text-r">
+                  <span className="badge" style={{
+                    fontSize: 9,
+                    background: m.status === "paid" ? "#4C8D73" : m.status === "registered" ? "var(--primary)" : "var(--text-muted)",
+                    color: "#fff",
+                  }}>
+                    {(m.status || "registered").toUpperCase()}
+                  </span>
+                </span>
+              )}
+              {type === "registered" && (
+                <span style={{ flex: 1 }} className="text-r tab-num">
+                  {m.amount_cents ? `$${(m.amount_cents / 100).toFixed(0)}` : "Free"}
+                </span>
+              )}
+              <span style={{ flex: 1, textAlign: "right", fontSize: 11, color: "var(--text-muted)" }}>
+                {m.created_at ? new Date(m.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+        <button className="btn" onClick={onClose}>Close</button>
+      </div>
+    </Modal>
+  );
+}
+
 export default function EventsView({ apiKey }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editEvent, setEditEvent] = useState(null);
   const [delTarget, setDelTarget] = useState(null);
+  const [memberList, setMemberList] = useState(null);
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -251,8 +304,32 @@ export default function EventsView({ apiKey }) {
             <span style={{ flex: 0.7 }} className="text-r tab-num">
               {Number(ev.cost) > 0 ? `$${Number(ev.cost).toFixed(0)}` : "Free"}
             </span>
-            <span style={{ flex: 0.7 }} className="text-c tab-num">{ev.interest_count}</span>
-            <span style={{ flex: 0.7 }} className="text-c tab-num">{ev.registration_count}</span>
+            <span style={{ flex: 0.7 }} className="text-c tab-num">
+              {ev.interest_count > 0 ? (
+                <button
+                  className="btn"
+                  style={{ fontSize: 11, padding: "1px 8px", minWidth: 28 }}
+                  onClick={() => setMemberList({ title: `Interested — ${ev.title}`, members: ev.interested_members || [], type: "interested" })}
+                >
+                  {ev.interest_count}
+                </button>
+              ) : (
+                <span className="muted">0</span>
+              )}
+            </span>
+            <span style={{ flex: 0.7 }} className="text-c tab-num">
+              {ev.registration_count > 0 ? (
+                <button
+                  className="btn"
+                  style={{ fontSize: 11, padding: "1px 8px", minWidth: 28 }}
+                  onClick={() => setMemberList({ title: `Registered — ${ev.title}`, members: ev.registered_members || [], type: "registered" })}
+                >
+                  {ev.registration_count}
+                </button>
+              ) : (
+                <span className="muted">0</span>
+              )}
+            </span>
             <span style={{ flex: 0.7 }} className="text-c">
               <label style={{ cursor: "pointer", display: "inline-flex", alignItems: "center" }}>
                 <input
@@ -286,6 +363,14 @@ export default function EventsView({ apiKey }) {
         msg={delTarget ? `Delete "${delTarget.title}"? This also removes all interests and registrations.` : ""}
         label="Delete"
         danger
+      />
+
+      <MemberListModal
+        open={!!memberList}
+        onClose={() => setMemberList(null)}
+        title={memberList?.title || ""}
+        members={memberList?.members || []}
+        type={memberList?.type || "interested"}
       />
     </div>
   );
