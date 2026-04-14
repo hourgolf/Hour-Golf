@@ -11,6 +11,7 @@ const TABS = [
 export default function Nav({ view, setView, todayCount, detailName, onClearDetail }) {
   return (
     <nav className="nav">
+      <div className="nav-inner-wrap">
       {TABS.map(({ key, label, countKey }) => (
         <button
           key={key}
@@ -31,6 +32,7 @@ export default function Nav({ view, setView, todayCount, detailName, onClearDeta
           {detailName}
         </button>
       )}
+      </div>
     </nav>
   );
 }
