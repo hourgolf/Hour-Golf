@@ -99,6 +99,9 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
   }
 
   const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: TZ });
+  const maxDate = new Date();
+  maxDate.setDate(maxDate.getDate() + 7);
+  const maxDateStr = maxDate.toLocaleDateString("en-CA", { timeZone: TZ });
 
   return (
     <>
@@ -126,6 +129,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
               type="date"
               value={bookDate}
               min={todayStr}
+              max={maxDateStr}
               onChange={(e) => setBookDate(e.target.value)}
             />
           </div>
