@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import useMemberAuth from "../../hooks/useMemberAuth";
 import { TIER_COLORS } from "../../lib/constants";
+import HelpDrawer from "./HelpDrawer";
+
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", href: "/members/dashboard" },
@@ -35,6 +37,9 @@ export default function MemberLayout({ activeTab, children }) {
 
   const [formError, setFormError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
+
+  // Help drawer
+  const [helpOpen, setHelpOpen] = useState(false);
 
   // Toast
   const [toast, setToast] = useState(null);
@@ -371,6 +376,11 @@ export default function MemberLayout({ activeTab, children }) {
 
       {/* Toast */}
       {toast && <div className={`mem-toast ${toast.type}`}>{toast.msg}</div>}
+
+      {/* Help */}
+      <button className="help-fab" onClick={() => setHelpOpen(true)} title="Help">?</button>
+      <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }
+
