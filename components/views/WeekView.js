@@ -2,7 +2,8 @@ import { useMemo, Fragment } from "react";
 import { BAYS, TZ } from "../../lib/constants";
 import { fT, lds, tds } from "../../lib/format";
 
-export default function WeekView({ bookings, weekOff, setWeekOff, onSelectMember }) {
+export default function WeekView({ bookings, weekOff, setWeekOff, onSelectMember, onSelectDate }) {
+
   const activeBk = useMemo(
     () => bookings.filter((b) => b.booking_status !== "Cancelled"),
     [bookings]
@@ -74,7 +75,12 @@ export default function WeekView({ bookings, weekOff, setWeekOff, onSelectMember
           const isToday = ds === today;
           return (
             <Fragment key={ds}>
-              <div className={`wk-d ${isToday ? "today" : ""}`}>
+              <div
+                className={`wk-d ${isToday ? "today" : ""}`}
+                style={{ cursor: "pointer" }}
+                onClick={() => onSelectDate && onSelectDate(ds)}
+                title="View this day"
+              >
                 <span className="dl">
                   {d.toLocaleDateString("en-US", { weekday: "short", timeZone: TZ })}
                 </span>
@@ -82,6 +88,7 @@ export default function WeekView({ bookings, weekOff, setWeekOff, onSelectMember
                   {d.toLocaleDateString("en-US", { day: "numeric", timeZone: TZ })}
                 </span>
               </div>
+
               {BAYS.map((bay) => {
                 const bks = monthBk[`${ds}-${bay}`] || [];
                 return (
