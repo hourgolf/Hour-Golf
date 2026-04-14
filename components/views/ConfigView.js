@@ -7,6 +7,7 @@ function TierEditModal({ open, onClose, tier, onSave }) {
   const [form, setForm] = useState({
     tier: "", monthly_fee: 0, included_hours: 0,
     overage_rate: 0, pro_shop_discount: 0, display_order: 0,
+    booking_hours_start: 0, booking_hours_end: 24,
   });
   const [saving, setSaving] = useState(false);
   const [unlimited, setUnlimited] = useState(false);
@@ -21,10 +22,12 @@ function TierEditModal({ open, onClose, tier, onSave }) {
         overage_rate: Number(tier.overage_rate),
         pro_shop_discount: Number(tier.pro_shop_discount),
         display_order: Number(tier.display_order || 0),
+        booking_hours_start: Number(tier.booking_hours_start ?? 0),
+        booking_hours_end: Number(tier.booking_hours_end ?? 24),
       });
       setUnlimited(Number(tier.included_hours) >= 99999);
     } else {
-      setForm({ tier: "", monthly_fee: 0, included_hours: 0, overage_rate: 0, pro_shop_discount: 0, display_order: 99 });
+      setForm({ tier: "", monthly_fee: 0, included_hours: 0, overage_rate: 0, pro_shop_discount: 0, display_order: 99, booking_hours_start: 0, booking_hours_end: 24 });
       setUnlimited(false);
     }
   }, [tier]);
@@ -42,6 +45,8 @@ function TierEditModal({ open, onClose, tier, onSave }) {
       overage_rate: Number(form.overage_rate),
       pro_shop_discount: Number(form.pro_shop_discount),
       display_order: Number(form.display_order),
+      booking_hours_start: Number(form.booking_hours_start),
+      booking_hours_end: Number(form.booking_hours_end),
     }, isNew);
     setSaving(false);
   }
@@ -88,6 +93,22 @@ function TierEditModal({ open, onClose, tier, onSave }) {
         <div className="mf">
           <label>Display Order</label>
           <input type="number" min={0} value={form.display_order} onChange={(e) => update("display_order", e.target.value)} />
+        </div>
+        <div className="mf">
+          <label>Booking Window Start</label>
+          <select value={form.booking_hours_start} onChange={(e) => update("booking_hours_start", Number(e.target.value))}>
+            {Array.from({ length: 24 }, (_, i) => (
+              <option key={i} value={i}>{i === 0 ? "12:00 AM" : i < 12 ? `${i}:00 AM` : i === 12 ? "12:00 PM" : `${i - 12}:00 PM`}</option>
+            ))}
+          </select>
+        </div>
+        <div className="mf">
+          <label>Booking Window End</label>
+          <select value={form.booking_hours_end} onChange={(e) => update("booking_hours_end", Number(e.target.value))}>
+            {Array.from({ length: 24 }, (_, i) => i + 1).map((h) => (
+              <option key={h} value={h}>{h === 24 ? "12:00 AM (next day)" : h < 12 ? `${h}:00 AM` : h === 12 ? "12:00 PM" : `${h - 12}:00 PM`}</option>
+            ))}
+          </select>
         </div>
       </div>
       <div className="macts">
