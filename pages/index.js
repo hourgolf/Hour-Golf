@@ -203,6 +203,43 @@ export default function Dashboard() {
     setSaving(false);
   }
 
+  async function chargeNonMember(bookingId) {
+    setSaving(true);
+    try {
+      const r = await fetch("/api/charge-nonmember", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error);
+      showToast(`Charged $${(d.amount_cents / 100).toFixed(2)} — ${d.customer_email}`);
+      await refresh();
+    } catch (e) {
+      if (e.message === "Already charged") showToast("Already charged", "error");
+      else showToast(`Failed: ${e.message}`, "error");
+    }
+    setSaving(false);
+  }
+
+  async function chargeNonMembersBatch() {
+    setSaving(true);
+    try {
+      const r = await fetch("/api/charge-nonmembers-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error);
+      const msg = `Charged: ${d.summary.charged}, Failed: ${d.summary.failed}, Skipped: ${d.summary.skipped}`;
+      showToast(msg, d.summary.failed > 0 ? "error" : undefined);
+      await refresh();
+    } catch (e) {
+      showToast(`Batch failed: ${e.message}`, "error");
+    }
+    setSaving(false);
+  }
+
   async function saveTier(data, isNew) {
     setSaving(true);
     try {
@@ -341,10 +378,14 @@ export default function Dashboard() {
           payments={payments}
           members={members}
           bookings={bookings}
+          tierCfg={tierCfg}
           selMonth={selMonth}
           setSelMonth={setSelMonth}
           onSelectMember={selectMember}
           onUpdateTier={updateTier}
+          onChargeNonMember={chargeNonMember}
+          onChargeNonMembersBatch={chargeNonMembersBatch}
+          saving={saving}
         />
       )}
 
