@@ -26,21 +26,39 @@ export default async function handler(req, res) {
       if (!evResp.ok) throw new Error(`Events fetch: ${evResp.status}`);
       const events = await evResp.json();
 
-      // Get counts
-      const intResp = await sb(key, "event_interests?select=event_id");
+      // Get interests and registrations with member details
+      const intResp = await sb(key, "event_interests?select=event_id,member_email,created_at");
       const interests = intResp.ok ? await intResp.json() : [];
-      const regResp = await sb(key, "event_registrations?select=event_id,status");
+      const regResp = await sb(key, "event_registrations?select=event_id,member_email,status,amount_cents,created_at");
       const regs = regResp.ok ? await regResp.json() : [];
 
-      const intCounts = {};
-      interests.forEach((i) => { intCounts[i.event_id] = (intCounts[i.event_id] || 0) + 1; });
-      const regCounts = {};
-      regs.forEach((r) => { regCounts[r.event_id] = (regCounts[r.event_id] || 0) + 1; });
+      // Get member names for display
+      const allEmails = new Set([...interests.map((i) => i.member_email), ...regs.map((r) => r.member_email)]);
+      const memberNames = {};
+      if (allEmails.size > 0) {
+        const memResp = await sb(key, "members?select=email,name");
+        const mems = memResp.ok ? await memResp.json() : [];
+        mems.forEach((m) => { memberNames[m.email] = m.name || m.email; });
+      }
+
+      // Group by event
+      const intByEvent = {};
+      interests.forEach((i) => {
+        if (!intByEvent[i.event_id]) intByEvent[i.event_id] = [];
+        intByEvent[i.event_id].push({ email: i.member_email, name: memberNames[i.member_email] || i.member_email, created_at: i.created_at });
+      });
+      const regByEvent = {};
+      regs.forEach((r) => {
+        if (!regByEvent[r.event_id]) regByEvent[r.event_id] = [];
+        regByEvent[r.event_id].push({ email: r.member_email, name: memberNames[r.member_email] || r.member_email, status: r.status, amount_cents: r.amount_cents, created_at: r.created_at });
+      });
 
       const enriched = events.map((e) => ({
         ...e,
-        interest_count: intCounts[e.id] || 0,
-        registration_count: regCounts[e.id] || 0,
+        interest_count: (intByEvent[e.id] || []).length,
+        registration_count: (regByEvent[e.id] || []).length,
+        interested_members: intByEvent[e.id] || [],
+        registered_members: regByEvent[e.id] || [],
       }));
 
       return res.status(200).json(enriched);
