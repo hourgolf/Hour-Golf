@@ -3,11 +3,12 @@ import { useRouter } from "next/router";
 import useMemberAuth from "../../hooks/useMemberAuth";
 import { TIER_COLORS } from "../../lib/constants";
 import HelpDrawer from "./HelpDrawer";
-
+import EventPopup from "./EventPopup";
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", href: "/members/dashboard" },
   { key: "book", label: "Book a Bay", href: "/members/book" },
+  { key: "events", label: "Events", href: "/members/events" },
   { key: "billing", label: "Billing", href: "/members/billing" },
   { key: "account", label: "Account", href: "/members/account" },
 ];
@@ -40,6 +41,17 @@ export default function MemberLayout({ activeTab, children }) {
 
   // Help drawer
   const [helpOpen, setHelpOpen] = useState(false);
+
+  // Event popup
+  const [popupEvent, setPopupEvent] = useState(null);
+  useEffect(() => {
+    if (member && !member.needsAccountSetup && !loading) {
+      fetch("/api/member-event-popup", { credentials: "include" })
+        .then((r) => r.ok ? r.json() : [])
+        .then((events) => { if (events.length > 0) setPopupEvent(events[0]); })
+        .catch(() => {});
+    }
+  }, [member, loading]);
 
   // Toast
   const [toast, setToast] = useState(null);
@@ -246,7 +258,6 @@ export default function MemberLayout({ activeTab, children }) {
                 />
                 <span>
                   I agree to the <a href="https://hour.golf/legal/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Terms &amp; Conditions</a> and <a href="https://hour.golf/terms/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Club Policies</a>
-
                 </span>
               </label>
               {formError && <p className="mem-err">{formError}</p>}
@@ -307,7 +318,6 @@ export default function MemberLayout({ activeTab, children }) {
             />
             <span>
               I agree to the <a href="https://hour.golf/legal/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Terms &amp; Conditions</a> and <a href="https://hour.golf/terms/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Club Policies</a>
-
             </span>
           </label>
           {formError && <p className="mem-err">{formError}</p>}
@@ -377,10 +387,25 @@ export default function MemberLayout({ activeTab, children }) {
       {/* Toast */}
       {toast && <div className={`mem-toast ${toast.type}`}>{toast.msg}</div>}
 
+      {/* Event popup */}
+      {popupEvent && (
+        <EventPopup
+          event={popupEvent}
+          onDismiss={() => {
+            fetch("/api/member-event-popup", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ event_id: popupEvent.id }),
+            }).catch(() => {});
+            setPopupEvent(null);
+          }}
+        />
+      )}
+
       {/* Help */}
       <button className="help-fab" onClick={() => setHelpOpen(true)} title="Help">?</button>
       <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }
-
