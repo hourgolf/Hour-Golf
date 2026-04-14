@@ -3,6 +3,7 @@ const TABS = [
   { key: "week", label: "Calendar" },
   { key: "overview", label: "Usage" },
   { key: "customers", label: "Customers" },
+  { key: "events", label: "Events" },
   { key: "tiers", label: "Config" },
   { key: "reports", label: "Reports" },
   { key: "settings", label: "Settings" },
