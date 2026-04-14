@@ -60,13 +60,6 @@ export default function OverviewView({
     return set;
   }, [payments]);
 
-  // Build member lookup for stripe_customer_id
-  const memberMap = useMemo(() => {
-    const m = {};
-    (members || []).forEach((mem) => { m[mem.email] = mem; });
-    return m;
-  }, [members]);
-
   // Non-members computed from bookings with per-booking detail
   const nonMem = useMemo(() => {
     if (!actMonth) return [];
@@ -109,23 +102,12 @@ export default function OverviewView({
   // Count total uncharged non-member bookings for batch button
   const totalUncharged = useMemo(() => {
     return nonMem.reduce((sum, r) => {
-      const m = memberMap[r.customer_email];
-      if (!m?.stripe_customer_id) return sum;
       return sum + r.bookingIds.filter((id) => !chargedBookingIds.has(id)).length;
     }, 0);
-  }, [nonMem, memberMap, chargedBookingIds]);
+  }, [nonMem, chargedBookingIds]);
 
   const totOver = memMonth.reduce((s, r) => s + Number(r.overage_charge || 0), 0);
   const totHrs = memMonth.reduce((s, r) => s + Number(r.total_hours || 0), 0);
-
-  // Non-member revenue totals
-  const nmTotRevenue = nonMem.reduce((s, r) => s + (Number(r.total_hours) * nmRate), 0);
-  const nmTotPaid = nonMem.reduce((s, r) => {
-    const { paid } = nmChargeStatus(r);
-    // We need per-booking hours to compute paid amount accurately.
-    // For simplicity, use charged booking IDs to sum from activeBk.
-    return s;
-  }, 0);
 
   function isPaid(email, month) {
     return payments.some((p) => p.member_email === email && p.billing_month === month && p.status === "succeeded");
@@ -229,8 +211,6 @@ export default function OverviewView({
         </div>
         {nonMem.slice(0, 25).map((r) => {
           const { paid, unpaid } = nmChargeStatus(r);
-          const m = memberMap[r.customer_email];
-          const hasStripe = !!m?.stripe_customer_id;
           const revenue = Number(r.total_hours) * nmRate;
 
           return (
@@ -251,23 +231,19 @@ export default function OverviewView({
                     {paid}/{r.booking_count} PAID
                   </span>
                 )}
-                {paid === 0 && hasStripe && unpaid > 0 && (
+                {paid === 0 && unpaid > 0 && (
                   <button
                     className="btn primary"
                     style={{ fontSize: 10, padding: "2px 8px" }}
                     disabled={saving}
                     onClick={(e) => {
                       e.stopPropagation();
-                      // Charge all uncharged bookings for this non-member
                       const unchargedIds = r.bookingIds.filter((id) => !chargedBookingIds.has(id));
                       unchargedIds.forEach((id) => onChargeNonMember(id));
                     }}
                   >
                     Charge ${revenue.toFixed(0)}
                   </button>
-                )}
-                {!hasStripe && unpaid > 0 && (
-                  <span className="muted" style={{ fontSize: 10 }}>No Stripe</span>
                 )}
                 {r.booking_count === 0 && <span className="muted">&mdash;</span>}
               </span>
