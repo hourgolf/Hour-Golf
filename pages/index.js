@@ -15,7 +15,6 @@ import Confirm from "../components/ui/Confirm";
 import LoginForm from "../components/forms/LoginForm";
 import BookingForm from "../components/forms/BookingForm";
 import SyncModal from "../components/forms/SyncModal";
-
 import TodayView from "../components/views/TodayView";
 import WeekView from "../components/views/WeekView";
 import OverviewView from "../components/views/OverviewView";
@@ -49,6 +48,7 @@ export default function Dashboard() {
   const [cSort, setCSort] = useState("hours");
   const [cTier, setCTier] = useState("all");
   const [weekOff, setWeekOff] = useState(0);
+  const [viewDate, setViewDate] = useState(null); // null = today
 
   // Modals
   const [addOpen, setAddOpen] = useState(false);
@@ -292,7 +292,7 @@ export default function Dashboard() {
           onAddBooking={() => openAdd()}
           onRefresh={refresh}
           onSettings={() => setView("settings")}
-          onHome={() => { setSelMember(null); setView("today"); }}
+          onHome={() => { setSelMember(null); setViewDate(null); setView("today"); }}
           loading={loading}
           logoUrl={settings.logoUrl}
           logoScale={settings.logoScale}
@@ -306,7 +306,7 @@ export default function Dashboard() {
           setView={setView}
           todayCount={todayBk.length}
           detailName={detailName}
-          onClearDetail={() => { setSelMember(null); }}
+          onClearDetail={() => { setSelMember(null); setViewDate(null); }}
         />
       </div>
 
@@ -321,6 +321,7 @@ export default function Dashboard() {
           onEdit={setEditBk}
           onCancel={setCancTgt}
           onSelectMember={selectMember}
+          targetDate={viewDate}
         />
       )}
 
@@ -330,6 +331,7 @@ export default function Dashboard() {
           weekOff={weekOff}
           setWeekOff={setWeekOff}
           onSelectMember={selectMember}
+          onSelectDate={(dateStr) => { setViewDate(dateStr); setView("today"); }}
         />
       )}
 
