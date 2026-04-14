@@ -90,12 +90,14 @@ html { overflow-y: scroll; }
 .hdr-title-block { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 
 /* ── Nav ── */
-.nav { display: flex; border-bottom: 2px solid var(--primary); background: var(--surface); overflow-x: auto; padding: 0 24px; }
+.nav { border-bottom: 2px solid var(--primary); background: var(--surface); overflow: hidden; }
+.nav-inner-wrap { display: flex; max-width: 1200px; margin: 0 auto; padding: 0 20px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.nav-inner-wrap::-webkit-scrollbar { display: none; }
 .nav-btn { padding: 12px 18px; border: none; background: transparent; cursor: pointer; font-family: var(--font-body); font-size: 13px; color: var(--text-muted); font-weight: 500; letter-spacing: 0.03em; white-space: nowrap; border-radius: var(--radius) var(--radius) 0 0; transition: background 0.15s, color 0.15s; }
 .nav-btn:hover { color: var(--text); background: rgba(209,223,203,0.3); }
 .nav-btn.active { color: var(--text); font-weight: 600; background: var(--bg); border-bottom: 2px solid var(--primary); margin-bottom: -2px; }
 .nav-btn .cnt { background: var(--primary); color: #EDF3E3; font-family: var(--font-display); font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 4px; }
-.sticky-top .nav { background: var(--surface); }
+
 
 /* ── Content ── */
 .content { max-width: 1200px; margin: 0 auto; padding: 20px; }
@@ -383,7 +385,7 @@ html { overflow-y: scroll; }
   .wk-b { font-size: 9px; padding: 2px 4px; }
   .wk-d .dn { font-size: 14px; }
   .wk-d .dl { font-size: 8px; }
-  .nav { padding: 0 14px; }
+  .nav-inner-wrap { padding: 0 14px; }
   .nav-btn { padding: 10px 12px; font-size: 12px; letter-spacing: 0.5px; }
 }
 
@@ -427,8 +429,8 @@ html { overflow-y: scroll; }
 .mem-header-name { font-family: var(--font-body); font-size: 13px; }
 .mem-tier-badge { padding: 3px 12px; border-radius: var(--radius); font-family: var(--font-display); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 
-.mem-nav { background: var(--surface); border-bottom: 2px solid var(--primary); }
-.mem-nav-inner { display: flex; max-width: 960px; margin: 0 auto; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.mem-nav { background: var(--surface); border-bottom: 2px solid var(--primary); overflow: hidden; }
+.mem-nav-inner { display: flex; max-width: 960px; margin: 0 auto; padding: 0 24px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .mem-nav-inner::-webkit-scrollbar { display: none; }
 .mem-nav-btn { padding: 12px 20px; border: none; background: transparent; cursor: pointer; font-size: 13px; font-family: var(--font-body); color: var(--text-muted); font-weight: 500; transition: color 0.15s; white-space: nowrap; border-radius: var(--radius) var(--radius) 0 0; }
 .mem-nav-btn:hover { color: var(--text); }
@@ -455,7 +457,7 @@ html { overflow-y: scroll; }
 .mem-form-row label { display: block; font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--primary); margin-bottom: 5px; }
 .mem-form-row input,
 .mem-form-row select,
-.mem-form-row textarea { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: var(--radius); font-size: 15px; font-family: var(--font-body); letter-spacing: 0.03em; background: var(--surface); color: var(--text); box-sizing: border-box; }
+.mem-form-row textarea { width: 100%; max-width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: var(--radius); font-size: 15px; font-family: var(--font-body); letter-spacing: 0.03em; background: var(--surface); color: var(--text); box-sizing: border-box; -webkit-appearance: none; }
 .mem-form-row input:focus,
 .mem-form-row select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--border); }
 
@@ -475,7 +477,7 @@ html { overflow-y: scroll; }
 .mem-credit-hrs { font-family: var(--font-display); font-size: 24px; font-weight: 700; color: var(--primary); }
 .mem-credit-price { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); margin-top: 4px; }
 
-.mem-book-form { max-width: 480px; }
+.mem-book-form { max-width: 480px; overflow: hidden; }
 .mem-book-btn { width: 100%; padding: 14px; background: var(--primary); color: #EDF3E3; border: none; border-radius: var(--radius); font-family: var(--font-display); font-size: 14px; font-weight: 700; cursor: pointer; text-transform: uppercase; margin-top: 12px; transition: transform 0.12s; }
 .mem-book-btn:hover { transform: scale(0.97); }
 .mem-book-btn:disabled { opacity: 0.5; cursor: default; }
