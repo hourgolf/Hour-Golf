@@ -5,13 +5,16 @@ import Badge from "../ui/Badge";
 
 export default function TodayView({
   bookings, members, bayFilter, setBayFilter,
-  onEdit, onCancel, onSelectMember,
+  onEdit, onCancel, onSelectMember, targetDate,
 }) {
   const now = new Date();
   const today = tds();
+  const viewDate = targetDate || today;
+  const isToday = viewDate === today;
 
   const todayBk = useMemo(() => {
-    let bks = bookings.filter((b) => b.booking_status !== "Cancelled" && lds(new Date(b.booking_start)) === today);
+    let bks = bookings.filter((b) => b.booking_status !== "Cancelled" && lds(new Date(b.booking_start)) === viewDate);
+
     if (bayFilter !== "all") bks = bks.filter((b) => b.bay === bayFilter);
     return bks.sort((a, b) => new Date(a.booking_start) - new Date(b.booking_start));
   }, [bookings, bayFilter, today]);
@@ -30,12 +33,14 @@ export default function TodayView({
   }, 0);
 
   function bkStatus(b) {
+    if (!isToday) return "upcoming";
     const s = new Date(b.booking_start);
     const e = new Date(b.booking_end);
     if (now >= s && now <= e) return "now";
     if (now < s) return "upcoming";
     return "past";
   }
+
 
   const displayBays = bayFilter === "all" ? BAYS : [bayFilter];
 
@@ -58,7 +63,7 @@ export default function TodayView({
 
       {displayBays.map((bay) => (
         <div key={bay} className="bay-lane">
-          <div className="bay-label">{bay} &mdash; {fDL(new Date())}</div>
+          <div className="bay-label">{bay} &mdash; {fDL(new Date(viewDate + "T12:00:00"))}</div>
           {(todayByBay[bay] || []).length === 0 && (
             <div className="slot">
               <div className="slot-t">&mdash;</div>
