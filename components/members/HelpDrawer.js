@@ -18,7 +18,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: "Can I bring a guest?",
-        a: "Yes! Guests are welcome during your booked session. Just make sure they\u2019re with you when you enter. Guest fees may apply depending on your membership tier.",
+        a: "Absolutely! You can bring up to 3 guests per bay per booking. Just make sure they\u2019re with you when you enter.",
       },
     ],
   },
@@ -33,7 +33,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: "How far in advance can I book?",
-        a: "You can book up to 14 days in advance. Same-day bookings are available if slots are open.",
+        a: "You can book up to 7 days in advance. Same-day bookings are available if slots are open.",
       },
       {
         q: "How do I cancel a booking?",
@@ -98,7 +98,7 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: "How do I reach Hour Golf?",
-        a: "Email us at hello@hour.golf or call/text (503) 206-2222. We typically respond within a few hours during business hours.",
+        a: "Email us at starter@hour.golf or call/text (503) 765-6906. We'll try to get return your message as quickly as possible",
       },
     ],
   },
@@ -129,7 +129,7 @@ const ACCESS_STEPS = [
   },
   {
     question: "No worries \u2014 use backup code 2138 to get in.",
-    detail: "Enter 2138 on the keypad. This is a temporary backup code. If this also doesn\u2019t work, call or text us at (503) 206-2222.",
+    detail: "Enter 2138 on the keypad. This is a temporary backup code. If this also doesn\u2019t work, call or text us at (503) 765-6906.",
     options: ["I\u2019m in, thanks!", "Backup code didn\u2019t work either"],
     nextOnFirst: "resolved",
     nextOnSecond: "escalate",
