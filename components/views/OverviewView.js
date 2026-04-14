@@ -1,13 +1,17 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { TIERS } from "../../lib/constants";
 import { mL, hrs, dlr, allD } from "../../lib/format";
 import Badge from "../ui/Badge";
 
 export default function OverviewView({
-  usage, payments, members, bookings,
+  usage, payments, members, bookings, tierCfg,
   selMonth, setSelMonth,
   onSelectMember, onUpdateTier,
+  onChargeNonMember, onChargeNonMembersBatch,
+  saving,
 }) {
+  const [batchLoading, setBatchLoading] = useState(false);
+
   const activeBk = useMemo(
     () => (bookings || []).filter((b) => b.booking_status !== "Cancelled"),
     [bookings]
@@ -30,8 +34,6 @@ export default function OverviewView({
   const actMonth = selMonth || allMonths[0] || "";
 
   // Normalize the monthly_usage view to handle both old and new column names.
-  // The new view returns `name` / `email` from members; old code expected
-  // `customer_name` / `customer_email`.
   const curData = useMemo(
     () => usage
       .filter((r) => r.billing_month === actMonth)
@@ -45,8 +47,27 @@ export default function OverviewView({
 
   const memMonth = curData.filter((r) => r.tier && r.tier !== "Non-Member");
 
-  // Non-members must be computed from bookings since the new view only
-  // joins from members and excludes anyone who isn't a tracked member.
+  // Get Non-Member hourly rate from tier_config (fallback $60)
+  const nmRate = useMemo(() => {
+    const tc = (tierCfg || []).find((t) => t.tier === "Non-Member");
+    return Number(tc?.overage_rate || 60);
+  }, [tierCfg]);
+
+  // Build a set of charged booking IDs from payments
+  const chargedBookingIds = useMemo(() => {
+    const set = new Set();
+    (payments || []).forEach((p) => { if (p.charged_booking_id) set.add(p.charged_booking_id); });
+    return set;
+  }, [payments]);
+
+  // Build member lookup for stripe_customer_id
+  const memberMap = useMemo(() => {
+    const m = {};
+    (members || []).forEach((mem) => { m[mem.email] = mem; });
+    return m;
+  }, [members]);
+
+  // Non-members computed from bookings with per-booking detail
   const nonMem = useMemo(() => {
     if (!actMonth) return [];
     const monthDate = new Date(actMonth);
@@ -67,20 +88,57 @@ export default function OverviewView({
           total_hours: 0,
           booking_count: 0,
           tier: "Non-Member",
+          bookingIds: [],
         };
       }
       stats[b.customer_email].total_hours += Number(b.duration_hours || 0);
       stats[b.customer_email].booking_count += 1;
+      stats[b.customer_email].bookingIds.push(b.booking_id);
       if (b.customer_name) stats[b.customer_email].customer_name = b.customer_name;
     });
     return Object.values(stats).sort((a, b) => b.total_hours - a.total_hours);
   }, [activeBk, members, actMonth]);
 
+  // For each non-member, compute paid/unpaid counts
+  function nmChargeStatus(r) {
+    const paid = r.bookingIds.filter((id) => chargedBookingIds.has(id)).length;
+    const unpaid = r.bookingIds.length - paid;
+    return { paid, unpaid };
+  }
+
+  // Count total uncharged non-member bookings for batch button
+  const totalUncharged = useMemo(() => {
+    return nonMem.reduce((sum, r) => {
+      const m = memberMap[r.customer_email];
+      if (!m?.stripe_customer_id) return sum;
+      return sum + r.bookingIds.filter((id) => !chargedBookingIds.has(id)).length;
+    }, 0);
+  }, [nonMem, memberMap, chargedBookingIds]);
+
   const totOver = memMonth.reduce((s, r) => s + Number(r.overage_charge || 0), 0);
   const totHrs = memMonth.reduce((s, r) => s + Number(r.total_hours || 0), 0);
 
+  // Non-member revenue totals
+  const nmTotRevenue = nonMem.reduce((s, r) => s + (Number(r.total_hours) * nmRate), 0);
+  const nmTotPaid = nonMem.reduce((s, r) => {
+    const { paid } = nmChargeStatus(r);
+    // We need per-booking hours to compute paid amount accurately.
+    // For simplicity, use charged booking IDs to sum from activeBk.
+    return s;
+  }, 0);
+
   function isPaid(email, month) {
     return payments.some((p) => p.member_email === email && p.billing_month === month && p.status === "succeeded");
+  }
+
+  async function handleBatchCharge() {
+    if (batchLoading) return;
+    setBatchLoading(true);
+    try {
+      await onChargeNonMembersBatch();
+    } finally {
+      setBatchLoading(false);
+    }
   }
 
   return (
@@ -133,7 +191,7 @@ export default function OverviewView({
                     {ho ? dlr(r.overage_charge) : "\u2014"}
                   </span>
                   <span style={{ flex: 1 }} className="text-r">
-                    {ho && pd && <span className="badge" style={{ background: "#4a7c59", fontSize: 9 }}>PAID</span>}
+                    {ho && pd && <span className="badge" style={{ background: "#4C8D73", fontSize: 9 }}>PAID</span>}
                     {ho && !pd && <span className="badge" style={{ background: "var(--red)", fontSize: 9 }}>UNPAID</span>}
                     {!ho && <span className="muted">&mdash;</span>}
                   </span>
@@ -144,32 +202,84 @@ export default function OverviewView({
         </>
       )}
 
-      <h2 className="section-head" style={{ marginTop: 24 }}>Non-Members &mdash; {mL(actMonth)}</h2>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 24 }}>
+        <h2 className="section-head" style={{ margin: 0 }}>Non-Members &mdash; {mL(actMonth)}</h2>
+        {totalUncharged > 0 && (
+          <button
+            className="btn primary"
+            style={{ fontSize: 11, padding: "4px 12px" }}
+            disabled={saving || batchLoading}
+            onClick={handleBatchCharge}
+          >
+            {batchLoading ? "Charging..." : `Charge All (${totalUncharged})`}
+          </button>
+        )}
+      </div>
+      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
+        Rate: ${nmRate}/hr
+      </div>
       <div className="tbl">
         <div className="th">
           <span style={{ flex: 2 }}>Customer</span>
           <span style={{ flex: 1 }} className="text-r">Hours</span>
           <span style={{ flex: 1 }} className="text-r">Sessions</span>
           <span style={{ flex: 1 }} className="text-r">Revenue</span>
+          <span style={{ flex: 1 }} className="text-r">Status</span>
           <span style={{ flex: 1 }} className="text-c">Assign</span>
         </div>
-        {nonMem.slice(0, 25).map((r) => (
-          <div key={r.customer_email} className="tr">
-            <span style={{ flex: 2, cursor: "pointer" }} onClick={() => onSelectMember(r.customer_email)}>
-              <strong>{r.customer_name}</strong><br />
-              <span className="email-sm">{r.customer_email}</span>
-            </span>
-            <span style={{ flex: 1 }} className="text-r tab-num">{hrs(r.total_hours)}</span>
-            <span style={{ flex: 1 }} className="text-r tab-num">{r.booking_count}</span>
-            <span style={{ flex: 1 }} className="text-r tab-num">${(Number(r.total_hours) * 60).toFixed(0)}</span>
-            <span style={{ flex: 1 }} className="text-c">
-              <select className="tier-sel" value="Non-Member" onChange={(e) => onUpdateTier(r.customer_email, e.target.value, r.customer_name)}>
-                <option value="Non-Member">&mdash;</option>
-                {TIERS.filter((t) => t !== "Non-Member").map((t) => <option key={t}>{t}</option>)}
-              </select>
-            </span>
-          </div>
-        ))}
+        {nonMem.slice(0, 25).map((r) => {
+          const { paid, unpaid } = nmChargeStatus(r);
+          const m = memberMap[r.customer_email];
+          const hasStripe = !!m?.stripe_customer_id;
+          const revenue = Number(r.total_hours) * nmRate;
+
+          return (
+            <div key={r.customer_email} className="tr">
+              <span style={{ flex: 2, cursor: "pointer" }} onClick={() => onSelectMember(r.customer_email)}>
+                <strong>{r.customer_name}</strong><br />
+                <span className="email-sm">{r.customer_email}</span>
+              </span>
+              <span style={{ flex: 1 }} className="text-r tab-num">{hrs(r.total_hours)}</span>
+              <span style={{ flex: 1 }} className="text-r tab-num">{r.booking_count}</span>
+              <span style={{ flex: 1 }} className="text-r tab-num">${revenue.toFixed(0)}</span>
+              <span style={{ flex: 1 }} className="text-r">
+                {paid > 0 && unpaid === 0 && (
+                  <span className="badge" style={{ background: "#4C8D73", fontSize: 9 }}>PAID</span>
+                )}
+                {paid > 0 && unpaid > 0 && (
+                  <span className="badge" style={{ background: "var(--amber, #D97706)", fontSize: 9 }}>
+                    {paid}/{r.booking_count} PAID
+                  </span>
+                )}
+                {paid === 0 && hasStripe && unpaid > 0 && (
+                  <button
+                    className="btn primary"
+                    style={{ fontSize: 10, padding: "2px 8px" }}
+                    disabled={saving}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Charge all uncharged bookings for this non-member
+                      const unchargedIds = r.bookingIds.filter((id) => !chargedBookingIds.has(id));
+                      unchargedIds.forEach((id) => onChargeNonMember(id));
+                    }}
+                  >
+                    Charge ${revenue.toFixed(0)}
+                  </button>
+                )}
+                {!hasStripe && unpaid > 0 && (
+                  <span className="muted" style={{ fontSize: 10 }}>No Stripe</span>
+                )}
+                {r.booking_count === 0 && <span className="muted">&mdash;</span>}
+              </span>
+              <span style={{ flex: 1 }} className="text-c">
+                <select className="tier-sel" value="Non-Member" onChange={(e) => onUpdateTier(r.customer_email, e.target.value, r.customer_name)}>
+                  <option value="Non-Member">&mdash;</option>
+                  {TIERS.filter((t) => t !== "Non-Member").map((t) => <option key={t}>{t}</option>)}
+                </select>
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
