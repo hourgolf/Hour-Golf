@@ -2,28 +2,37 @@ import { useState, useEffect, useMemo } from "react";
 import { BAYS, TZ } from "../../lib/constants";
 import { fT, fDL } from "../../lib/format";
 
-const ALL_HOURS = [];
-for (let h = 7; h <= 21; h++) {
-  for (let m = 0; m < 60; m += 15) {
-    ALL_HOURS.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+function buildHours(startHour, endHour) {
+  const hours = [];
+  for (let h = startHour; h < endHour; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      hours.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    }
   }
+  // Add the final end-of-window slot
+  hours.push(`${String(endHour).padStart(2, "0")}:00`);
+  return hours;
 }
 
 export default function MemberBooking({ member, tierConfig, refresh, showToast }) {
   const isNonMember = member.tier === "Non-Member";
   const hasCard = member.hasPaymentMethod;
 
-  // Non-members: 10:00 AM - 8:00 PM only. Members: full range.
+  // Booking window from tier config, with sensible fallbacks
+  const bookStart = Number(tierConfig?.booking_hours_start ?? (isNonMember ? 10 : 0));
+  const bookEnd = Number(tierConfig?.booking_hours_end ?? (isNonMember ? 20 : 24));
+
   const HOURS = useMemo(() => {
-    if (isNonMember) return ALL_HOURS.filter((h) => h >= "10:00" && h <= "20:00");
-    return ALL_HOURS;
-  }, [isNonMember]);
+    return buildHours(bookStart, Math.min(bookEnd, 24));
+  }, [bookStart, bookEnd]);
 
   const [bookDate, setBookDate] = useState(() => {
     return new Date().toLocaleDateString("en-CA", { timeZone: TZ });
   });
-  const [bookStart, setBookStart] = useState(isNonMember ? "10:00" : "10:00");
-  const [bookEnd, setBookEnd] = useState(isNonMember ? "11:00" : "11:00");
+  const defaultStart = HOURS.length > 0 ? HOURS[0] : "10:00";
+  const defaultEnd = HOURS.length > 4 ? HOURS[4] : HOURS[HOURS.length - 1] || "11:00";
+  const [bookStartTime, setBookStartTime] = useState(defaultStart);
+  const [bookEndTime, setBookEndTime] = useState(defaultEnd);
   const [bookBay, setBookBay] = useState("Bay 1");
   const [availability, setAvailability] = useState([]);
   const [booking, setBooking] = useState(false);
@@ -47,11 +56,11 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
     );
   }
 
-  const bookDuration = bookStart && bookEnd
-    ? Math.max(0, (new Date(`${bookDate}T${bookEnd}:00`) - new Date(`${bookDate}T${bookStart}:00`)) / 3600000)
+  const bookDuration = bookStartTime && bookEndTime
+    ? Math.max(0, (new Date(`${bookDate}T${bookEndTime}:00`) - new Date(`${bookDate}T${bookStartTime}:00`)) / 3600000)
     : 0;
 
-  const slotConflict = bookStart && bookEnd && isSlotTaken(bookBay, bookStart, bookEnd);
+  const slotConflict = bookStartTime && bookEndTime && isSlotTaken(bookBay, bookStartTime, bookEndTime);
 
   async function handleBook() {
     setBooking(true);
@@ -65,8 +74,8 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
           email: member.email,
           name: member.name,
           date: bookDate,
-          startTime: bookStart,
-          endTime: bookEnd,
+          startTime: bookStartTime,
+          endTime: bookEndTime,
           bay: bookBay,
           terms_accepted: true,
         }),
@@ -74,9 +83,8 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || d.detail || "Booking failed");
       showToast("Booking confirmed!");
-      // Reset form so the just-booked slot doesn't trigger a conflict error
-      setBookStart(isNonMember ? "10:00" : "10:00");
-      setBookEnd(isNonMember ? "11:00" : "11:00");
+      setBookStartTime(defaultStart);
+      setBookEndTime(defaultEnd);
       setBookBay("Bay 1");
       setTermsAccepted(false);
       // Refresh availability
@@ -103,7 +111,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
 
       {isNonMember && hasCard && (
         <div className="mem-info-banner">
-          {"\u23f0"} Non-member bookings available <strong>10 AM {"\u2013"} 8 PM</strong>.{" "}
+          {"\u23f0"} Non-member bookings available <strong>{bookStart === 0 ? "12 AM" : bookStart < 12 ? `${bookStart} AM` : bookStart === 12 ? "12 PM" : `${bookStart - 12} PM`} {"\u2013"} {bookEnd === 24 ? "12 AM" : bookEnd < 12 ? `${bookEnd} AM` : bookEnd === 12 ? "12 PM" : `${bookEnd - 12} PM`}</strong>.{" "}
           <a href="/members/billing">Upgrade your membership</a> for 24/7 access.
         </div>
       )}
@@ -130,7 +138,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
           <div className="mem-time-row" style={{ display: "flex", gap: 12 }}>
             <div className="mem-form-row" style={{ flex: 1 }}>
               <label>Start</label>
-              <select value={bookStart} onChange={(e) => setBookStart(e.target.value)}>
+              <select value={bookStartTime} onChange={(e) => setBookStartTime(e.target.value)}>
                 {HOURS.map((h) => (
                   <option key={h} value={h}>{fT(new Date(`2026-01-01T${h}:00`))}</option>
                 ))}
@@ -138,8 +146,8 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
             </div>
             <div className="mem-form-row" style={{ flex: 1 }}>
               <label>End</label>
-              <select value={bookEnd} onChange={(e) => setBookEnd(e.target.value)}>
-                {HOURS.filter((h) => h > bookStart).map((h) => (
+              <select value={bookEndTime} onChange={(e) => setBookEndTime(e.target.value)}>
+                {HOURS.filter((h) => h > bookStartTime).map((h) => (
                   <option key={h} value={h}>{fT(new Date(`2026-01-01T${h}:00`))}</option>
                 ))}
               </select>
@@ -204,8 +212,8 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
                       onClick={() => {
                         if (!taken) {
                           setBookBay(bay);
-                          setBookStart(h);
-                          setBookEnd(nextH);
+                          setBookStartTime(h);
+                          setBookEndTime(nextH);
                         }
                       }}
                     >
