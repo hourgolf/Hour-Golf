@@ -3,6 +3,25 @@ import { verifyAdmin, SUPABASE_URL, getServiceKey } from "../../lib/api-helpers"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+async function findStripeCustomer(email) {
+  const customers = await stripe.customers.list({ email, limit: 1 });
+  return customers.data.length > 0 ? customers.data[0].id : null;
+}
+
+async function findPaymentMethod(customerId) {
+  const customer = await stripe.customers.retrieve(customerId);
+  let pm = customer.invoice_settings?.default_payment_method || customer.default_source;
+  if (!pm) {
+    const methods = await stripe.paymentMethods.list({ customer: customerId, type: "card", limit: 5 });
+    if (methods.data.length > 0) pm = methods.data[0].id;
+  }
+  if (!pm) {
+    const full = await stripe.customers.retrieve(customerId, { expand: ["sources"] });
+    if (full.sources?.data?.length > 0) pm = full.sources.data[0].id;
+  }
+  return pm;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
@@ -21,7 +40,7 @@ export default async function handler(req, res) {
     const tcRows = tcResp.ok ? await tcResp.json() : [];
     const rate = Number(tcRows[0]?.overage_rate || 60);
 
-    // 2. Get all members and build sets
+    // 2. Get all members and build lookup
     const memResp = await fetch(
       `${SUPABASE_URL}/rest/v1/members?select=email,tier,stripe_customer_id`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
@@ -48,21 +67,17 @@ export default async function handler(req, res) {
     // Filter to non-members only
     const eligible = allBookings.filter((b) => {
       const m = memberTiers[b.customer_email];
-      if (m && m.tier && m.tier !== "Non-Member") return false; // is a real member
-      if (paidBookings.has(b.booking_id)) return false; // already charged
+      if (m && m.tier && m.tier !== "Non-Member") return false;
+      if (paidBookings.has(b.booking_id)) return false;
       if (Number(b.duration_hours || 0) <= 0) return false;
       return true;
     });
 
     const results = { charged: [], failed: [], skipped: [] };
+    // Cache Stripe lookups so we don't search the same email twice
+    const stripeCache = {};
 
     for (const bk of eligible) {
-      const m = memberTiers[bk.customer_email];
-      if (!m?.stripe_customer_id) {
-        results.skipped.push({ booking_id: bk.booking_id, email: bk.customer_email, reason: "no_stripe" });
-        continue;
-      }
-
       const hours = Number(bk.duration_hours);
       const amountCents = Math.round(hours * rate * 100);
       if (amountCents < 50) {
@@ -71,17 +86,34 @@ export default async function handler(req, res) {
       }
 
       try {
-        // Find payment method
-        const customer = await stripe.customers.retrieve(m.stripe_customer_id);
-        let pm = customer.invoice_settings?.default_payment_method || customer.default_source;
-        if (!pm) {
-          const methods = await stripe.paymentMethods.list({ customer: m.stripe_customer_id, type: "card", limit: 5 });
-          if (methods.data.length > 0) pm = methods.data[0].id;
+        // Find Stripe customer: members table first, then Stripe search by email
+        let stripeId = memberTiers[bk.customer_email]?.stripe_customer_id || null;
+        if (!stripeId) {
+          if (stripeCache[bk.customer_email] !== undefined) {
+            stripeId = stripeCache[bk.customer_email];
+          } else {
+            stripeId = await findStripeCustomer(bk.customer_email);
+            stripeCache[bk.customer_email] = stripeId;
+            // Save back to members table
+            if (stripeId) {
+              await fetch(
+                `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(bk.customer_email)}`,
+                {
+                  method: "PATCH",
+                  headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+                  body: JSON.stringify({ stripe_customer_id: stripeId }),
+                }
+              );
+            }
+          }
         }
-        if (!pm) {
-          const full = await stripe.customers.retrieve(m.stripe_customer_id, { expand: ["sources"] });
-          if (full.sources?.data?.length > 0) pm = full.sources.data[0].id;
+
+        if (!stripeId) {
+          results.skipped.push({ booking_id: bk.booking_id, email: bk.customer_email, reason: "no_stripe" });
+          continue;
         }
+
+        const pm = await findPaymentMethod(stripeId);
         if (!pm) {
           results.skipped.push({ booking_id: bk.booking_id, email: bk.customer_email, reason: "no_payment_method" });
           continue;
@@ -91,7 +123,7 @@ export default async function handler(req, res) {
         const pi = await stripe.paymentIntents.create({
           amount: amountCents,
           currency: "usd",
-          customer: m.stripe_customer_id,
+          customer: stripeId,
           payment_method: pm,
           off_session: true,
           confirm: true,
