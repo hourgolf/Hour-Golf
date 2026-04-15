@@ -251,7 +251,8 @@ export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStrip
       </div>
 
       <h2 className="section-head" style={{ marginTop: 24 }}>Members ({members.length})</h2>
-      <div className="tbl">
+      {/* Desktop table */}
+      <div className="tbl usage-desktop">
         <div className="th">
           <span style={{ flex: 2 }}>Member</span>
           <span style={{ flex: 1 }}>Tier</span>
@@ -286,6 +287,38 @@ export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStrip
                 </button>
               )}
             </span>
+          </div>
+        ))}
+      </div>
+      {/* Mobile cards */}
+      <div className="usage-mobile">
+        {members.map((m) => (
+          <div key={m.email} className="usage-card" onClick={() => onSelectMember(m.email)}>
+            <div className="usage-card-top">
+              <strong>{m.name}</strong>
+              <Badge tier={m.tier} />
+            </div>
+            <div className="usage-card-stats" style={{ justifyContent: "space-between" }}>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                {m.monthly_rate ? (
+                  <span className="tab-num" style={{ fontSize: 13, color: "var(--text-muted)" }}>${Number(m.monthly_rate).toFixed(0)}/mo</span>
+                ) : null}
+                {!m.stripe_customer_id && (
+                  <button
+                    className="btn primary"
+                    style={{ fontSize: 10, padding: "2px 8px" }}
+                    onClick={(e) => { e.stopPropagation(); handleLink(m.email, m.name); }}
+                    disabled={linking === m.email}
+                  >
+                    {linking === m.email ? "\u2026" : "Link Stripe"}
+                  </button>
+                )}
+              </div>
+              <div className="usage-card-stat" onClick={(e) => e.stopPropagation()}>
+                <TierSelect value={m.tier} onChange={(t) => onUpdateTier(m.email, t, m.name)} />
+                <span className="usage-card-lbl">Assign</span>
+              </div>
+            </div>
           </div>
         ))}
       </div>
