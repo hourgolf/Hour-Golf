@@ -78,11 +78,11 @@ html { overflow-y: scroll; }
 .logo { font-family: var(--font-display); font-size: 24px; letter-spacing: 4px; font-weight: 700; white-space: nowrap; color: #EDF3E3; line-height: 22px; }
 .logo-sub { font-family: var(--font-mono); font-size: 10px; opacity: 0.6; letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; white-space: nowrap; color: #EDF3E3; }
 .hdr-brand-break { }
-.hdr-title-logo { height: 40px; display: block; margin: 0 auto; }
+.hdr-title-logo { height: 50px; display: block; margin: 0 auto; }
 .header-stats { display: flex; gap: 14px; align-items: center; justify-content: flex-end; }
 .stat-box { display: flex; flex-direction: column; align-items: center; }
-.stat-val { font-family: var(--font-display); font-size: 18px; font-weight: 700; line-height: 1.2; color: #EDF3E3; }
-.stat-lbl { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: rgba(237,243,227,0.6); margin-top: 2px; }
+.stat-val { font-family: var(--font-display); font-size: 22px; font-weight: 700; line-height: 1.2; color: #EDF3E3; }
+.stat-lbl { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: rgba(237,243,227,0.6); margin-top: 2px; }
 .logo-btn { background: none; border: none; padding: 0; cursor: pointer; color: inherit; display: flex; align-items: center; gap: 14px; font-family: inherit; min-width: 0; min-height: 40px; }
 .logo-btn:hover { opacity: 0.85; }
 .hdr-logo-img { display: block; flex-shrink: 0; max-height: 58px; }
@@ -368,12 +368,12 @@ html { overflow-y: scroll; }
   .hdr-logo-img { max-height: 64px !important; }
   .hdr-brand-break { display: block; font-size: 0; line-height: 0; }
   .logo { font-size: 24px; letter-spacing: 4px; line-height: 22px; }
-  .hdr-title-logo { height: 34px; }
+  .hdr-title-logo { height: 43px; }
   .logo-sub { font-size: 8px; letter-spacing: 1px; }
-  .header-stats { gap: 10px; }
-  .stat-box { min-width: auto; flex: 0 0 auto; }
-  .stat-val { font-size: 15px; }
-  .stat-lbl { font-size: 7px; letter-spacing: 0.5px; }
+  .header-stats { gap: 2px; flex-direction: column; align-items: flex-end; }
+  .stat-box { flex-direction: row; gap: 5px; align-items: baseline; }
+  .stat-val { font-size: 16px; }
+  .stat-lbl { font-size: 8px; letter-spacing: 0.5px; margin-top: 0; }
   .content { padding: 14px; }
   .summary { padding: 12px 14px; gap: 12px; }
   .sum-val { font-size: 18px; }
