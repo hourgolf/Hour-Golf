@@ -520,7 +520,7 @@ export default function Dashboard() {
       {/* FAB buttons */}
       <button className="admin-fab admin-fab-booking" onClick={() => openAdd()} title="New Booking">+</button>
       <button className="admin-fab admin-fab-refresh" onClick={refresh} disabled={loading} title="Refresh">{"\u21BB"}</button>
-      <button className="admin-fab admin-fab-settings" onClick={() => setView("settings")} title="Settings">{"\u2699"}</button>
+      <button className="admin-fab admin-fab-settings" onClick={() => setView("settings")} title="Settings">*</button>
     </div>
   );
 }
