@@ -166,12 +166,21 @@ export default function MemberLayout({ activeTab, children }) {
   if (!member) {
     return (
       <div className="mem-layout" style={{ position: "relative", overflow: "hidden" }}>
-        {/* Login page background blobs — adjust position/size/opacity here */}
-        <img src="/blobs/green1.png" alt="" style={{ position: "absolute", top: -80, right: -120, width: 650, opacity: 0.18, pointerEvents: "none", zIndex: 0 }} />
-        <img src="/blobs/pond1.png" alt="" style={{ position: "absolute", bottom: -60, left: -100, width: 800, opacity: 0.14, pointerEvents: "none", zIndex: 0 }} />
+        {/* Background — same azalea as main dash */}
+        <img src="/blobs/azalea_bg.png" alt="" style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.06, pointerEvents: "none", zIndex: 0 }} />
 
-        <div className="mem-login" style={{ position: "relative", zIndex: 1 }}>
-          <img src="/blobs/HGC_card2.png" alt="Hour Golf" style={{ width: 380, marginBottom: 20 }} />
+        <div className="mem-login" style={{
+          position: "relative", zIndex: 1,
+          background: "var(--surface, #fff)",
+          borderRadius: "var(--radius, 15px)",
+          border: "1px solid var(--border, #D1DFCB)",
+          boxShadow: "0 4px 24px rgba(53,68,59,0.10)",
+          padding: "40px 32px",
+          maxWidth: 400,
+          width: "calc(100% - 32px)",
+          margin: "60px auto",
+        }}>
+          <img src="/blobs/HGC_card2.png" alt="Hour Golf" style={{ width: 220, marginBottom: 20 }} />
           <div className="mem-brand-sub">{mode === "login" ? "Welcome Back." : "Join the Club."}</div>
 
           {mode === "login" ? (
@@ -294,10 +303,10 @@ export default function MemberLayout({ activeTab, children }) {
 
   return (
     <div className="mem-layout" style={{ position: "relative", overflow: "hidden" }}>
-      {/* Main dashboard background — swap image, adjust position/size/opacity here */}
-      <img src="/blobs/azalea_bg.png" alt="" style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.15, pointerEvents: "none", zIndex: 0 }} />
+      {/* Main dashboard background — swap image, adjust opacity here */}
+      <img src="/blobs/azalea_bg.png" alt="" style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.06, pointerEvents: "none", zIndex: 0 }} />
 
-      {/* Header — sign out removed, moved to Account tab */}
+      {/* Header */}
       <header className="mem-header" style={{ position: "relative", zIndex: 1 }}>
         <div className="mem-header-inner">
           <div className="mem-brand" style={{ fontSize: 16 }}>HOUR GOLF</div>
@@ -319,7 +328,7 @@ export default function MemberLayout({ activeTab, children }) {
         </div>
       </nav>
 
-      {/* Content — pass onLogout so Account tab can use it */}
+      {/* Content */}
       <main className="mem-content" style={{ position: "relative", zIndex: 1 }}>
         {typeof children === "function"
           ? children({ member, tierConfig, refresh, showToast, onLogout: handleLogout })
