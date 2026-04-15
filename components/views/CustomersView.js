@@ -58,7 +58,8 @@ export default function CustomersView({
         <span className="muted" style={{ marginLeft: 12 }}>{filtCust.length} results</span>
       </div>
 
-      <div className="tbl">
+      {/* Desktop table */}
+      <div className="tbl usage-desktop">
         <div className="th">
           <span style={{ flex: 2 }}>Customer</span>
           <span style={{ flex: 1 }}>Tier</span>
@@ -81,6 +82,37 @@ export default function CustomersView({
               <span style={{ flex: 1 }} className="text-c">
                 <TierSelect value={tier} onChange={(t) => onUpdateTier(c.email, t, c.name)} />
               </span>
+            </div>
+          );
+        })}
+      </div>
+      {/* Mobile cards */}
+      <div className="usage-mobile">
+        {filtCust.map((c) => {
+          const m = members.find((x) => x.email === c.email);
+          const tier = m?.tier || "Non-Member";
+          return (
+            <div key={c.email} className="usage-card" onClick={() => onSelectMember(c.email)}>
+              <div className="usage-card-top">
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <strong>{c.name}</strong>
+                  <Badge tier={tier} />
+                </div>
+              </div>
+              <div className="usage-card-stats">
+                <div className="usage-card-stat">
+                  <span className="usage-card-val tab-num">{c.hrs.toFixed(1)}h</span>
+                  <span className="usage-card-lbl">Hours</span>
+                </div>
+                <div className="usage-card-stat">
+                  <span className="usage-card-val tab-num">{c.cnt}</span>
+                  <span className="usage-card-lbl">Sessions</span>
+                </div>
+                <div className="usage-card-stat" onClick={(e) => e.stopPropagation()}>
+                  <TierSelect value={tier} onChange={(t) => onUpdateTier(c.email, t, c.name)} />
+                  <span className="usage-card-lbl">Assign</span>
+                </div>
+              </div>
             </div>
           );
         })}
