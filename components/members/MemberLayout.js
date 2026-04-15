@@ -39,6 +39,8 @@ export default function MemberLayout({ activeTab, children }) {
 
   const [formError, setFormError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
 
   // Help drawer
   const [helpOpen, setHelpOpen] = useState(false);
@@ -181,9 +183,81 @@ export default function MemberLayout({ activeTab, children }) {
           margin: "60px auto",
         }}>
           <img src="/blobs/HGC_card2.png" alt="Hour Golf" style={{ width: "100%", maxWidth: 350, marginBottom: 30 }} />
-          <div className="mem-brand-sub">{mode === "login" ? "Hello Friend." : "Join the Club."}</div>
+          <div className="mem-brand-sub">{mode === "login" ? "Hello Friend." : mode === "forgot" ? "Reset Password." : "Join the Club."}</div>
 
-          {mode === "login" ? (
+          {mode === "forgot" ? (
+            <>
+              {forgotSent ? (
+                <>
+                  <p style={{ fontSize: 14, color: "var(--primary)", marginBottom: 24, lineHeight: 1.5 }}>
+                    If an account exists with that email, we&rsquo;ve sent a password reset link. Check your inbox!
+                  </p>
+                  <button
+                    className="mem-btn mem-btn-primary mem-btn-full"
+                    onClick={() => { setMode("login"); setForgotSent(false); setForgotEmail(""); setFormError(""); }}
+                  >
+                    Back to Sign In
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 20, lineHeight: 1.5 }}>
+                    Enter your email address and we&rsquo;ll send you a link to reset your password.
+                  </p>
+                  <input
+                    type="email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && forgotEmail.trim()) {
+                        setFormLoading(true);
+                        setFormError("");
+                        fetch("/api/member-forgot-password", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ email: forgotEmail.trim() }),
+                        })
+                          .then((r) => r.json())
+                          .then(() => setForgotSent(true))
+                          .catch(() => setFormError("Something went wrong. Please try again."))
+                          .finally(() => setFormLoading(false));
+                      }
+                    }}
+                    placeholder="Email address"
+                    className="mem-input"
+                  />
+                  {formError && <p className="mem-err">{formError}</p>}
+                  <button
+                    className="mem-btn mem-btn-primary mem-btn-full"
+                    disabled={!forgotEmail.trim() || formLoading}
+                    onClick={() => {
+                      setFormLoading(true);
+                      setFormError("");
+                      fetch("/api/member-forgot-password", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ email: forgotEmail.trim() }),
+                      })
+                        .then((r) => r.json())
+                        .then(() => setForgotSent(true))
+                        .catch(() => setFormError("Something went wrong. Please try again."))
+                        .finally(() => setFormLoading(false));
+                    }}
+                  >
+                    {formLoading ? "Sending..." : "Send Reset Link."}
+                  </button>
+                  <p style={{ marginTop: 20, fontSize: 13, color: "var(--text-muted)" }}>
+                    <button
+                      onClick={() => { setMode("login"); setFormError(""); setForgotEmail(""); }}
+                      style={{ background: "none", border: "none", color: "var(--primary)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", fontSize: 13, textDecoration: "underline" }}
+                    >
+                      Back to Sign In
+                    </button>
+                  </p>
+                </>
+              )}
+            </>
+          ) : mode === "login" ? (
             <>
               <input
                 type="email"
@@ -201,15 +275,23 @@ export default function MemberLayout({ activeTab, children }) {
                 placeholder="Password"
                 className="mem-input"
               />
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-muted)", marginBottom: 16, cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  style={{ accentColor: "#4C8D73" }}
-                />
-                Remember me
-              </label>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-muted)", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    style={{ accentColor: "#4C8D73" }}
+                  />
+                  Remember me
+                </label>
+                <button
+                  onClick={() => { setMode("forgot"); setFormError(""); setForgotEmail(email); }}
+                  style={{ background: "none", border: "none", color: "var(--primary)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", fontSize: 13, textDecoration: "underline" }}
+                >
+                  Forgot Password?
+                </button>
+              </div>
               {formError && <p className="mem-err">{formError}</p>}
               <button
                 className="mem-btn mem-btn-primary mem-btn-full"
