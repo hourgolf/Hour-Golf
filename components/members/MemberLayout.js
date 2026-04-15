@@ -177,8 +177,8 @@ export default function MemberLayout({ activeTab, children }) {
           boxShadow: "0 4px 24px rgba(53,68,59,0.10)",
           padding: "28px 28px",
           maxWidth: 400,
-          width: "calc(100% - 32px)",
-          margin: "40px auto",
+          width: "calc(100% - 40px)",
+          margin: "60px auto",
         }}>
           <img src="/blobs/HGC_card2.png" alt="Hour Golf" style={{ width: "100%", maxWidth: 350, marginBottom: 30 }} />
           <div className="mem-brand-sub">{mode === "login" ? "Hello Friend." : "Join the Club."}</div>
