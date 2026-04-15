@@ -329,7 +329,7 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
 
             {/* Cancel button */}
             {hasSubscription && !isCancelling && (
-              <div style={{ marginTop: 8 }}>
+            <div style={{ marginTop: 8, textAlign: "center" }}>
                 {cancelConfirm ? (
                   <div className="mem-cancel-confirm">
                     <span>Cancel your membership? It will remain active until the end of your billing period.</span>
