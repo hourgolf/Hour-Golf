@@ -35,11 +35,11 @@ export default function Header({
         <div className="header-stats">
           <div className="stat-box">
             <span className="stat-val">{todayCount}</span>
-            <span className="stat-lbl">Today</span>
+            <span className="stat-lbl">Bookings</span>
           </div>
           <div className="stat-box">
             <span className="stat-val">{todayHours.toFixed(1)}h</span>
-            <span className="stat-lbl">Bay Hrs</span>
+            <span className="stat-lbl">Usage</span>
           </div>
           <div className="stat-box">
             <span className="stat-val">{memberCount}</span>
