@@ -541,7 +541,7 @@ html { overflow-y: scroll; }
   .mem-punch-grid { grid-template-columns: 1fr; }
   .mem-avail-grid { font-size: 10px; grid-template-columns: 60px 1fr 1fr; }
   .mem-header-inner { gap: 6px; }
-  .mem-header { padding: 14px 16px; }
+  .mem-header { padding: 14px 14px; }
   .mem-header-name { font-size: 11px; }
   .mem-tier-badge { font-size: 9px; padding: 2px 6px; }
   .mem-nav-btn { padding: 10px 14px; font-size: 12px; }
