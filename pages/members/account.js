@@ -4,12 +4,13 @@ import MemberAccount from "../../components/members/MemberAccount";
 export default function AccountPage() {
   return (
     <MemberLayout activeTab="account">
-      {({ member, tierConfig, refresh, showToast }) => (
+      {({ member, tierConfig, refresh, showToast, onLogout }) => (
         <MemberAccount
           member={member}
           tierConfig={tierConfig}
           refresh={refresh}
           showToast={showToast}
+          onLogout={onLogout}
         />
       )}
     </MemberLayout>
