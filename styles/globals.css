@@ -263,7 +263,7 @@ html { overflow-y: scroll; }
 .wk-c.today { background: var(--primary-bg); }
 .wk-b { font-family: var(--font-body); font-size: 15px; padding: 6px 8px; border-radius: var(--radius); background: var(--primary-bg); color: var(--primary); border-left: 3px solid var(--primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .wk-b:hover { opacity: 0.8; }
-.wk-nav { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.wk-nav { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; margin-bottom: 12px; }
 .wk-nav span { font-family: var(--font-display); font-size: 20px; font-weight: 700; }
 
 /* ── Confirm dialog ── */
