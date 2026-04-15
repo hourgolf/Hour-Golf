@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-export default function MemberAccount({ member, tierConfig, refresh, showToast }) {
+export default function MemberAccount({ member, tierConfig, refresh, showToast, onLogout }) {
   const [name, setName] = useState(member.name || "");
   const [phone, setPhone] = useState(member.phone || "");
   const [prefs, setPrefs] = useState({
@@ -338,6 +338,20 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast }
           <div className={`mem-toggle-switch ${prefs.email_billing ? "on" : ""}`} />
         </div>
       </div>
-    </>
+         {/* Sign Out */}
+      {onLogout && (
+        <div className="mem-section" style={{ textAlign: "center", paddingTop: 8, paddingBottom: 32 }}>
+          <button
+            onClick={onLogout}
+            style={{
+              background: "none", border: "1px solid var(--border)",
+              color: "var(--text-muted)", cursor: "pointer", fontFamily: "inherit",
+              fontSize: 13, padding: "10px 32px", borderRadius: 10,
+            }}
+          >
+            Sign Out
+          </button>
+        </div>
+      )} </>
   );
 }
