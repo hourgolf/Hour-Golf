@@ -94,19 +94,19 @@ export default function CustomersView({
           return (
             <div key={c.email} className="usage-card" onClick={() => onSelectMember(c.email)}>
               <div className="usage-card-top">
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <strong>{c.name}</strong>
-                  <Badge tier={tier} />
-                </div>
+                <strong>{c.name}</strong>
+                <Badge tier={tier} />
               </div>
-              <div className="usage-card-stats">
-                <div className="usage-card-stat">
-                  <span className="usage-card-val tab-num">{c.hrs.toFixed(1)}h</span>
-                  <span className="usage-card-lbl">Hours</span>
-                </div>
-                <div className="usage-card-stat">
-                  <span className="usage-card-val tab-num">{c.cnt}</span>
-                  <span className="usage-card-lbl">Sessions</span>
+              <div className="usage-card-stats" style={{ justifyContent: "space-between" }}>
+                <div style={{ display: "flex", gap: 16 }}>
+                  <div className="usage-card-stat">
+                    <span className="usage-card-val tab-num">{c.hrs.toFixed(1)}h</span>
+                    <span className="usage-card-lbl">Hours</span>
+                  </div>
+                  <div className="usage-card-stat">
+                    <span className="usage-card-val tab-num">{c.cnt}</span>
+                    <span className="usage-card-lbl">Sessions</span>
+                  </div>
                 </div>
                 <div className="usage-card-stat" onClick={(e) => e.stopPropagation()}>
                   <TierSelect value={tier} onChange={(t) => onUpdateTier(c.email, t, c.name)} />
