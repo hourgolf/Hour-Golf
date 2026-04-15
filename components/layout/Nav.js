@@ -6,7 +6,6 @@ const TABS = [
   { key: "events", label: "Events" },
   { key: "tiers", label: "Config" },
   { key: "reports", label: "Reports" },
-  { key: "settings", label: "Settings" },
 ];
 
 export default function Nav({ view, setView, todayCount, detailName, onClearDetail }) {
