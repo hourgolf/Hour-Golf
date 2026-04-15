@@ -142,6 +142,21 @@ html { overflow-y: scroll; }
 .green { color: var(--primary); }
 .bold { font-weight: 700; }
 
+/* ── Usage mobile cards ── */
+.usage-desktop { display: block; }
+.usage-mobile { display: none; }
+.usage-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 8px; cursor: pointer; }
+.usage-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 14px; }
+.usage-card-stats { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.usage-card-stat { display: flex; flex-direction: column; align-items: center; min-width: 48px; }
+.usage-card-val { font-size: 14px; font-weight: 600; color: var(--text); }
+.usage-card-lbl { font-size: 8px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-family: var(--font-mono); }
+
+@media (max-width: 768px) {
+  .usage-desktop { display: none; }
+  .usage-mobile { display: block; }
+}
+
 /* ── Search ── */
 .search { width: 100%; padding: 10px 16px; border: 1.5px solid var(--border); border-radius: var(--radius); font-size: 15px; font-family: var(--font-body); letter-spacing: 0.03em; background: var(--surface); color: var(--text); margin-bottom: 12px; }
 .search:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--border); }
