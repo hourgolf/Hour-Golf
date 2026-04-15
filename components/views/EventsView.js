@@ -73,8 +73,6 @@ function EventFormModal({ open, onClose, event, onSave, apiKey }) {
   return (
     <Modal open={open} onClose={onClose}>
       <h2>{event ? "Edit Event" : "New Event"}</h2>
-
-      {/* Image */}
       <div className="mf">
         <label>Event Image</label>
         {form.image_url && (
@@ -83,8 +81,6 @@ function EventFormModal({ open, onClose, event, onSave, apiKey }) {
         <input type="file" accept="image/*" onChange={handleImage} disabled={uploading} />
         {uploading && <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Uploading...</span>}
       </div>
-
-      {/* Title / Subtitle */}
       <div className="mf">
         <label>Title *</label>
         <input value={form.title} onChange={(e) => update("title", e.target.value)} placeholder="Spring Tournament" />
@@ -93,8 +89,6 @@ function EventFormModal({ open, onClose, event, onSave, apiKey }) {
         <label>Subtitle</label>
         <input value={form.subtitle} onChange={(e) => update("subtitle", e.target.value)} placeholder="Members only — limited spots" />
       </div>
-
-      {/* Dates */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div className="mf">
           <label>Start Date *</label>
@@ -105,20 +99,14 @@ function EventFormModal({ open, onClose, event, onSave, apiKey }) {
           <input type="datetime-local" value={form.end_date} onChange={(e) => update("end_date", e.target.value)} />
         </div>
       </div>
-
-      {/* Cost */}
       <div className="mf">
         <label>Cost ($) — 0 = Free</label>
         <input type="number" min={0} step="0.01" value={form.cost} onChange={(e) => update("cost", e.target.value)} />
       </div>
-
-      {/* Description */}
       <div className="mf">
         <label>Description</label>
         <textarea rows={4} value={form.description} onChange={(e) => update("description", e.target.value)} placeholder="Event details, rules, what to bring..." style={{ width: "100%", resize: "vertical" }} />
       </div>
-
-      {/* Toggles */}
       <div style={{ display: "flex", gap: 24, margin: "12px 0" }}>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, cursor: "pointer", textTransform: "none", fontWeight: 400, letterSpacing: 0, color: "var(--text)" }}>
           <input type="checkbox" checked={form.is_published} onChange={(e) => update("is_published", e.target.checked)} />
@@ -129,7 +117,6 @@ function EventFormModal({ open, onClose, event, onSave, apiKey }) {
           Show Login Popup
         </label>
       </div>
-
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
         <button className="btn" onClick={onClose}>Cancel</button>
         <button className="btn primary" onClick={handleSave} disabled={saving || !form.title.trim() || !form.start_date}>
@@ -148,7 +135,24 @@ function MemberListModal({ open, onClose, title, members, type }) {
       {members.length === 0 && (
         <p style={{ color: "var(--text-muted)", textAlign: "center", padding: 16 }}>None yet.</p>
       )}
-      {members.length > 0 && (
+      {type === "comments" ? (
+        <div style={{ marginTop: 8, maxHeight: 400, overflowY: "auto" }}>
+          {members.map((c, i) => (
+            <div key={i} style={{ background: "var(--bg, #EDF3E3)", borderRadius: 10, padding: "10px 14px", marginBottom: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <div>
+                  <strong style={{ fontSize: 13 }}>{c.name}</strong>
+                  <span className="email-sm" style={{ marginLeft: 6 }}>{c.email}</span>
+                </div>
+                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                  {c.created_at ? new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{c.comment_text}</p>
+            </div>
+          ))}
+        </div>
+      ) : members.length > 0 && (
         <div className="tbl" style={{ marginTop: 8 }}>
           <div className="th">
             <span style={{ flex: 2 }}>Member</span>
@@ -277,6 +281,7 @@ export default function EventsView({ apiKey }) {
             <span style={{ flex: 0.7 }} className="text-r">Cost</span>
             <span style={{ flex: 0.7 }} className="text-c">Interested</span>
             <span style={{ flex: 0.7 }} className="text-c">Registered</span>
+            <span style={{ flex: 0.7 }} className="text-c">Comments</span>
             <span style={{ flex: 0.7 }} className="text-c">Popup</span>
             <span style={{ flex: 1 }} className="text-r">Actions</span>
           </div>
@@ -306,37 +311,31 @@ export default function EventsView({ apiKey }) {
             </span>
             <span style={{ flex: 0.7 }} className="text-c tab-num">
               {ev.interest_count > 0 ? (
-                <button
-                  className="btn"
-                  style={{ fontSize: 11, padding: "1px 8px", minWidth: 28 }}
-                  onClick={() => setMemberList({ title: `Interested — ${ev.title}`, members: ev.interested_members || [], type: "interested" })}
-                >
+                <button className="btn" style={{ fontSize: 11, padding: "1px 8px", minWidth: 28 }}
+                  onClick={() => setMemberList({ title: `Interested — ${ev.title}`, members: ev.interested_members || [], type: "interested" })}>
                   {ev.interest_count}
                 </button>
-              ) : (
-                <span className="muted">0</span>
-              )}
+              ) : (<span className="muted">0</span>)}
             </span>
             <span style={{ flex: 0.7 }} className="text-c tab-num">
               {ev.registration_count > 0 ? (
-                <button
-                  className="btn"
-                  style={{ fontSize: 11, padding: "1px 8px", minWidth: 28 }}
-                  onClick={() => setMemberList({ title: `Registered — ${ev.title}`, members: ev.registered_members || [], type: "registered" })}
-                >
+                <button className="btn" style={{ fontSize: 11, padding: "1px 8px", minWidth: 28 }}
+                  onClick={() => setMemberList({ title: `Registered — ${ev.title}`, members: ev.registered_members || [], type: "registered" })}>
                   {ev.registration_count}
                 </button>
-              ) : (
-                <span className="muted">0</span>
-              )}
+              ) : (<span className="muted">0</span>)}
+            </span>
+            <span style={{ flex: 0.7 }} className="text-c tab-num">
+              {(ev.comment_count || 0) > 0 ? (
+                <button className="btn" style={{ fontSize: 11, padding: "1px 8px", minWidth: 28 }}
+                  onClick={() => setMemberList({ title: `Comments — ${ev.title}`, members: ev.comments || [], type: "comments" })}>
+                  {ev.comment_count}
+                </button>
+              ) : (<span className="muted">0</span>)}
             </span>
             <span style={{ flex: 0.7 }} className="text-c">
               <label style={{ cursor: "pointer", display: "inline-flex", alignItems: "center" }}>
-                <input
-                  type="checkbox"
-                  checked={ev.show_popup}
-                  onChange={() => togglePopup(ev)}
-                />
+                <input type="checkbox" checked={ev.show_popup} onChange={() => togglePopup(ev)} />
               </label>
             </span>
             <span style={{ flex: 1 }} className="text-r">
