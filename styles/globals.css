@@ -485,7 +485,7 @@ html { overflow-y: scroll; }
 .mem-avail-grid { display: grid; grid-template-columns: 80px 1fr 1fr; gap: 1px; background: var(--border); border-radius: var(--radius); overflow: hidden; font-size: 13px; }
 .mem-avail-hdr { background: var(--primary); color: #EDF3E3; padding: 8px; text-align: center; font-family: var(--font-display); font-weight: 700; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
 .mem-avail-time { background: var(--bg); padding: 6px 8px; font-family: var(--font-mono); font-weight: 600; font-variant-numeric: tabular-nums; display: flex; align-items: center; }
-.mem-avail-cell { padding: 6px 8px; text-align: center; font-weight: 500; cursor: pointer; background: var(--surface); }
+.mem-avail-cell { padding: 6px 8px; text-align: center; font-family: var(--font-mono); font-size: 16px; font-weight: 400; cursor: pointer; background: var(--surface); display: flex; align-items: center; justify-content: center; }
 .mem-avail-cell.open { background: var(--primary-bg); color: var(--primary); }
 .mem-avail-cell.open:hover { background: rgba(76,141,115,0.2); }
 .mem-avail-cell.taken { background: var(--red-bg); color: var(--red); cursor: default; }
@@ -556,7 +556,7 @@ html { overflow-y: scroll; }
   .mem-billing-table { font-size: 11px; }
   .mem-billing-table th, .mem-billing-table td { padding: 6px 4px; }
   .mem-book-btn { font-size: 13px; padding: 12px; }
-  .mem-avail-cell { padding: 4px 4px; }
+  .mem-avail-cell { padding: 4px 4px; font-size: 14px; }
   .mem-avail-time { padding: 4px 6px; }
 }
 
