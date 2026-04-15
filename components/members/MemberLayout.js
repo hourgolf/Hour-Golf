@@ -167,7 +167,7 @@ export default function MemberLayout({ activeTab, children }) {
     return (
       <div className="mem-layout" style={{ position: "relative", overflow: "hidden" }}>
         {/* Background — same azalea as main dash */}
-        <img src="/blobs/azalea_bg.png" alt="" style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.30, pointerEvents: "none", zIndex: 0 }} />
+        <img src="/blobs/azalea_bg.png" alt="" style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.50, pointerEvents: "none", zIndex: 0 }} />
 
         <div className="mem-login" style={{
           position: "relative", zIndex: 1,
@@ -180,7 +180,7 @@ export default function MemberLayout({ activeTab, children }) {
           width: "calc(100% - 32px)",
           margin: "60px auto",
         }}>
-          <img src="/blobs/MASTERS LOGO.png" alt="Hour Golf" style={{ width: "80%", maxWidth: 320, marginBottom: 20 }} />
+          <img src="/blobs/HGC_card2.png" alt="Hour Golf" style={{ width: "85%", maxWidth: 350, marginBottom: 30 }} />
           <div className="mem-brand-sub">{mode === "login" ? "Welcome Back." : "Join the Club."}</div>
 
           {mode === "login" ? (
