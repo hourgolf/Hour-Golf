@@ -806,4 +806,5 @@ html { overflow-y: scroll; }
 @media (max-width: 600px) {
   .help-drawer { width: 100vw; height: 90vh; border-radius: var(--radius) var(--radius) 0 0; }
   .help-fab { bottom: 16px; right: 16px; width: 48px; height: 48px; font-size: 20px; }
+  .book-fab { bottom: 76px; right: 16px; width: 48px; height: 48px; font-size: 24px; }
 }
