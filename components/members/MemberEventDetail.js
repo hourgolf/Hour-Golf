@@ -6,9 +6,12 @@ export default function MemberEventDetail({ id, member, showToast }) {
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
+  const [posting, setPosting] = useState(false);
 
   useEffect(() => {
-    if (id) loadEvent();
+    if (id) { loadEvent(); loadComments(); }
   }, [id]);
 
   useEffect(() => {
@@ -31,6 +34,33 @@ export default function MemberEventDetail({ id, member, showToast }) {
       showToast("Failed to load event", "error");
     }
     setLoading(false);
+  }
+
+  async function loadComments() {
+    try {
+      const r = await fetch(`/api/member-event-comments?event_id=${id}`, { credentials: "include" });
+      if (r.ok) setComments(await r.json());
+    } catch {}
+  }
+
+  async function postComment() {
+    if (!newComment.trim() || posting) return;
+    setPosting(true);
+    try {
+      const r = await fetch("/api/member-event-comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ event_id: id, comment_text: newComment.trim() }),
+      });
+      if (!r.ok) throw new Error("Failed");
+      setNewComment("");
+      showToast("Comment posted!");
+      await loadComments();
+    } catch (e) {
+      showToast("Failed to post comment", "error");
+    }
+    setPosting(false);
   }
 
   async function toggleInterest() {
@@ -109,6 +139,7 @@ export default function MemberEventDetail({ id, member, showToast }) {
 
   return (
     <div className="mem-section">
+      {/* Back link */}
       <button
         onClick={() => router.push("/members/events")}
         style={{ background: "none", border: "none", color: "var(--primary)", cursor: "pointer", fontSize: 13, padding: 0, marginBottom: 16 }}
@@ -116,15 +147,18 @@ export default function MemberEventDetail({ id, member, showToast }) {
         &larr; All Events
       </button>
 
+      {/* Image */}
       {event.image_url && (
         <img src={event.image_url} alt="" style={{
           width: "100%", maxHeight: 300, objectFit: "cover", borderRadius: "var(--radius, 15px)", marginBottom: 16,
         }} />
       )}
 
+      {/* Title */}
       <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.3 }}>{event.title}</h1>
       {event.subtitle && <p style={{ margin: "4px 0 0", fontSize: 14, color: "var(--text-muted)" }}>{event.subtitle}</p>}
 
+      {/* Meta */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, margin: "16px 0", fontSize: 13 }}>
         <div>
           <span style={{ color: "var(--text-muted)" }}>Date: </span>
@@ -137,12 +171,15 @@ export default function MemberEventDetail({ id, member, showToast }) {
         </div>
       </div>
 
+      {/* Interest + Registration counts */}
       <div style={{ display: "flex", gap: 16, margin: "12px 0", fontSize: 13, color: "var(--text-muted)" }}>
         <span>{event.interest_count} interested</span>
         <span>{event.registration_count} registered</span>
       </div>
 
+      {/* Action buttons */}
       <div style={{ display: "flex", gap: 12, margin: "20px 0" }}>
+        {/* Interested toggle */}
         <button
           className="mem-btn"
           onClick={toggleInterest}
@@ -157,6 +194,7 @@ export default function MemberEventDetail({ id, member, showToast }) {
           {event.is_interested ? "\u{1F44D} Interested" : "\u{1F44D} I'm Interested"}
         </button>
 
+        {/* Register button */}
         {isRegistered ? (
           <button
             className="mem-btn"
@@ -183,11 +221,63 @@ export default function MemberEventDetail({ id, member, showToast }) {
         )}
       </div>
 
+      {/* Description */}
       {event.description && (
         <div style={{ marginTop: 24, lineHeight: 1.7, fontSize: 14, whiteSpace: "pre-wrap" }}>
           {event.description}
         </div>
       )}
+
+      {/* Comments / Questions */}
+      <div style={{ marginTop: 32, borderTop: "1px solid var(--border)", paddingTop: 24 }}>
+        <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>Questions &amp; Comments</h3>
+
+        {/* Post a comment */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+          <textarea
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Ask a question or leave a comment..."
+            rows={2}
+            style={{
+              flex: 1, padding: "10px 12px", borderRadius: 10,
+              border: "1px solid var(--border)", resize: "vertical",
+              fontFamily: "inherit", fontSize: 14,
+            }}
+          />
+          <button
+            onClick={postComment}
+            disabled={posting || !newComment.trim()}
+            style={{
+              alignSelf: "flex-end",
+              background: "var(--primary)", color: "#fff", border: "none",
+              padding: "10px 16px", borderRadius: 10, cursor: "pointer",
+              fontSize: 13, fontWeight: 600, whiteSpace: "nowrap",
+            }}
+          >
+            {posting ? "..." : "Post"}
+          </button>
+        </div>
+
+        {/* Comment list */}
+        {comments.length === 0 && (
+          <p style={{ color: "var(--text-muted)", fontSize: 13 }}>No comments yet. Be the first!</p>
+        )}
+        {comments.map((c) => (
+          <div key={c.id} style={{
+            background: "var(--bg, #EDF3E3)", borderRadius: 10,
+            padding: "10px 14px", marginBottom: 8,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <strong style={{ fontSize: 13 }}>{c.member_name}</strong>
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                {new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              </span>
+            </div>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{c.comment_text}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
