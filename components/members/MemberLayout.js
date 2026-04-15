@@ -180,7 +180,7 @@ export default function MemberLayout({ activeTab, children }) {
           width: "calc(100% - 32px)",
           margin: "60px auto",
         }}>
-          <img src="/blobs/HGC_card2.png" alt="Hour Golf" style={{ width: 420, marginBottom: 20 }} />
+          <img src="/blobs/MASTERS LOGO.png" alt="Hour Golf" style={{ width: 420, marginBottom: 20 }} />
           <div className="mem-brand-sub">{mode === "login" ? "Welcome Back." : "Join the Club."}</div>
 
           {mode === "login" ? (
