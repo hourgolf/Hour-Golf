@@ -310,7 +310,7 @@ export default function MemberLayout({ activeTab, children }) {
       <header className="mem-header" style={{ position: "relative", zIndex: 1 }}>
         <div className="mem-header-inner" style={{ position: "relative" }}>
           <div className="mem-brand" style={{ fontSize: 16, color: "#EDF3E3" }}>HOUR GOLF</div>
-          <img src="/blobs/HGC_card2.png" alt="" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", height: 36 }} />
+          <img src="/blobs/MASTERS FLAG.svg" alt="" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", height: 42 }} />
           <div className="mem-header-right">
             <span className="mem-header-name">{member.name}</span>
             <span className="mem-tier-badge" style={{ background: tierObj.bg, color: tierObj.text }}>{member.tier}</span>
