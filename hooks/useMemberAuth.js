@@ -30,7 +30,7 @@ export default function useMemberAuth() {
     setLoading(false);
   }
 
-  async function login(email, password) {
+  async function login(email, password, rememberMe = false) {
     setLoading(true);
     setError("");
     try {
@@ -38,7 +38,7 @@ export default function useMemberAuth() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, rememberMe }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Login failed");
