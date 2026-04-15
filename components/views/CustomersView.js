@@ -1,7 +1,22 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { TIERS } from "../../lib/constants";
 import Badge from "../ui/Badge";
 import TierSelect from "../ui/TierSelect";
+
+function exportCSV(rows, filename) {
+  const header = "Name,Email,Tier,Hours,Sessions";
+  const lines = rows.map((r) =>
+    `"${(r.name || "").replace(/"/g, '""')}","${r.email}","${r.tier}","${r.hrs.toFixed(1)}","${r.cnt}"`
+  );
+  const csv = [header, ...lines].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function CustomersView({
   bookings, members,
@@ -34,6 +49,17 @@ export default function CustomersView({
     return l;
   }, [allCust, search, cSort, cTier, members]);
 
+  const handleExport = useCallback((tierFilter) => {
+    const rows = allCust.map((c) => {
+      const m = members.find((x) => x.email === c.email);
+      return { ...c, tier: m?.tier || "Non-Member" };
+    });
+    const filtered = tierFilter === "all" ? rows : rows.filter((r) => r.tier === tierFilter);
+    const sorted = [...filtered].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    const label = tierFilter === "all" ? "All-Customers" : tierFilter.replace(/\s+/g, "-");
+    exportCSV(sorted, `HourGolf-${label}-${new Date().toISOString().slice(0, 10)}.csv`);
+  }, [allCust, members]);
+
   return (
     <div className="content">
       <input
@@ -56,6 +82,15 @@ export default function CustomersView({
           {TIERS.map((t) => <option key={t}>{t}</option>)}
         </select>
         <span className="muted" style={{ marginLeft: 12 }}>{filtCust.length} results</span>
+        <select
+          style={{ marginLeft: "auto", fontSize: 11, padding: "4px 8px", border: "1.5px solid var(--border)", borderRadius: "var(--radius)", fontFamily: "var(--font-body)", background: "var(--surface)", color: "var(--text)", cursor: "pointer" }}
+          value=""
+          onChange={(e) => { if (e.target.value) { handleExport(e.target.value); e.target.value = ""; } }}
+        >
+          <option value="" disabled>Export CSV</option>
+          <option value="all">All Customers</option>
+          {TIERS.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
       </div>
 
       {/* Desktop table */}
