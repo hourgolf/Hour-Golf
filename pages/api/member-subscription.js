@@ -225,7 +225,8 @@ export default async function handler(req, res) {
       // Update subscription with new price (prorated)
       await stripe.subscriptions.update(subscriptionId, {
         items: [{ id: itemId, price: tierCfg.stripe_price_id }],
-        proration_behavior: "create_prorations",
+        proration_behavior: "always_invoice",
+        payment_behavior: "allow_incomplete",
       });
 
       // Update member tier immediately
