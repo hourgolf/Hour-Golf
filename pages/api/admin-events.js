@@ -41,6 +41,15 @@ export default async function handler(req, res) {
         mems.forEach((m) => { memberNames[m.email] = m.name || m.email; });
       }
 
+      // Get comments
+      const comResp = await sb(key, "event_comments?select=event_id,member_email,comment_text,created_at&order=created_at.desc");
+      const comments = comResp.ok ? await comResp.json() : [];
+      const comByEvent = {};
+      comments.forEach((c) => {
+        if (!comByEvent[c.event_id]) comByEvent[c.event_id] = [];
+        comByEvent[c.event_id].push({ email: c.member_email, name: memberNames[c.member_email] || c.member_email, comment_text: c.comment_text, created_at: c.created_at });
+      });
+
       // Group by event
       const intByEvent = {};
       interests.forEach((i) => {
@@ -59,6 +68,8 @@ export default async function handler(req, res) {
         registration_count: (regByEvent[e.id] || []).length,
         interested_members: intByEvent[e.id] || [],
         registered_members: regByEvent[e.id] || [],
+        comment_count: (comByEvent[e.id] || []).length,
+        comments: comByEvent[e.id] || [],
       }));
 
       return res.status(200).json(enriched);
