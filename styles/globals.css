@@ -625,10 +625,10 @@ html { overflow-y: scroll; }
 }
 
 .rpt-chart {
-  display: flex; gap: 8px; margin-bottom: 24px;
+  display: flex; gap: 8px; margin-bottom: 24px; overflow: hidden; width: 100%;
 }
 .rpt-chart-col {
-  flex: 1; display: flex; flex-direction: column; align-items: center;
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center;
 }
 .rpt-chart-bar-wrap {
   height: 180px; width: 100%; display: flex; align-items: flex-end; justify-content: center;
@@ -643,7 +643,7 @@ html { overflow-y: scroll; }
 }
 .rpt-chart-amt {
   font-family: var(--font-display); font-size: 18px; font-weight: 700; color: var(--text);
-  text-align: center; white-space: nowrap; margin-top: 2px;
+  text-align: center; white-space: nowrap; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
 }
 
 .rpt-heat-wrap { overflow-x: auto; margin-bottom: 24px; }
@@ -668,7 +668,7 @@ html { overflow-y: scroll; }
   .rpt-bar-val { width: 60px; font-size: 10px; }
   .rpt-chart-bar-wrap { height: 130px; }
   .rpt-chart-lbl { font-size: 11px; }
-  .rpt-chart-amt { font-size: 12px; }
+  .rpt-chart-amt { font-size: 11px; }
   .rpt-heat-cell { min-width: 24px; height: 22px; font-size: 8px; }
   .rpt-heat-dow { width: 28px; font-size: 9px; }
 }

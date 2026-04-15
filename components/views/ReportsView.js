@@ -432,22 +432,56 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
           ))}
         </div>
 
-        {/* Monthly trend — clickable */}
+        {/* Monthly trend — line chart */}
         <h3 className="rpt-sub-head">Monthly Revenue Trend</h3>
         {revenue.trend.length > 0 ? (
-          <div className="rpt-chart">
-            {revenue.trend.map((t) => (
-              <TrendCol
-                key={t.month}
-                month={t.month}
-                label={t.label}
-                height={`${(t.total / maxTrend) * 100}%`}
-                onClick={() => setSelMonth(selMonth === t.month ? null : t.month)}
-              >
-                <div className="rpt-chart-amt">{dlr(t.total)}</div>
-              </TrendCol>
-            ))}
-          </div>
+          <>
+            <div className="tbl" style={{ padding: 16, marginBottom: 20 }}>
+              {(() => {
+                const data = revenue.trend;
+                const maxVal = Math.max(1, ...data.map((d) => d.total));
+                const W = 640, H = 220, PL = 50, PR = 10, PT = 14, PB = 30;
+                const plotW = W - PL - PR;
+                const plotH = H - PT - PB;
+                const pts = data.map((d, i) => ({
+                  x: PL + (i / Math.max(data.length - 1, 1)) * plotW,
+                  y: PT + plotH - (d.total / maxVal) * plotH,
+                }));
+                const polyline = pts.map((p) => `${p.x},${p.y}`).join(" ");
+                const area = polyline + ` ${PL + plotW},${PT + plotH} ${PL},${PT + plotH}`;
+                const gridLines = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(maxVal * f));
+                return (
+                  <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: 700, height: "auto", display: "block" }}>
+                    {gridLines.map((v) => {
+                      const y = PT + plotH - (v / maxVal) * plotH;
+                      return (
+                        <g key={v}>
+                          <line x1={PL} y1={y} x2={PL + plotW} y2={y} stroke="var(--border)" strokeWidth="0.5" />
+                          <text x={PL - 4} y={y + 3} textAnchor="end" style={{ fontSize: 8, fontFamily: "var(--font-mono)", fill: "var(--text-muted)" }}>${(v / 1000).toFixed(1)}k</text>
+                        </g>
+                      );
+                    })}
+                    <polygon points={area} fill="rgba(76,141,115,0.12)" />
+                    <polyline points={polyline} fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+                    {pts.map((p, i) => (
+                      <g key={i} onClick={() => setSelMonth(selMonth === data[i].month ? null : data[i].month)} style={{ cursor: "pointer" }}>
+                        <circle cx={p.x} cy={p.y} r={selMonth === data[i].month ? 5 : 3.5} fill={selMonth === data[i].month ? "var(--text)" : "var(--primary)"} />
+                        <title>{data[i].label}: {dlr(data[i].total)}</title>
+                      </g>
+                    ))}
+                    {data.map((d, i) => {
+                      const x = PL + (i / Math.max(data.length - 1, 1)) * plotW;
+                      return (
+                        <text key={d.month} x={x} y={H - 6} textAnchor="middle" style={{ fontSize: 9, fontFamily: "var(--font-mono)", fontWeight: selMonth === d.month ? 700 : 600, fill: "var(--text-muted)", textTransform: "uppercase" }}>
+                          {d.label}
+                        </text>
+                      );
+                    })}
+                  </svg>
+                );
+              })()}
+            </div>
+          </>
         ) : <p className="muted">No data yet</p>}
       </>
     );
