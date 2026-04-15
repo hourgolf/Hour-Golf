@@ -372,6 +372,7 @@ html { overflow-y: scroll; }
   .wk-d .dn { font-size: 20px; }
   .wk-d .dl { font-size: 10px; }
   .slot-t { width: 90px; font-size: 10px; }
+  .hdr-title-logo { height: 15vw; min-height: 50px; max-height: 90px; }
   .settings-grid { grid-template-columns: 1fr; }
   .profile-grid { grid-template-columns: 1fr; }
 }
