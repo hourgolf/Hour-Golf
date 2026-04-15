@@ -681,8 +681,8 @@ html { overflow-y: scroll; }
 /* ── Help Drawer (Member Portal) ── */
 .help-fab {
   position: fixed; bottom: 24px; right: 24px; z-index: 900;
-  width: 52px; height: 52px; border-radius: 50%; border: none;
-  background: #ddd480; color: #35443B; font-size: 22px;
+  width: 60px; height: 60px; border-radius: 50%; border: none;
+  background: #ddd480; color: #35443B; font-size: 28px;
   cursor: pointer; font-family: var(--font-display);
   box-shadow: 0 4px 16px rgba(53,68,59,0.25);
   transition: transform 0.15s;
@@ -690,7 +690,7 @@ html { overflow-y: scroll; }
 }
 .book-fab {
   position: fixed; bottom: 88px; right: 24px; z-index: 900;
-  width: 52px; height: 52px; border-radius: 50%; border: none;
+  width: 60px; height: 60px; border-radius: 50%; border: none;
   background: var(--primary); color: #EDF3E3; font-size: 28px;
   cursor: pointer; font-family: var(--font-display);
   box-shadow: 0 4px 16px rgba(53,68,59,0.25);
@@ -806,6 +806,6 @@ html { overflow-y: scroll; }
 /* Help drawer responsive */
 @media (max-width: 600px) {
   .help-drawer { width: 100vw; height: 90vh; border-radius: var(--radius) var(--radius) 0 0; }
-  .help-fab { bottom: 16px; right: 16px; width: 48px; height: 48px; font-size: 20px; }
-  .book-fab { bottom: 76px; right: 16px; width: 48px; height: 48px; font-size: 24px; }
+  .help-fab { bottom: 16px; right: 16px; width: 54px; height: 54px; font-size: 20px; }
+  .book-fab { bottom: 76px; right: 16px; width: 54px; height: 54px; font-size: 24px; }
 }
