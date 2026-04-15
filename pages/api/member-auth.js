@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
-  const { email, password } = req.body || {};
+  const { email, password, rememberMe } = req.body || {};
   if (!email) return res.status(400).json({ error: "Email required" });
 
   const cleanEmail = email.toLowerCase().trim();
@@ -39,9 +39,10 @@ export default async function handler(req, res) {
     }
     // If no password_hash, allow login (legacy member — will be prompted to set password)
 
-    // 3) Generate session token
+    // 3) Generate session token — 30 days if rememberMe, else 24 hours
     const sessionToken = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const sessionDuration = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+    const expiresAt = new Date(Date.now() + sessionDuration).toISOString();
 
     // 4) Store token in members table
     const updateResp = await fetch(
@@ -79,12 +80,13 @@ export default async function handler(req, res) {
 
     // 6) Set httpOnly cookie
     const isSecure = process.env.NODE_ENV === "production";
+    const cookieMaxAge = rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60;
     const cookie = [
       `hg-member-token=${sessionToken}`,
       "Path=/",
       "HttpOnly",
       "SameSite=Lax",
-      `Max-Age=${24 * 60 * 60}`,
+      `Max-Age=${cookieMaxAge}`,
     ];
     if (isSecure) cookie.push("Secure");
     res.setHeader("Set-Cookie", cookie.join("; "));
@@ -101,7 +103,6 @@ export default async function handler(req, res) {
         phone: member.phone || "",
         hasPaymentMethod: !!member.stripe_customer_id,
         needsAccountSetup,
-
       },
       tierConfig,
     });
