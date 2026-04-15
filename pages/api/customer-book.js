@@ -3,6 +3,7 @@ import { sendBookingConfirmation } from "../../lib/email";
 
 const TZ = "America/Los_Angeles";
 
+// Convert a date + time the user picked (in Pacific) to a proper UTC Date object.
 function pacificToUTC(dateStr, timeStr) {
   const naive = new Date(`${dateStr}T${timeStr}:00Z`);
   const utcD = new Date(naive.toLocaleString("en-US", { timeZone: "UTC" }));
@@ -22,13 +23,13 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Non-member time restriction: 10 AM - 8 PM only
     const cleanEmail = email.toLowerCase().trim();
     let memberTier = "Non-Member";
     let hasPaymentMethod = false;
     try {
       const memberResp = await fetch(
         `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&select=tier,stripe_customer_id`,
-
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       );
       if (memberResp.ok) {
@@ -38,11 +39,13 @@ export default async function handler(req, res) {
           hasPaymentMethod = !!rows[0].stripe_customer_id;
         }
       }
-    } catch (_) {}
+    } catch (_) { /* default to Non-Member */ }
+
     // Require payment method on file
     if (!hasPaymentMethod) {
       return res.status(403).json({ error: "Please add a payment method before booking. Go to Billing to add a card." });
     }
+
     if (memberTier === "Non-Member") {
       if (startTime < "10:00" || endTime > "20:00") {
         return res.status(400).json({ error: "Non-member bookings are restricted to 10:00 AM - 8:00 PM. Upgrade your membership for 24/7 access." });
@@ -51,9 +54,23 @@ export default async function handler(req, res) {
 
     const sD = pacificToUTC(date, startTime);
     const eD = pacificToUTC(date, endTime);
+
+    // Reject bookings in the past
+    if (sD < new Date()) {
+      return res.status(400).json({ error: "Cannot book in the past. Please select a future time." });
+    }
+
+    // Reject bookings more than 7 days out
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 8); // 7 days + buffer for timezone
+    if (sD > maxDate) {
+      return res.status(400).json({ error: "Bookings can only be made up to 7 days in advance." });
+    }
+
     const bookingStartISO = sD.toISOString();
     const bookingEndISO = eD.toISOString();
 
+    // Check overlapping bookings
     const conflicts = await fetch(
       `${SUPABASE_URL}/rest/v1/bookings?bay=eq.${encodeURIComponent(bay)}&booking_status=eq.Confirmed&booking_start=lt.${bookingEndISO}&booking_end=gt.${bookingStartISO}`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
@@ -91,6 +108,7 @@ export default async function handler(req, res) {
     const data = await resp.json();
     const booked = data[0];
 
+    // Send booking confirmation email immediately (fire-and-forget)
     sendBookingConfirmation({
       to: booked.customer_email,
       customerName: booked.customer_name || booked.customer_email,
