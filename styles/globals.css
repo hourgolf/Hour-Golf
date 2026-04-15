@@ -432,7 +432,7 @@ html { overflow-y: scroll; }
 .mem-nav { background: var(--surface); border-bottom: 2px solid var(--primary); overflow: hidden; }
 .mem-nav-inner { display: flex; max-width: 960px; margin: 0 auto; padding: 0 24px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .mem-nav-inner::-webkit-scrollbar { display: none; }
-.mem-nav-btn { padding: 12px 20px; border: none; background: transparent; cursor: pointer; font-size: 16px; font-family: var(--font-mono); color: var(--text-muted); font-weight: 400; transition: color 0.15s; white-space: nowrap; border-radius: var(--radius) var(--radius) 0 0; }
+.mem-nav-btn { padding: 12px 20px; border: none; background: transparent; cursor: pointer; font-size: 16px; font-family: var(--font-mono); color: var(--text-muted); font-weight: 400; text-transform: uppercase; transition: color 0.15s; white-space: nowrap; border-radius: var(--radius) var(--radius) 0 0; }
 .mem-nav-btn:hover { color: var(--text); }
 .mem-nav-btn.active { color: var(--text); font-weight: 600; background: var(--bg); border-bottom: 2px solid var(--primary); margin-bottom: -2px; }
 
