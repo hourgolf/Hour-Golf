@@ -311,7 +311,7 @@ export default function MemberLayout({ activeTab, children }) {
         <div className="mem-header-inner" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center" }}>
           <img src="/blobs/MASTERS FLAG.svg" alt="" className="mem-header-logo" style={{ height: 53, filter: "brightness(0) invert(0.95)" }} />
           <div style={{ textAlign: "center" }}>
-            <div className="mem-brand" style={{ fontSize: 22, color: "#EDF3E3" }}>HOUR<span className="mem-brand-break"> </span>GOLF</div>
+            <div className="mem-brand" style={{ fontSize: 24, lineHeight: "20px", color: "#EDF3E3" }}>HOUR<span className="mem-brand-break"> </span>GOLF</div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div className="mem-header-name" style={{ marginBottom: 4 }}>{member.name}</div>
