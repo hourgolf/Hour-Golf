@@ -268,7 +268,7 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
                           onClick={() => handleSubscribe(t.tier)}
                           disabled={changingTier}
                         >
-                          {changingTier ? "..." : "Select Plan"}
+                          {changingTier ? "..." : "Subscribe"}
                         </button>
                       )}
                     </div>
