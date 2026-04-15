@@ -237,18 +237,18 @@ html { overflow-y: scroll; }
 .slot-m { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
 
 /* ── Calendar grid ── */
-.wk-grid { display: grid; grid-template-columns: 80px 1fr 1fr; grid-auto-rows: minmax(64px, auto); gap: 1px; background: var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 20px; }
-.wk-h { background: var(--primary); color: #EDF3E3; padding: 10px 8px; font-family: var(--font-display); font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; text-align: center; }
-.wk-d { background: var(--surface); padding: 8px 6px; font-size: 11px; font-weight: 700; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
-.wk-d .dn { font-family: var(--font-display); font-size: 18px; color: var(--primary); line-height: 1; }
-.wk-d .dl { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+.wk-grid { display: grid; grid-template-columns: 112px 1fr 1fr; grid-auto-rows: minmax(90px, auto); gap: 1px; background: var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 20px; }
+.wk-h { background: var(--primary); color: #EDF3E3; padding: 14px 11px; font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; text-align: center; }
+.wk-d { background: var(--surface); padding: 11px 8px; font-size: 15px; font-weight: 700; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
+.wk-d .dn { font-family: var(--font-display); font-size: 25px; color: var(--primary); line-height: 1; }
+.wk-d .dl { font-family: var(--font-mono); font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
 .wk-d.today { background: var(--primary-bg); }
-.wk-c { background: var(--surface); padding: 8px 8px; display: flex; flex-direction: column; gap: 3px; }
+.wk-c { background: var(--surface); padding: 11px 11px; display: flex; flex-direction: column; gap: 4px; }
 .wk-c.today { background: var(--primary-bg); }
-.wk-b { font-family: var(--font-body); font-size: 11px; padding: 4px 6px; border-radius: var(--radius); background: var(--primary-bg); color: var(--primary); border-left: 2px solid var(--primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.wk-b { font-family: var(--font-body); font-size: 15px; padding: 6px 8px; border-radius: var(--radius); background: var(--primary-bg); color: var(--primary); border-left: 3px solid var(--primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .wk-b:hover { opacity: 0.8; }
 .wk-nav { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
-.wk-nav span { font-family: var(--font-display); font-size: 14px; font-weight: 700; }
+.wk-nav span { font-family: var(--font-display); font-size: 20px; font-weight: 700; }
 
 /* ── Confirm dialog ── */
 .confirm-box { text-align: center; }
@@ -350,7 +350,11 @@ html { overflow-y: scroll; }
   .th, .tr { font-size: 11px; padding: 8px 10px; }
   .header-stats { gap: 10px; }
   .stat-val { font-size: 16px; }
-  .wk-grid { grid-template-columns: 50px 1fr 1fr; }
+  .wk-grid { grid-template-columns: 70px 1fr 1fr; }
+  .wk-h { font-size: 13px; padding: 10px 8px; }
+  .wk-b { font-size: 13px; padding: 4px 6px; }
+  .wk-d .dn { font-size: 20px; }
+  .wk-d .dl { font-size: 11px; }
   .slot-t { width: 90px; font-size: 10px; }
   .settings-grid { grid-template-columns: 1fr; }
   .profile-grid { grid-template-columns: 1fr; }
@@ -376,10 +380,12 @@ html { overflow-y: scroll; }
   .slot-t { width: 70px; font-size: 9px; padding: 8px 6px; }
   .slot-c { font-size: 11px; }
   .slot-m { font-size: 9px; }
-  .wk-grid { grid-template-columns: 40px 1fr 1fr; }
-  .wk-b { font-size: 9px; padding: 2px 4px; }
-  .wk-d .dn { font-size: 14px; }
-  .wk-d .dl { font-size: 8px; }
+  .wk-grid { grid-template-columns: 56px 1fr 1fr; }
+  .wk-h { font-size: 13px; padding: 10px 6px; }
+  .wk-b { font-size: 13px; padding: 3px 6px; }
+  .wk-d { padding: 8px 4px; }
+  .wk-d .dn { font-size: 20px; }
+  .wk-d .dl { font-size: 11px; }
   .nav-inner-wrap { padding: 0 14px; }
   .nav-btn { padding: 10px 12px; font-size: 12px; letter-spacing: 0.5px; }
 }
