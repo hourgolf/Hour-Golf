@@ -272,7 +272,8 @@ export default function EventsView({ apiKey }) {
         <p style={{ color: "var(--text-muted)", textAlign: "center", padding: 32 }}>No events yet. Create your first event!</p>
       )}
 
-      <div className="tbl">
+      {/* Desktop table */}
+      <div className="tbl usage-desktop">
         {events.length > 0 && (
           <div className="th">
             <span style={{ flex: 0.5 }}></span>
@@ -342,6 +343,76 @@ export default function EventsView({ apiKey }) {
               <button className="btn" style={{ fontSize: 10, padding: "2px 8px", marginRight: 4 }} onClick={() => setEditEvent(ev)}>Edit</button>
               <button className="btn" style={{ fontSize: 10, padding: "2px 8px", color: "var(--red)" }} onClick={() => setDelTarget(ev)}>Delete</button>
             </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Mobile cards */}
+      <div className="usage-mobile">
+        {events.map((ev) => (
+          <div key={ev.id} className="usage-card" style={{ padding: 0, overflow: "hidden" }}>
+            {/* Header: image + title + date */}
+            <div style={{ display: "flex", gap: 12, padding: "12px 14px", alignItems: "flex-start" }}>
+              {ev.image_url ? (
+                <img src={ev.image_url} alt="" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: 56, height: 56, borderRadius: 8, background: "var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, color: "var(--text-muted)", flexShrink: 0 }}>
+                  &#9670;
+                </div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  <strong style={{ fontSize: 15 }}>{ev.title}</strong>
+                  {!ev.is_published && <span className="badge" style={{ background: "var(--text-muted)", fontSize: 8 }}>DRAFT</span>}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+                  {fmtDate(ev.start_date)}{ev.end_date ? ` — ${fmtDate(ev.end_date)}` : ""}
+                </div>
+                <div style={{ fontSize: 13, marginTop: 4 }}>
+                  <span className="tab-num" style={{ fontWeight: 600 }}>{Number(ev.cost) > 0 ? `$${Number(ev.cost).toFixed(0)}` : "Free"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Stats row */}
+            <div style={{ display: "flex", borderTop: "0.5px solid var(--border)", background: "var(--bg)" }}>
+              <button
+                className="ev-mobile-stat"
+                onClick={() => ev.interest_count > 0 && setMemberList({ title: `Interested — ${ev.title}`, members: ev.interested_members || [], type: "interested" })}
+                style={{ flex: 1, padding: "8px 4px", background: "none", border: "none", borderRight: "0.5px solid var(--border)", cursor: ev.interest_count > 0 ? "pointer" : "default", textAlign: "center", fontFamily: "inherit" }}
+              >
+                <div className="tab-num" style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{ev.interest_count || 0}</div>
+                <div style={{ fontSize: 8, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Interested</div>
+              </button>
+              <button
+                className="ev-mobile-stat"
+                onClick={() => ev.registration_count > 0 && setMemberList({ title: `Registered — ${ev.title}`, members: ev.registered_members || [], type: "registered" })}
+                style={{ flex: 1, padding: "8px 4px", background: "none", border: "none", borderRight: "0.5px solid var(--border)", cursor: ev.registration_count > 0 ? "pointer" : "default", textAlign: "center", fontFamily: "inherit" }}
+              >
+                <div className="tab-num" style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{ev.registration_count || 0}</div>
+                <div style={{ fontSize: 8, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Registered</div>
+              </button>
+              <button
+                className="ev-mobile-stat"
+                onClick={() => (ev.comment_count || 0) > 0 && setMemberList({ title: `Comments — ${ev.title}`, members: ev.comments || [], type: "comments" })}
+                style={{ flex: 1, padding: "8px 4px", background: "none", border: "none", cursor: (ev.comment_count || 0) > 0 ? "pointer" : "default", textAlign: "center", fontFamily: "inherit" }}
+              >
+                <div className="tab-num" style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{ev.comment_count || 0}</div>
+                <div style={{ fontSize: 8, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Comments</div>
+              </button>
+            </div>
+
+            {/* Actions row */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 14px", borderTop: "0.5px solid var(--border)" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-muted)", cursor: "pointer" }}>
+                <input type="checkbox" checked={ev.show_popup} onChange={() => togglePopup(ev)} style={{ accentColor: "#4C8D73" }} />
+                Popup
+              </label>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button className="btn" style={{ fontSize: 11, padding: "4px 12px" }} onClick={() => setEditEvent(ev)}>Edit</button>
+                <button className="btn" style={{ fontSize: 11, padding: "4px 12px", color: "var(--red)" }} onClick={() => setDelTarget(ev)}>Delete</button>
+              </div>
+            </div>
           </div>
         ))}
       </div>
