@@ -51,17 +51,19 @@ export default function WeekView({ bookings, weekOff, setWeekOff, onSelectMember
 
   return (
     <div className="content">
-      <div className="wk-nav" style={{ justifyContent: "center" }}>
-        <button className="btn" onClick={() => setWeekOff((w) => w - 1)}>
-          &larr; Prev
-        </button>
-        <button className="btn" onClick={() => setWeekOff(0)}>
-          This Month
-        </button>
-        <button className="btn" onClick={() => setWeekOff((w) => w + 1)}>
-          Next &rarr;
-        </button>
-        <span style={{ marginLeft: 8 }}>{monthLabel}</span>
+      <div className="wk-nav" style={{ flexDirection: "column", alignItems: "center" }}>
+        <span>{monthLabel}</span>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn" onClick={() => setWeekOff((w) => w - 1)}>
+            &larr; Prev
+          </button>
+          <button className="btn" onClick={() => setWeekOff(0)}>
+            This Month
+          </button>
+          <button className="btn" onClick={() => setWeekOff((w) => w + 1)}>
+            Next &rarr;
+          </button>
+        </div>
       </div>
 
       <div className="wk-grid">
