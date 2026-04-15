@@ -677,15 +677,28 @@ html { overflow-y: scroll; }
 }
 
 /* ── Help Drawer (Member Portal) ── */
+/* ── Help Drawer (Member Portal) ── */
 .help-fab {
   position: fixed; bottom: 24px; right: 24px; z-index: 900;
   width: 52px; height: 52px; border-radius: 50%; border: none;
-  background: var(--primary); color: #EDF3E3; font-size: 22px;
+  background: #ddd480; color: #35443B; font-size: 22px;
   cursor: pointer; font-family: var(--font-display);
   box-shadow: 0 4px 16px rgba(53,68,59,0.25);
   transition: transform 0.15s;
   display: flex; align-items: center; justify-content: center;
 }
+.book-fab {
+  position: fixed; bottom: 88px; right: 24px; z-index: 900;
+  width: 52px; height: 52px; border-radius: 50%; border: none;
+  background: var(--primary); color: #EDF3E3; font-size: 28px;
+  cursor: pointer; font-family: var(--font-display);
+  box-shadow: 0 4px 16px rgba(53,68,59,0.25);
+  transition: transform 0.15s;
+  display: flex; align-items: center; justify-content: center;
+  text-decoration: none; line-height: 1;
+}
+.book-fab:hover { transform: scale(1.06); }
+.book-fab:active { transform: scale(0.95); }
 .help-fab:hover { transform: scale(1.06); }
 .help-fab:active { transform: scale(0.95); }
 
