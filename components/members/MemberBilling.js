@@ -19,6 +19,7 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
   const [subLoading, setSubLoading] = useState(true);
   const [changingTier, setChangingTier] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
+  const [upgradeConfirm, setUpgradeConfirm] = useState(null); // tier name or null
 
   const overageRate = Number(tierConfig?.overage_rate || 60);
 
@@ -91,6 +92,7 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
 
   async function handleChangeTier(tier) {
     setChangingTier(true);
+    setUpgradeConfirm(null);
     try {
       const r = await fetch("/api/member-subscription", {
         method: "PATCH",
@@ -168,6 +170,11 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
   const isCancelling = subscription?.cancel_at_period_end;
   const hasCard = member.hasPaymentMethod;
 
+  // Helper to check if a tier is an upgrade or downgrade
+  function isUpgrade(t) {
+    return Number(t.monthly_fee) > Number(tierConfig?.monthly_fee || 0);
+  }
+
   return (
     <>
       {/* Payment Method */}
@@ -236,6 +243,7 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
                   const isCurrent = t.tier === member.tier;
                   const isUnlimited = Number(t.included_hours) >= 99999;
                   const hasStripePriceId = !!t.stripe_price_id;
+                  const up = isUpgrade(t);
 
                   return (
                     <div key={t.tier} className={`mem-tier-card ${isCurrent ? "current" : ""}`}>
@@ -256,10 +264,10 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
                         <button
                           className="mem-btn mem-btn-primary"
                           style={{ width: "100%", padding: "8px 12px", fontSize: 13 }}
-                          onClick={() => handleChangeTier(t.tier)}
+                          onClick={() => setUpgradeConfirm(t.tier)}
                           disabled={changingTier}
                         >
-                          {changingTier ? "..." : Number(t.monthly_fee) > Number(tierConfig?.monthly_fee || 0) ? "Upgrade" : "Downgrade"}
+                          {changingTier ? "..." : up ? "Upgrade" : "Downgrade"}
                         </button>
                       ) : (
                         <button
@@ -274,6 +282,48 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Upgrade/Downgrade confirmation */}
+            {upgradeConfirm && (
+              <div style={{
+                marginTop: 12, padding: "12px 16px", borderRadius: 12,
+                background: "var(--bg, #EDF3E3)", border: "1px solid var(--border)",
+              }}>
+                {(() => {
+                  const targetTier = tiers.find((t) => t.tier === upgradeConfirm);
+                  const up = targetTier && isUpgrade(targetTier);
+                  return (
+                    <>
+                      <p style={{ margin: "0 0 8px", fontSize: 14 }}>
+                        <strong>{up ? "Upgrade" : "Downgrade"} to {upgradeConfirm}?</strong>
+                      </p>
+                      <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-muted)" }}>
+                        {up
+                          ? "The price difference will be prorated for the rest of your billing cycle. Your new rate takes effect immediately."
+                          : "You'll receive a prorated credit for the remainder of your billing cycle. Your new rate takes effect immediately."}
+                      </p>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          className="mem-btn mem-btn-primary"
+                          style={{ padding: "8px 20px", fontSize: 13 }}
+                          onClick={() => handleChangeTier(upgradeConfirm)}
+                          disabled={changingTier}
+                        >
+                          {changingTier ? "Processing..." : `Confirm ${up ? "Upgrade" : "Downgrade"}`}
+                        </button>
+                        <button
+                          className="mem-btn-sm"
+                          style={{ color: "var(--text)", border: "1px solid var(--border)" }}
+                          onClick={() => setUpgradeConfirm(null)}
+                        >
+                          Nevermind
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             )}
 
