@@ -78,6 +78,7 @@ html { overflow-y: scroll; }
 .logo { font-family: var(--font-display); font-size: 24px; letter-spacing: 4px; font-weight: 700; white-space: nowrap; color: #EDF3E3; line-height: 22px; }
 .logo-sub { font-family: var(--font-mono); font-size: 10px; opacity: 0.6; letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; white-space: nowrap; color: #EDF3E3; }
 .hdr-brand-break { }
+.hdr-title-logo { height: 40px; display: block; margin: 0 auto; }
 .header-stats { display: flex; gap: 14px; align-items: center; justify-content: flex-end; }
 .stat-box { display: flex; flex-direction: column; align-items: center; }
 .stat-val { font-family: var(--font-display); font-size: 18px; font-weight: 700; line-height: 1.2; color: #EDF3E3; }
@@ -367,6 +368,7 @@ html { overflow-y: scroll; }
   .hdr-logo-img { max-height: 64px !important; }
   .hdr-brand-break { display: block; font-size: 0; line-height: 0; }
   .logo { font-size: 24px; letter-spacing: 4px; line-height: 22px; }
+  .hdr-title-logo { height: 34px; }
   .logo-sub { font-size: 8px; letter-spacing: 1px; }
   .header-stats { gap: 10px; }
   .stat-box { min-width: auto; flex: 0 0 auto; }

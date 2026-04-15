@@ -28,7 +28,7 @@ export default function Header({
         </button>
         <div style={{ textAlign: "center" }}>
           {titleVisible && (
-            <div className="logo">HOUR<span className="hdr-brand-break"> </span>GOLF</div>
+            <img src="/blobs/HGC-Script-White.svg" alt="Hour Golf" className="hdr-title-logo" />
           )}
           {showSubtitle !== false && <div className="logo-sub">Admin Dashboard</div>}
         </div>
