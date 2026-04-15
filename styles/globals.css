@@ -542,9 +542,9 @@ html { overflow-y: scroll; }
   .mem-avail-grid { font-size: 13px; grid-template-columns: 60px 1fr 1fr; }
   .mem-header-inner { gap: 6px; }
   .mem-header { padding: 14px 14px; }
-  .mem-header-name { font-size: 11px; }
-  .mem-tier-badge { font-size: 9px; padding: 2px 6px; }
-  .mem-nav-btn { padding: 10px 14px; font-size: 12px; }
+  .mem-header-name { font-size: 13px; }
+  .mem-tier-badge { font-size: 11px; padding: 2px 6px; }
+  .mem-nav-btn { padding: 10px 14px; font-size: 14px; }
   .mem-tier-grid { grid-template-columns: 1fr; }
   .mem-cancel-confirm { flex-direction: column; gap: 8px; text-align: center; }
   .mem-content { padding: 16px; }
