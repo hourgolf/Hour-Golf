@@ -190,8 +190,15 @@ export default function OverviewView({
               return (
                 <div key={r.customer_email} className="usage-card" onClick={() => onSelectMember(r.customer_email)}>
                   <div className="usage-card-top">
-                    <strong>{r.customer_name}</strong>
-                    <Badge tier={r.tier} />
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <strong>{r.customer_name}</strong>
+                      <Badge tier={r.tier} />
+                    </div>
+                    <div>
+                      {ho && pd && <span className="badge" style={{ background: "#4C8D73", color: "#EDF3E3", fontSize: 9 }}>PAID</span>}
+                      {ho && !pd && <span className="badge" style={{ background: "var(--red)", color: "#EDF3E3", fontSize: 9 }}>UNPAID</span>}
+                      {!ho && <span className="muted">&mdash;</span>}
+                    </div>
                   </div>
                   <div className="usage-card-stats">
                     <div className="usage-card-stat">
@@ -213,11 +220,6 @@ export default function OverviewView({
                         {ho ? dlr(r.overage_charge) : "\u2014"}
                       </span>
                       <span className="usage-card-lbl">Charge</span>
-                    </div>
-                    <div className="usage-card-stat">
-                      {ho && pd && <span className="badge" style={{ background: "#4C8D73", color: "#EDF3E3", fontSize: 9 }}>PAID</span>}
-                      {ho && !pd && <span className="badge" style={{ background: "var(--red)", color: "#EDF3E3", fontSize: 9 }}>UNPAID</span>}
-                      {!ho && <span className="muted">&mdash;</span>}
                     </div>
                   </div>
                 </div>
