@@ -51,7 +51,7 @@ export default function WeekView({ bookings, weekOff, setWeekOff, onSelectMember
 
   return (
     <div className="content">
-      <div className="wk-nav">
+      <div className="wk-nav" style={{ justifyContent: "center" }}>
         <button className="btn" onClick={() => setWeekOff((w) => w - 1)}>
           &larr; Prev
         </button>
