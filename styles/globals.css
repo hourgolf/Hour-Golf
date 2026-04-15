@@ -406,7 +406,7 @@ html { overflow-y: scroll; }
 
 .mem-login { max-width: 380px; margin: 0 auto; padding: 100px 24px; text-align: center; }
 .mem-brand { font-family: var(--font-display); font-size: 22px; letter-spacing: 4px; font-weight: 700; color: var(--text); }
-.mem-brand-sub { font-family: var(--font-mono); font-size: 11px; letter-spacing: 3px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 40px; margin-top: 4px; }
+.mem-brand-sub { font-family: var(--font-mono); font-size: 14px; letter-spacing: 3px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 40px; margin-top: 4px; }
 .mem-err { color: var(--red); font-size: 13px; margin-bottom: 12px; }
 
 .mem-input { width: 100%; padding: 14px 16px; border: 1.5px solid var(--border); border-radius: var(--radius); font-size: 15px; font-family: var(--font-body); letter-spacing: 0.03em; margin-bottom: 16px; background: var(--surface); color: var(--text); box-sizing: border-box; }
