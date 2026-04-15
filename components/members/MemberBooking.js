@@ -244,8 +244,8 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
         <div className="mem-avail-grid">
           <div className="mem-avail-hdr">Time</div>
           {BAYS.map((b) => <div key={b} className="mem-avail-hdr">{b}</div>)}
-          {ALL_HOURS.filter((h, i) => i < ALL_HOURS.length - 1 && !(isToday && h < currentTime)).map((h, i) => {
-            const nextH = ALL_HOURS[i + 1];
+          {ALL_HOURS.filter((h, i) => i < ALL_HOURS.length - 1 && !(isToday && h < currentTime)).map((h) => {
+  const nextH = ALL_HOURS[ALL_HOURS.indexOf(h) + 1];
             const isPast = isToday && h < currentTime;
             return (
               <div key={h} style={{ display: "contents", opacity: isPast ? 0.35 : 1 }}>
