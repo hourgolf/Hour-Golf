@@ -9,28 +9,36 @@ function buildHours(startHour, endHour) {
       hours.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
     }
   }
-  // Add the final end-of-window slot
   hours.push(`${String(endHour).padStart(2, "0")}:00`);
   return hours;
+}
+
+// Get current time in Pacific as "HH:MM"
+function nowPacific() {
+  const d = new Date();
+  const parts = d.toLocaleString("en-US", { timeZone: TZ, hour12: false, hour: "2-digit", minute: "2-digit" }).split(":");
+  return `${parts[0].padStart(2, "0")}:${parts[1]}`;
 }
 
 export default function MemberBooking({ member, tierConfig, refresh, showToast }) {
   const isNonMember = member.tier === "Non-Member";
   const hasCard = member.hasPaymentMethod;
 
-  // Booking window from tier config, with sensible fallbacks
   const bookStart = Number(tierConfig?.booking_hours_start ?? (isNonMember ? 10 : 0));
   const bookEnd = Number(tierConfig?.booking_hours_end ?? (isNonMember ? 20 : 24));
 
-  const HOURS = useMemo(() => {
+  const ALL_HOURS = useMemo(() => {
     return buildHours(bookStart, Math.min(bookEnd, 24));
   }, [bookStart, bookEnd]);
 
-  const [bookDate, setBookDate] = useState(() => {
-    return new Date().toLocaleDateString("en-CA", { timeZone: TZ });
-  });
-  const defaultStart = HOURS.length > 0 ? HOURS[0] : "10:00";
-  const defaultEnd = HOURS.length > 4 ? HOURS[4] : HOURS[HOURS.length - 1] || "11:00";
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: TZ });
+  const maxDate = new Date();
+  maxDate.setDate(maxDate.getDate() + 7);
+  const maxDateStr = maxDate.toLocaleDateString("en-CA", { timeZone: TZ });
+
+  const [bookDate, setBookDate] = useState(todayStr);
+  const defaultStart = ALL_HOURS.length > 0 ? ALL_HOURS[0] : "10:00";
+  const defaultEnd = ALL_HOURS.length > 4 ? ALL_HOURS[4] : ALL_HOURS[ALL_HOURS.length - 1] || "11:00";
   const [bookStartTime, setBookStartTime] = useState(defaultStart);
   const [bookEndTime, setBookEndTime] = useState(defaultEnd);
   const [bookBay, setBookBay] = useState("Bay 1");
@@ -39,6 +47,14 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
   const [bookMsg, setBookMsg] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
 
+  // Filter hours: if booking today, hide times that have already passed
+  const isToday = bookDate === todayStr;
+  const currentTime = nowPacific();
+  const HOURS = useMemo(() => {
+    if (!isToday) return ALL_HOURS;
+    return ALL_HOURS.filter((h) => h >= currentTime);
+  }, [ALL_HOURS, isToday, currentTime]);
+
   // Load availability when date changes
   useEffect(() => {
     if (!bookDate) return;
@@ -46,6 +62,15 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
       .then((r) => r.json())
       .then((d) => setAvailability(d.bookings || []))
       .catch(() => setAvailability([]));
+  }, [bookDate]);
+
+  // When date changes to today and start time is in the past, auto-advance
+  useEffect(() => {
+    if (isToday && bookStartTime < currentTime && HOURS.length > 0) {
+      setBookStartTime(HOURS[0]);
+      if (HOURS.length > 4) setBookEndTime(HOURS[4]);
+      else setBookEndTime(HOURS[HOURS.length - 1]);
+    }
   }, [bookDate]);
 
   function isSlotTaken(bay, startStr, endStr) {
@@ -62,7 +87,17 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
 
   const slotConflict = bookStartTime && bookEndTime && isSlotTaken(bookBay, bookStartTime, bookEndTime);
 
+  // Check if selected date is valid (not past, not > 7 days out)
+  const dateInPast = bookDate < todayStr;
+  const dateTooFar = bookDate > maxDateStr;
+  const timeInPast = isToday && bookStartTime < currentTime;
+
   async function handleBook() {
+    // Client-side validation
+    if (dateInPast) { setBookMsg("Cannot book in the past."); return; }
+    if (dateTooFar) { setBookMsg("Bookings can only be made up to 7 days in advance."); return; }
+    if (timeInPast) { setBookMsg("This time has already passed. Please select a later time."); return; }
+
     setBooking(true);
     setBookMsg("");
     try {
@@ -83,11 +118,10 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || d.detail || "Booking failed");
       showToast("Booking confirmed!");
-      setBookStartTime(defaultStart);
-      setBookEndTime(defaultEnd);
+      setBookStartTime(HOURS.length > 0 ? HOURS[0] : defaultStart);
+      setBookEndTime(HOURS.length > 4 ? HOURS[4] : HOURS[HOURS.length - 1] || defaultEnd);
       setBookBay("Bay 1");
       setTermsAccepted(false);
-      // Refresh availability
       fetch(`/api/customer-availability?date=${bookDate}`, { credentials: "include" })
         .then((r) => r.json())
         .then((d) => setAvailability(d.bookings || []))
@@ -98,10 +132,13 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
     setBooking(false);
   }
 
-  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: TZ });
-  const maxDate = new Date();
-  maxDate.setDate(maxDate.getDate() + 7);
-  const maxDateStr = maxDate.toLocaleDateString("en-CA", { timeZone: TZ });
+  // Clamp date when user selects via calendar
+  function handleDateChange(e) {
+    let val = e.target.value;
+    if (val < todayStr) val = todayStr;
+    if (val > maxDateStr) val = maxDateStr;
+    setBookDate(val);
+  }
 
   return (
     <>
@@ -130,9 +167,14 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
               value={bookDate}
               min={todayStr}
               max={maxDateStr}
-              onChange={(e) => setBookDate(e.target.value)}
+              onChange={handleDateChange}
             />
           </div>
+          {(dateInPast || dateTooFar) && (
+            <div className="mem-err" style={{ marginTop: 4, fontSize: 12 }}>
+              {dateInPast ? "Cannot book in the past." : "Bookings limited to 7 days out."}
+            </div>
+          )}
           <div className="mem-form-row">
             <label>Bay</label>
             <select value={bookBay} onChange={(e) => setBookBay(e.target.value)}>
@@ -187,7 +229,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
           <button
             className="mem-book-btn"
             onClick={handleBook}
-            disabled={booking || slotConflict || bookDuration <= 0 || !termsAccepted || !hasCard}
+            disabled={booking || slotConflict || bookDuration <= 0 || !termsAccepted || !hasCard || dateInPast || dateTooFar}
           >
             {booking ? "Booking..." : "Confirm Booking."}
           </button>
@@ -202,26 +244,27 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
         <div className="mem-avail-grid">
           <div className="mem-avail-hdr">Time</div>
           {BAYS.map((b) => <div key={b} className="mem-avail-hdr">{b}</div>)}
-          {HOURS.filter((_, i) => i < HOURS.length - 1).map((h, i) => {
-            const nextH = HOURS[i + 1];
+          {ALL_HOURS.filter((_, i) => i < ALL_HOURS.length - 1).map((h, i) => {
+            const nextH = ALL_HOURS[i + 1];
+            const isPast = isToday && h < currentTime;
             return (
-              <div key={h} style={{ display: "contents" }}>
+              <div key={h} style={{ display: "contents", opacity: isPast ? 0.35 : 1 }}>
                 <div className="mem-avail-time">{fT(new Date(`2026-01-01T${h}:00`))}</div>
                 {BAYS.map((bay) => {
                   const taken = isSlotTaken(bay, h, nextH);
                   return (
                     <div
                       key={bay}
-                      className={`mem-avail-cell ${taken ? "taken" : "open"}`}
+                      className={`mem-avail-cell ${taken ? "taken" : isPast ? "taken" : "open"}`}
                       onClick={() => {
-                        if (!taken) {
+                        if (!taken && !isPast) {
                           setBookBay(bay);
                           setBookStartTime(h);
                           setBookEndTime(nextH);
                         }
                       }}
                     >
-                      {taken ? "Booked" : "Open"}
+                      {taken ? "Booked" : isPast ? "Past" : "Open"}
                     </div>
                   );
                 })}
