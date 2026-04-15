@@ -46,9 +46,43 @@ export default async function handler(req, res) {
 
       // Get subscription info from Stripe if member has one
       let subscription = null;
-      if (member.stripe_subscription_id) {
+      let subId = member.stripe_subscription_id;
+
+      // Auto-discover: if no subscription ID saved but has a Stripe customer, look it up
+      if (!subId && member.stripe_customer_id) {
         try {
-          const sub = await stripe.subscriptions.retrieve(member.stripe_subscription_id);
+          const subs = await stripe.subscriptions.list({
+            customer: member.stripe_customer_id,
+            status: "active",
+            limit: 1,
+          });
+          if (subs.data.length > 0) {
+            subId = subs.data[0].id;
+            const priceId = subs.data[0].items?.data?.[0]?.price?.id || null;
+            // Save it for future lookups
+            await fetch(
+              `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}`,
+              {
+                method: "PATCH",
+                headers: {
+                  apikey: key, Authorization: `Bearer ${key}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  stripe_subscription_id: subId,
+                  stripe_price_id: priceId,
+                }),
+              }
+            );
+          }
+        } catch (e) {
+          console.warn("Subscription auto-discover failed:", e.message);
+        }
+      }
+
+      if (subId) {
+        try {
+          const sub = await stripe.subscriptions.retrieve(subId);
           subscription = {
             id: sub.id,
             status: sub.status,
@@ -58,7 +92,6 @@ export default async function handler(req, res) {
             item_id: sub.items?.data?.[0]?.id,
           };
         } catch (e) {
-          // Subscription may have been deleted in Stripe
           console.warn("Could not retrieve subscription:", e.message);
         }
       }
@@ -148,7 +181,28 @@ export default async function handler(req, res) {
     if (!tier) return res.status(400).json({ error: "tier required" });
 
     try {
-      if (!member.stripe_subscription_id) {
+      // Auto-discover subscription if not saved
+      let subscriptionId = member.stripe_subscription_id;
+      if (!subscriptionId && member.stripe_customer_id) {
+        const subs = await stripe.subscriptions.list({
+          customer: member.stripe_customer_id,
+          status: "active",
+          limit: 1,
+        });
+        if (subs.data.length > 0) {
+          subscriptionId = subs.data[0].id;
+          await fetch(
+            `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}`,
+            {
+              method: "PATCH",
+              headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ stripe_subscription_id: subscriptionId }),
+            }
+          );
+        }
+      }
+
+      if (!subscriptionId) {
         return res.status(400).json({ error: "No active subscription to modify" });
       }
 
@@ -164,12 +218,12 @@ export default async function handler(req, res) {
       if (!tierCfg.stripe_price_id) return res.status(400).json({ error: "Tier not configured for billing" });
 
       // Get current subscription to find the item ID
-      const sub = await stripe.subscriptions.retrieve(member.stripe_subscription_id);
+      const sub = await stripe.subscriptions.retrieve(subscriptionId);
       const itemId = sub.items?.data?.[0]?.id;
       if (!itemId) return res.status(400).json({ error: "Subscription item not found" });
 
       // Update subscription with new price (prorated)
-      await stripe.subscriptions.update(member.stripe_subscription_id, {
+      await stripe.subscriptions.update(subscriptionId, {
         items: [{ id: itemId, price: tierCfg.stripe_price_id }],
         proration_behavior: "create_prorations",
       });
@@ -202,11 +256,18 @@ export default async function handler(req, res) {
   // --- DELETE: Cancel membership (at period end) ---
   if (req.method === "DELETE") {
     try {
-      if (!member.stripe_subscription_id) {
+      let cancelSubId = member.stripe_subscription_id;
+      if (!cancelSubId && member.stripe_customer_id) {
+        const subs = await stripe.subscriptions.list({
+          customer: member.stripe_customer_id, status: "active", limit: 1,
+        });
+        if (subs.data.length > 0) cancelSubId = subs.data[0].id;
+      }
+      if (!cancelSubId) {
         return res.status(400).json({ error: "No active subscription to cancel" });
       }
 
-      const sub = await stripe.subscriptions.update(member.stripe_subscription_id, {
+      const sub = await stripe.subscriptions.update(cancelSubId, {
         cancel_at_period_end: true,
       });
 
