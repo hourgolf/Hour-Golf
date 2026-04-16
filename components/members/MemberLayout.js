@@ -385,7 +385,7 @@ export default function MemberLayout({ activeTab, children }) {
   const tierObj = TIER_COLORS[member.tier] || { bg: "#D1DFCB", text: "#35443B" };
 
   return (
-    <div className="mem-layout" style={{ position: "relative", overflow: "hidden" }}>
+    <div className="mem-layout" style={{ position: "relative" }}>
       {/* Main dashboard background — swap image, adjust opacity here */}
       <img src="/blobs/azalea_bg.png" alt="" style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.50, pointerEvents: "none", zIndex: 0 }} />
 

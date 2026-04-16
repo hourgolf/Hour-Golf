@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { TZ } from "../../lib/constants";
+import Modal from "../ui/Modal";
 import { fT, fD, fDL } from "../../lib/format";
 
 export default function MemberDashboard({ member, tierConfig, refresh, showToast }) {
   const router = useRouter();
   const [usage, setUsage] = useState(null);
+  const [showQR, setShowQR] = useState(false);
   const [upcoming, setUpcoming] = useState([]);
   const [monthBookings, setMonthBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -84,27 +86,6 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
         Hey, {firstName}.
       </h1>
 
-      {/* In-Store Discount QR */}
-      {member.verify_token && (
-        <div className="mem-section" style={{ textAlign: "center", padding: "16px 16px 20px", marginBottom: 20 }}>
-          <div className="mem-section-head" style={{ textAlign: "left" }}>In-Store Discount</div>
-          <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 12px 0" }}>
-            Show this code at the register to apply your member discount.
-          </p>
-          <img
-            src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-              (typeof window !== "undefined" ? window.location.origin : "https://hourgolf.vercel.app") +
-              "/verify?token=" + member.verify_token
-            )}&color=35443B&bgcolor=FFFFFF`}
-            alt="Member QR Code"
-            style={{ width: 180, height: 180, borderRadius: 8, border: "1px solid var(--border)" }}
-          />
-          <div style={{ marginTop: 10, fontSize: 11, color: "var(--text-muted)" }}>
-            {member.tier} &mdash; {tierConfig?.pro_shop_discount || 0}% discount
-          </div>
-        </div>
-      )}
-
       {/* Usage Cards */}
       <div className="mem-cards">
         <div className="mem-card">
@@ -133,13 +114,50 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
             <div className="mem-card-lbl">Overage (${(overageHours * overageRate).toFixed(2)})</div>
           </div>
         )}
-        {Number(member.shop_credit_balance || 0) > 0 && (
-          <div className="mem-card" style={{ borderColor: "#ddd480" }}>
-            <div className="mem-card-val" style={{ color: "#ddd480" }}>${Number(member.shop_credit_balance).toFixed(2)}</div>
-            <div className="mem-card-lbl">Pro Shop Credits</div>
+        <div className="mem-card" style={{ borderColor: "#ddd480" }}>
+          <div className="mem-card-val" style={{ color: Number(member.shop_credit_balance || 0) > 0 ? "#ddd480" : "var(--text-muted)" }}>${Number(member.shop_credit_balance || 0).toFixed(2)}</div>
+          <div className="mem-card-lbl">Pro Shop Credits</div>
+        </div>
+        {member.verify_token && (
+          <div className="mem-card" style={{ borderColor: "var(--primary)", cursor: "pointer" }} onClick={() => setShowQR(true)}>
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(
+                (typeof window !== "undefined" ? window.location.origin : "https://hourgolf.vercel.app") +
+                "/verify?token=" + member.verify_token
+              )}&color=35443B&bgcolor=FFFFFF`}
+              alt="QR"
+              style={{ width: 48, height: 48, borderRadius: 4 }}
+            />
+            <div className="mem-card-lbl" style={{ marginTop: 4 }}>In-Store Code</div>
           </div>
         )}
       </div>
+
+      {/* QR Code Modal */}
+      <Modal open={showQR} onClose={() => setShowQR(false)}>
+        <div style={{ textAlign: "center" }}>
+          <h2 style={{ marginBottom: 4 }}>In-Store Discount</h2>
+          <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 16px 0" }}>
+            Show this code at the register to apply your member discount.
+          </p>
+          <img
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(
+              (typeof window !== "undefined" ? window.location.origin : "https://hourgolf.vercel.app") +
+              "/verify?token=" + member.verify_token
+            )}&color=35443B&bgcolor=FFFFFF`}
+            alt="Member QR Code"
+            style={{ width: 240, height: 240, borderRadius: 8, border: "1px solid var(--border)" }}
+          />
+          <div style={{ marginTop: 12, fontSize: 13, color: "var(--text-muted)" }}>
+            {member.tier} &mdash; {tierConfig?.pro_shop_discount || 0}% discount
+          </div>
+          {Number(member.shop_credit_balance || 0) > 0 && (
+            <div style={{ marginTop: 8, fontSize: 13, color: "#ddd480", fontWeight: 600 }}>
+              ${Number(member.shop_credit_balance).toFixed(2)} store credit available
+            </div>
+          )}
+        </div>
+      </Modal>
 
       {/* Upcoming Bookings */}
       <div className="mem-section">
