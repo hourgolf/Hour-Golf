@@ -340,14 +340,11 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast, 
       </div>
          {/* Sign Out */}
       {onLogout && (
-        <div className="mem-section" style={{ textAlign: "center", paddingTop: 8, paddingBottom: 32 }}>
+        <div className="mem-section" style={{ textAlign: "center", paddingTop: 16, paddingBottom: 32 }}>
           <button
+            className="mem-cancel-btn"
             onClick={onLogout}
-            style={{
-              background: "none", border: "1px solid var(--border)",
-              color: "var(--text-muted)", cursor: "pointer", fontFamily: "inherit",
-              fontSize: 13, padding: "10px 32px", borderRadius: 10,
-            }}
+            style={{ width: "100%", padding: "14px 32px", fontSize: 13 }}
           >
             Sign Out
           </button>
