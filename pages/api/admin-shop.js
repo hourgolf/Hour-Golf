@@ -72,15 +72,19 @@ export default async function handler(req, res) {
 
     // ── POST — create item ──
     if (req.method === "POST") {
-      const { title, subtitle, description, image_url, price, category, brand,
+      const { title, subtitle, description, image_url, image_urls, price, category, brand,
               is_limited, drop_date, quantity_available, sizes, is_published, display_order } = req.body;
       if (!title || price === undefined) return res.status(400).json({ error: "Title and price required" });
+
+      const urls = Array.isArray(image_urls) ? image_urls.filter(Boolean).slice(0, 5) : [];
+      const primaryImage = urls[0] || image_url || null;
 
       const r = await sb(key, "shop_items", {
         method: "POST",
         body: JSON.stringify({
           title, subtitle: subtitle || null, description: description || null,
-          image_url: image_url || null, price: Number(price),
+          image_url: primaryImage, image_urls: urls.length > 0 ? urls : null,
+          price: Number(price),
           category: category || null, brand: brand || null,
           is_limited: !!is_limited, drop_date: drop_date || null,
           quantity_available: quantity_available != null ? Number(quantity_available) : null,
@@ -139,6 +143,11 @@ export default async function handler(req, res) {
       if (data.price !== undefined) data.price = Number(data.price);
       if (data.quantity_available !== undefined) data.quantity_available = data.quantity_available != null ? Number(data.quantity_available) : null;
       if (data.display_order !== undefined) data.display_order = Number(data.display_order);
+      if (data.image_urls !== undefined) {
+        const urls = Array.isArray(data.image_urls) ? data.image_urls.filter(Boolean).slice(0, 5) : [];
+        data.image_urls = urls.length > 0 ? urls : null;
+        data.image_url = urls[0] || null;
+      }
 
       const r = await sb(key, `shop_items?id=eq.${id}`, {
         method: "PATCH",

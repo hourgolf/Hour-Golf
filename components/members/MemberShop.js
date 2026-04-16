@@ -20,6 +20,7 @@ export default function MemberShop({ member, tierConfig, showToast }) {
   const [orderQty, setOrderQty] = useState(1);
   const [orderNotes, setOrderNotes] = useState("");
   const [ordering, setOrdering] = useState(false);
+  const [galleryIdx, setGalleryIdx] = useState(0);
 
   const loadItems = useCallback(async () => {
     try {
@@ -59,7 +60,7 @@ export default function MemberShop({ member, tierConfig, showToast }) {
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Order failed");
-      showToast("Order placed! We'll have it ready for you.");
+      showToast("Purchase complete! We'll have it ready for you.");
       setSelectedItem(null);
       setOrderSize("");
       setOrderQty(1);
@@ -71,28 +72,25 @@ export default function MemberShop({ member, tierConfig, showToast }) {
     setOrdering(false);
   }
 
+  function openItem(it) {
+    setSelectedItem(it);
+    setOrderSize("");
+    setOrderQty(1);
+    setOrderNotes("");
+    setGalleryIdx(0);
+  }
+
   if (loading) return <div className="mem-loading">Loading shop...</div>;
 
   const limitedItems = items.filter((it) => it.is_limited);
   const regularItems = items.filter((it) => !it.is_limited);
+  const modalImages = selectedItem?.image_urls?.length > 0 ? selectedItem.image_urls : (selectedItem?.image_url ? [selectedItem.image_url] : []);
 
   return (
     <>
       <div className="mem-section" style={{ display: "flex", gap: 8, marginBottom: 0, background: "transparent", border: "none", padding: "0 0 16px 0" }}>
-        <button
-          className={`mem-btn ${tab === "browse" ? "mem-btn-primary" : ""}`}
-          onClick={() => setTab("browse")}
-          style={{ flex: 1 }}
-        >
-          Browse
-        </button>
-        <button
-          className={`mem-btn ${tab === "orders" ? "mem-btn-primary" : ""}`}
-          onClick={() => setTab("orders")}
-          style={{ flex: 1 }}
-        >
-          My Orders
-        </button>
+        <button className={`mem-btn ${tab === "browse" ? "mem-btn-primary" : ""}`} onClick={() => setTab("browse")} style={{ flex: 1 }}>Browse</button>
+        <button className={`mem-btn ${tab === "orders" ? "mem-btn-primary" : ""}`} onClick={() => setTab("orders")} style={{ flex: 1 }}>My Orders</button>
       </div>
 
       {tab === "browse" && (
@@ -104,25 +102,23 @@ export default function MemberShop({ member, tierConfig, showToast }) {
             </div>
           )}
 
-          {/* Limited Drops */}
           {limitedItems.length > 0 && (
             <>
               <h3 className="mem-section-head" style={{ color: "#C92F1F" }}>Limited Drops</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16, marginBottom: 24 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 16, marginBottom: 24 }}>
                 {limitedItems.map((it) => (
-                  <ItemCard key={it.id} item={it} discountPct={discountPct} onClick={() => { setSelectedItem(it); setOrderSize(""); setOrderQty(1); setOrderNotes(""); }} />
+                  <ItemCard key={it.id} item={it} discountPct={discountPct} onClick={() => openItem(it)} />
                 ))}
               </div>
             </>
           )}
 
-          {/* Always Available */}
           {regularItems.length > 0 && (
             <>
               {limitedItems.length > 0 && <h3 className="mem-section-head">Shop</h3>}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 16 }}>
                 {regularItems.map((it) => (
-                  <ItemCard key={it.id} item={it} discountPct={discountPct} onClick={() => { setSelectedItem(it); setOrderSize(""); setOrderQty(1); setOrderNotes(""); }} />
+                  <ItemCard key={it.id} item={it} discountPct={discountPct} onClick={() => openItem(it)} />
                 ))}
               </div>
             </>
@@ -164,7 +160,6 @@ export default function MemberShop({ member, tierConfig, showToast }) {
                   {new Date(o.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                 </span>
               </div>
-              {o.notes && <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>{o.notes}</p>}
             </div>
           ))}
         </>
@@ -174,9 +169,38 @@ export default function MemberShop({ member, tierConfig, showToast }) {
       <Modal open={!!selectedItem} onClose={() => setSelectedItem(null)}>
         {selectedItem && (
           <>
-            {selectedItem.image_url && (
-              <img src={selectedItem.image_url} alt="" style={{ width: "100%", maxHeight: 240, objectFit: "cover", borderRadius: 8, marginBottom: 16 }} />
+            {/* Image gallery */}
+            {modalImages.length > 0 && (
+              <div style={{ position: "relative", marginBottom: 16 }}>
+                <img
+                  src={modalImages[galleryIdx]}
+                  alt=""
+                  style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8 }}
+                />
+                {modalImages.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setGalleryIdx((i) => (i - 1 + modalImages.length) % modalImages.length)}
+                      style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.4)", color: "#fff", fontSize: 16, cursor: "pointer" }}
+                    >&lsaquo;</button>
+                    <button
+                      onClick={() => setGalleryIdx((i) => (i + 1) % modalImages.length)}
+                      style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.4)", color: "#fff", fontSize: 16, cursor: "pointer" }}
+                    >&rsaquo;</button>
+                    <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 8 }}>
+                      {modalImages.map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setGalleryIdx(i)}
+                          style={{ width: 8, height: 8, borderRadius: "50%", border: "none", background: i === galleryIdx ? "var(--primary)" : "var(--border)", cursor: "pointer", padding: 0 }}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             )}
+
             <h2 style={{ marginBottom: 4 }}>{selectedItem.title}</h2>
             {selectedItem.brand && <p style={{ color: "var(--text-muted)", margin: "0 0 8px 0", fontSize: 13 }}>{selectedItem.brand}</p>}
             {selectedItem.description && <p style={{ fontSize: 14, lineHeight: 1.5, margin: "0 0 16px 0" }}>{selectedItem.description}</p>}
@@ -227,7 +251,6 @@ export default function MemberShop({ member, tierConfig, showToast }) {
               </div>
             )}
 
-            {/* Quantity */}
             {selectedItem.quantity_remaining !== null && (
               <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
                 {selectedItem.quantity_remaining} remaining
@@ -254,9 +277,12 @@ export default function MemberShop({ member, tierConfig, showToast }) {
                 onClick={handleOrder}
                 disabled={ordering || (selectedItem.sizes?.length > 0 && !orderSize)}
               >
-                {ordering ? "Placing Order..." : `Request Item — $${(selectedItem.member_price * orderQty).toFixed(2)}`}
+                {ordering ? "Processing..." : `Buy Now — $${(selectedItem.member_price * orderQty).toFixed(2)}`}
               </button>
             )}
+            <p style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", marginTop: 8 }}>
+              Your card on file will be charged immediately.
+            </p>
           </>
         )}
       </Modal>
@@ -265,6 +291,7 @@ export default function MemberShop({ member, tierConfig, showToast }) {
 }
 
 function ItemCard({ item, discountPct, onClick }) {
+  const imgUrl = item.image_urls?.length > 0 ? item.image_urls[0] : item.image_url;
   return (
     <div
       onClick={item.sold_out ? undefined : onClick}
@@ -278,9 +305,9 @@ function ItemCard({ item, discountPct, onClick }) {
       onMouseEnter={(e) => { if (!item.sold_out) e.currentTarget.style.boxShadow = "0 4px 20px rgba(53,68,59,0.12)"; }}
       onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
     >
-      {item.image_url ? (
+      {imgUrl ? (
         <div style={{ position: "relative" }}>
-          <img src={item.image_url} alt="" style={{ width: "100%", height: 180, objectFit: "cover" }} />
+          <img src={imgUrl} alt="" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }} />
           {item.sold_out && (
             <div style={{ position: "absolute", inset: 0, background: "rgba(53,68,59,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <span style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#EDF3E3", fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Sold Out</span>
@@ -291,9 +318,14 @@ function ItemCard({ item, discountPct, onClick }) {
               Limited
             </span>
           )}
+          {item.image_urls?.length > 1 && (
+            <span style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.5)", color: "#fff", fontSize: 9, padding: "2px 6px", borderRadius: 4 }}>
+              1/{item.image_urls.length}
+            </span>
+          )}
         </div>
       ) : (
-        <div style={{ width: "100%", height: 160, background: "var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, color: "var(--text-muted)" }}>
+        <div style={{ width: "100%", aspectRatio: "1", background: "var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, color: "var(--text-muted)" }}>
           &#9670;
         </div>
       )}

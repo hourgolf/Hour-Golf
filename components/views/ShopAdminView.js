@@ -14,7 +14,7 @@ const STATUS_COLORS = {
 
 function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
   const [form, setForm] = useState({
-    title: "", subtitle: "", description: "", image_url: "",
+    title: "", subtitle: "", description: "", image_urls: [],
     price: 0, category: "Apparel", brand: "", is_limited: false,
     drop_date: "", quantity_available: "", sizes: "",
     is_published: true, display_order: 0,
@@ -25,11 +25,14 @@ function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
 
   useEffect(() => {
     if (item) {
+      const urls = Array.isArray(item.image_urls) && item.image_urls.length > 0
+        ? item.image_urls
+        : item.image_url ? [item.image_url] : [];
       setForm({
         title: item.title || "",
         subtitle: item.subtitle || "",
         description: item.description || "",
-        image_url: item.image_url || "",
+        image_urls: urls,
         price: Number(item.price || 0),
         category: item.category || "Apparel",
         brand: item.brand || "",
@@ -42,7 +45,7 @@ function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
       });
     } else {
       setForm({
-        title: "", subtitle: "", description: "", image_url: "",
+        title: "", subtitle: "", description: "", image_urls: [],
         price: 0, category: "Apparel", brand: "", is_limited: false,
         drop_date: "", quantity_available: "", sizes: "",
         is_published: true, display_order: 0,
@@ -52,10 +55,11 @@ function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
 
   function update(k, v) { setForm((f) => ({ ...f, [k]: v })); }
 
-  async function handleImage(e) {
+  async function handleImageUpload(e) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) { alert("Max 5MB"); return; }
+    if (form.image_urls.length >= 5) { alert("Maximum 5 images"); return; }
     setUploading(true);
     try {
       const ext = file.name.split(".").pop();
@@ -67,11 +71,16 @@ function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.detail || d.error);
-      update("image_url", d.url);
+      update("image_urls", [...form.image_urls, d.url]);
     } catch (err) {
       alert("Upload failed: " + err.message);
     }
     setUploading(false);
+    e.target.value = "";
+  }
+
+  function removeImage(idx) {
+    update("image_urls", form.image_urls.filter((_, i) => i !== idx));
   }
 
   async function handleSave() {
@@ -85,6 +94,7 @@ function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
       title: form.title.trim(),
       subtitle: form.subtitle.trim() || null,
       description: form.description.trim() || null,
+      image_urls: form.image_urls,
       price: Number(form.price || 0),
       quantity_available: form.quantity_available !== "" ? Number(form.quantity_available) : null,
       sizes: sizesArr,
@@ -97,11 +107,24 @@ function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
     <Modal open={open} onClose={onClose}>
       <h2>{isNew ? "Add Item" : "Edit Item"}</h2>
       <div className="mf">
-        <label>Product Image</label>
-        {form.image_url && (
-          <img src={form.image_url} alt="" style={{ width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: 8, marginBottom: 8 }} />
+        <label>Product Images ({form.image_urls.length}/5)</label>
+        {form.image_urls.length > 0 && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+            {form.image_urls.map((url, i) => (
+              <div key={i} style={{ position: "relative", width: 80, height: 80 }}>
+                <img src={url} alt="" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 6, border: i === 0 ? "2px solid var(--primary)" : "1px solid var(--border)" }} />
+                <button
+                  onClick={() => removeImage(i)}
+                  style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: "var(--red)", color: "#fff", border: "none", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}
+                >x</button>
+                {i === 0 && <div style={{ position: "absolute", bottom: 2, left: 2, fontSize: 8, background: "var(--primary)", color: "#EDF3E3", padding: "1px 4px", borderRadius: 3 }}>Primary</div>}
+              </div>
+            ))}
+          </div>
         )}
-        <input type="file" accept="image/*" onChange={handleImage} disabled={uploading} />
+        {form.image_urls.length < 5 && (
+          <input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
+        )}
         {uploading && <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Uploading...</span>}
       </div>
       <div className="mf">
