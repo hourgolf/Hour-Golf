@@ -208,6 +208,68 @@ const RULE_LABELS = {
   shop_spend: { label: "Pro Shop Spend", unit: "spent", icon: "\ud83d\uded2" },
 };
 
+function LoyaltyRuleCard({ rule, onUpdate, saving }) {
+  const meta = RULE_LABELS[rule.rule_type] || { label: rule.rule_type, unit: "", icon: "" };
+  const [localThreshold, setLocalThreshold] = useState(rule.threshold);
+  const [localReward, setLocalReward] = useState(rule.reward);
+
+  useEffect(() => { setLocalThreshold(rule.threshold); }, [rule.threshold]);
+  useEffect(() => { setLocalReward(rule.reward); }, [rule.reward]);
+
+  return (
+    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "14px 16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 18 }}>{meta.icon}</span>
+          <strong style={{ fontSize: 14 }}>{meta.label}</strong>
+        </div>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, cursor: "pointer" }}>
+          <div
+            onClick={() => onUpdate(rule.id, "enabled", !rule.enabled)}
+            className={`mem-toggle-switch ${rule.enabled ? "on" : ""}`}
+          />
+        </label>
+      </div>
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap", opacity: rule.enabled ? 1 : 0.5 }}>
+        <div>
+          <label style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>Every</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <input
+              type="number" min={1} step={1}
+              value={localThreshold}
+              onChange={(e) => setLocalThreshold(e.target.value)}
+              onBlur={() => { const v = Number(localThreshold); if (v > 0 && v !== rule.threshold) onUpdate(rule.id, "threshold", v); }}
+              disabled={saving === rule.id}
+              style={{ width: 80, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)" }}
+            />
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{meta.unit}</span>
+          </div>
+        </div>
+        <div>
+          <label style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>Earn</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span style={{ fontSize: 13, color: "var(--text-muted)" }}>$</span>
+            <input
+              type="number" min={1} step={1}
+              value={localReward}
+              onChange={(e) => setLocalReward(e.target.value)}
+              onBlur={() => { const v = Number(localReward); if (v > 0 && v !== rule.reward) onUpdate(rule.id, "reward", v); }}
+              disabled={saving === rule.id}
+              style={{ width: 70, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)" }}
+            />
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>credit</span>
+          </div>
+        </div>
+      </div>
+      {rule.enabled && (
+        <p style={{ fontSize: 11, color: "var(--primary)", marginTop: 8, marginBottom: 0 }}>
+          Members earn ${rule.reward} for every {rule.threshold} {meta.unit}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function LoyaltySection({ jwt }) {
   const [rules, setRules] = useState([]);
   const [ledger, setLedger] = useState([]);
@@ -268,63 +330,9 @@ function LoyaltySection({ jwt }) {
   return (
     <>
       <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
-        {rules.map((rule) => {
-          const meta = RULE_LABELS[rule.rule_type] || { label: rule.rule_type, unit: "", icon: "" };
-          return (
-            <div key={rule.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "14px 16px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 18 }}>{meta.icon}</span>
-                  <strong style={{ fontSize: 14 }}>{meta.label}</strong>
-                </div>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, cursor: "pointer" }}>
-                  <div
-                    onClick={() => updateRule(rule.id, "enabled", !rule.enabled)}
-                    className={`mem-toggle-switch ${rule.enabled ? "on" : ""}`}
-                  />
-                </label>
-              </div>
-              <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap", opacity: rule.enabled ? 1 : 0.5 }}>
-                <div>
-                  <label style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>
-                    Every
-                  </label>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <input
-                      type="number" min={1} step={1}
-                      value={rule.threshold}
-                      onChange={(e) => updateRule(rule.id, "threshold", Number(e.target.value))}
-                      disabled={saving === rule.id}
-                      style={{ width: 70, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)" }}
-                    />
-                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{meta.unit}</span>
-                  </div>
-                </div>
-                <div>
-                  <label style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>
-                    Earn
-                  </label>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <span style={{ fontSize: 13, color: "var(--text-muted)" }}>$</span>
-                    <input
-                      type="number" min={1} step={1}
-                      value={rule.reward}
-                      onChange={(e) => updateRule(rule.id, "reward", Number(e.target.value))}
-                      disabled={saving === rule.id}
-                      style={{ width: 60, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)" }}
-                    />
-                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>credit</span>
-                  </div>
-                </div>
-              </div>
-              {rule.enabled && (
-                <p style={{ fontSize: 11, color: "var(--primary)", marginTop: 8, marginBottom: 0 }}>
-                  Members earn ${rule.reward} for every {rule.threshold} {meta.unit}
-                </p>
-              )}
-            </div>
-          );
-        })}
+        {rules.map((rule) => (
+          <LoyaltyRuleCard key={rule.id} rule={rule} onUpdate={updateRule} saving={saving} />
+        ))}
       </div>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
@@ -418,6 +426,9 @@ export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStrip
         ))}
       </div>
 
+      <h2 className="section-head" style={{ marginTop: 24 }}>Loyalty Rewards</h2>
+      <LoyaltySection jwt={jwt} />
+
       <h2 className="section-head" style={{ marginTop: 24 }}>Members ({members.length})</h2>
       {/* Desktop table */}
       <div className="tbl usage-desktop">
@@ -493,9 +504,6 @@ export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStrip
 
       <h2 className="section-head" style={{ marginTop: 24 }}>Email Settings</h2>
       <EmailConfigSection jwt={jwt} />
-
-      <h2 className="section-head" style={{ marginTop: 24 }}>Loyalty Rewards</h2>
-      <LoyaltySection jwt={jwt} />
 
       <TierEditModal
         open={!!editTier || addTier}
