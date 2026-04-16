@@ -48,14 +48,12 @@ export default async function handler(req, res) {
   if (!token) return res.status(401).json({ error: "Not authenticated" });
 
   try {
-    // Verify session and get member info
     const mResp = await sb(key, `members?session_token=eq.${encodeURIComponent(token)}&session_expires_at=gt.${new Date().toISOString()}&select=email,name,tier,stripe_customer_id`);
     if (!mResp.ok) throw new Error("Session lookup failed");
     const members = await mResp.json();
     if (!members.length) return res.status(401).json({ error: "Session expired" });
     const member = members[0];
 
-    // Get tier discount
     let discountPct = 0;
     if (member.tier) {
       const tcResp = await sb(key, `tier_config?tier=eq.${encodeURIComponent(member.tier)}&select=pro_shop_discount`);
@@ -72,7 +70,6 @@ export default async function handler(req, res) {
       const now = new Date().toISOString();
 
       const visible = items.filter((it) => {
-        // Hide limited items before their drop date
         if (it.is_limited && it.drop_date && it.drop_date > now) return false;
         return true;
       });
@@ -101,8 +98,6 @@ export default async function handler(req, res) {
     if (req.method === "GET" && action === "my-orders") {
       const ordResp = await sb(key, `shop_orders?member_email=eq.${encodeURIComponent(member.email)}&order=created_at.desc`);
       const orders = ordResp.ok ? await ordResp.json() : [];
-
-      // Enrich with item details
       const itemIds = [...new Set(orders.map((o) => o.item_id))];
       let items = [];
       if (itemIds.length > 0) {
@@ -111,7 +106,6 @@ export default async function handler(req, res) {
       }
       const itemMap = {};
       items.forEach((i) => { itemMap[i.id] = i; });
-
       const enriched = orders.map((o) => ({
         ...o,
         item_title: itemMap[o.item_id]?.title || "Unknown",
@@ -120,48 +114,149 @@ export default async function handler(req, res) {
       return res.status(200).json(enriched);
     }
 
-    // ── POST: place order ──
-    if (req.method === "POST" && action === "order") {
-      const { item_id, size, quantity, notes } = req.body || {};
+    // ── GET: cart ──
+    if (req.method === "GET" && action === "cart") {
+      const cartResp = await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}&order=created_at.asc`);
+      const cartItems = cartResp.ok ? await cartResp.json() : [];
+      const itemIds = [...new Set(cartItems.map((c) => c.item_id))];
+      let items = [];
+      if (itemIds.length > 0) {
+        const itResp = await sb(key, `shop_items?id=in.(${itemIds.join(",")})`);
+        items = itResp.ok ? await itResp.json() : [];
+      }
+      const itemMap = {};
+      items.forEach((i) => { itemMap[i.id] = i; });
+
+      const enriched = cartItems.map((c) => {
+        const it = itemMap[c.item_id] || {};
+        const unitPrice = Number(it.price || 0);
+        const memberPrice = Math.round(unitPrice * (1 - discountPct / 100) * 100) / 100;
+        return {
+          cart_id: c.id,
+          item_id: c.item_id,
+          size: c.size,
+          quantity: c.quantity,
+          title: it.title || "Unknown",
+          brand: it.brand,
+          image_url: it.image_url,
+          price: unitPrice,
+          member_price: memberPrice,
+          line_total: Math.round(memberPrice * c.quantity * 100) / 100,
+        };
+      });
+
+      const cartTotal = enriched.reduce((s, c) => s + c.line_total, 0);
+      return res.status(200).json({ cart: enriched, discount_pct: discountPct, cart_total: Math.round(cartTotal * 100) / 100 });
+    }
+
+    // ── POST: add to cart ──
+    if (req.method === "POST" && action === "add-to-cart") {
+      const { item_id, size, quantity } = req.body || {};
       if (!item_id) return res.status(400).json({ error: "Item ID required" });
 
-      // Fetch item
-      const itResp = await sb(key, `shop_items?id=eq.${item_id}&is_published=eq.true`);
-      const items = itResp.ok ? await itResp.json() : [];
-      if (!items.length) return res.status(404).json({ error: "Item not found" });
-      const item = items[0];
+      // Check if same item+size already in cart
+      const sizeFilter = size ? `&size=eq.${encodeURIComponent(size)}` : "&size=is.null";
+      const existResp = await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}&item_id=eq.${item_id}${sizeFilter}`);
+      const existing = existResp.ok ? await existResp.json() : [];
 
-      // Check stock
+      if (existing.length > 0) {
+        // Increment quantity
+        const newQty = existing[0].quantity + Number(quantity || 1);
+        await sb(key, `shop_cart?id=eq.${existing[0].id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ quantity: newQty, updated_at: new Date().toISOString() }),
+        });
+      } else {
+        await sb(key, "shop_cart", {
+          method: "POST",
+          body: JSON.stringify({
+            member_email: member.email,
+            item_id,
+            size: size || null,
+            quantity: Number(quantity || 1),
+          }),
+        });
+      }
+
+      // Return updated cart count
+      const countResp = await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}&select=quantity`);
+      const countItems = countResp.ok ? await countResp.json() : [];
+      const cartCount = countItems.reduce((s, c) => s + c.quantity, 0);
+      return res.status(200).json({ success: true, cart_count: cartCount });
+    }
+
+    // ── PATCH: update cart quantity ──
+    if (req.method === "PATCH" && action === "update-cart") {
+      const { cart_id, quantity } = req.body || {};
+      if (!cart_id) return res.status(400).json({ error: "Cart ID required" });
       const qty = Number(quantity || 1);
-      if (item.quantity_available != null) {
-        const remaining = item.quantity_available - (item.quantity_claimed || 0);
-        if (remaining < qty) return res.status(400).json({ error: "Not enough stock" });
-      }
+      if (qty < 1) return res.status(400).json({ error: "Quantity must be at least 1" });
 
-      // Validate size
-      if (item.sizes && Array.isArray(item.sizes) && item.sizes.length > 0) {
-        if (!size || !item.sizes.includes(size)) {
-          return res.status(400).json({ error: "Please select a valid size" });
+      await sb(key, `shop_cart?id=eq.${cart_id}&member_email=eq.${encodeURIComponent(member.email)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ quantity: qty, updated_at: new Date().toISOString() }),
+      });
+      return res.status(200).json({ success: true });
+    }
+
+    // ── DELETE: remove from cart ──
+    if (req.method === "DELETE" && action === "remove-from-cart") {
+      const cartId = req.query.cart_id || req.body?.cart_id;
+      if (!cartId) return res.status(400).json({ error: "Cart ID required" });
+
+      await sb(key, `shop_cart?id=eq.${cartId}&member_email=eq.${encodeURIComponent(member.email)}`, {
+        method: "DELETE",
+      });
+      return res.status(200).json({ success: true });
+    }
+
+    // ── POST: checkout (charge full cart) ──
+    if (req.method === "POST" && action === "checkout") {
+      // 1. Fetch cart
+      const cartResp = await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}&order=created_at.asc`);
+      const cartItems = cartResp.ok ? await cartResp.json() : [];
+      if (!cartItems.length) return res.status(400).json({ error: "Cart is empty" });
+
+      // 2. Fetch all items
+      const itemIds = [...new Set(cartItems.map((c) => c.item_id))];
+      const itResp = await sb(key, `shop_items?id=in.(${itemIds.join(",")})`);
+      const items = itResp.ok ? await itResp.json() : [];
+      const itemMap = {};
+      items.forEach((i) => { itemMap[i.id] = i; });
+
+      // 3. Validate stock + calculate totals
+      let grandTotal = 0;
+      const lineItems = [];
+      for (const c of cartItems) {
+        const it = itemMap[c.item_id];
+        if (!it || !it.is_published) return res.status(400).json({ error: `Item "${it?.title || "unknown"}" is no longer available.` });
+        if (it.quantity_available != null) {
+          const remaining = it.quantity_available - (it.quantity_claimed || 0);
+          if (remaining < c.quantity) return res.status(400).json({ error: `Not enough stock for "${it.title}". Only ${remaining} left.` });
         }
+        if (it.sizes && Array.isArray(it.sizes) && it.sizes.length > 0 && c.size && !it.sizes.includes(c.size)) {
+          return res.status(400).json({ error: `Size "${c.size}" no longer available for "${it.title}".` });
+        }
+        const unitPrice = Number(it.price);
+        const lineTotal = Math.round(unitPrice * c.quantity * (1 - discountPct / 100) * 100) / 100;
+        grandTotal += lineTotal;
+        lineItems.push({ cart: c, item: it, unitPrice, lineTotal });
       }
 
-      // Calculate price
-      const unitPrice = Number(item.price);
-      const total = Math.round(unitPrice * qty * (1 - discountPct / 100) * 100) / 100;
-      const amountCents = Math.round(total * 100);
+      grandTotal = Math.round(grandTotal * 100) / 100;
+      const amountCents = Math.round(grandTotal * 100);
+      if (amountCents < 50) return res.status(400).json({ error: "Order total too small to process." });
 
-      if (amountCents < 50) return res.status(400).json({ error: "Order total too small to process" });
-
-      // Charge card on file via Stripe
+      // 4. Charge Stripe
       if (!member.stripe_customer_id) {
         return res.status(400).json({ error: "No payment method on file. Please add a card in the Billing tab." });
       }
-
       const paymentMethod = await findPaymentMethod(member.stripe_customer_id);
       if (!paymentMethod) {
         return res.status(400).json({ error: "No payment method found. Please update your card in the Billing tab." });
       }
 
+      const itemNames = lineItems.map((li) => li.item.title).join(", ");
       let pi;
       try {
         pi = await stripe.paymentIntents.create({
@@ -171,45 +266,52 @@ export default async function handler(req, res) {
           payment_method: paymentMethod,
           off_session: true,
           confirm: true,
-          description: `Hour Golf Pro Shop — ${item.title}${size ? ` (${size})` : ""}`,
+          description: `Hour Golf Pro Shop — ${itemNames}`.slice(0, 200),
           metadata: {
             member_email: member.email,
-            item_id,
+            item_count: String(lineItems.length),
             source: "hour-golf-pro-shop",
           },
         });
       } catch (stripeErr) {
-        console.error("Stripe charge failed:", stripeErr);
+        console.error("Stripe checkout failed:", stripeErr);
         return res.status(400).json({ error: "Payment failed. Please check your card details in the Billing tab." });
       }
 
-      // Create order (status = confirmed since payment succeeded)
-      const ordResp = await sb(key, "shop_orders", {
-        method: "POST",
-        body: JSON.stringify({
-          member_email: member.email,
-          member_name: member.name,
-          item_id,
-          size: size || null,
-          quantity: qty,
-          unit_price: unitPrice,
-          discount_pct: discountPct,
-          total,
-          status: "confirmed",
-          stripe_payment_intent_id: pi.id,
-          notes: notes || null,
-        }),
-      });
-      if (!ordResp.ok) throw new Error(await ordResp.text());
+      // 5. Create orders for each line item
+      for (const li of lineItems) {
+        await sb(key, "shop_orders", {
+          method: "POST",
+          body: JSON.stringify({
+            member_email: member.email,
+            member_name: member.name,
+            item_id: li.cart.item_id,
+            size: li.cart.size || null,
+            quantity: li.cart.quantity,
+            unit_price: li.unitPrice,
+            discount_pct: discountPct,
+            total: li.lineTotal,
+            status: "confirmed",
+            stripe_payment_intent_id: pi.id,
+            notes: "Pick up at next visit",
+          }),
+        });
+        // Increment quantity_claimed
+        await sb(key, `shop_items?id=eq.${li.cart.item_id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ quantity_claimed: (li.item.quantity_claimed || 0) + li.cart.quantity }),
+        });
+      }
 
-      // Increment quantity_claimed
-      await sb(key, `shop_items?id=eq.${item_id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ quantity_claimed: (item.quantity_claimed || 0) + qty }),
-      });
+      // 6. Clear cart
+      await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}`, { method: "DELETE" });
 
-      const rows = await ordResp.json();
-      return res.status(201).json(rows[0]);
+      return res.status(200).json({
+        success: true,
+        total: grandTotal,
+        item_count: lineItems.length,
+        stripe_payment_intent_id: pi.id,
+      });
     }
 
     return res.status(405).json({ error: "Method not allowed" });
