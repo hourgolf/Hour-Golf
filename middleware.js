@@ -20,14 +20,15 @@ import { NextResponse } from 'next/server';
 import { getCached, setCached, getNegativeCached, setNegativeCached } from './lib/tenant-cache';
 
 const HOURGOLF_TENANT_ID = '11111111-1111-4111-8111-111111111111';
-const PLATFORM_DOMAIN_SUFFIX = '.platform.com'; // update when real domain is chosen
+const PLATFORM_DOMAIN_SUFFIX = '.ourlee.co';
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://uxpkqbioxoezjmcoylkw.supabase.co';
 
 // Return the tenant slug if the host is a platform subdomain, else null.
 // Examples:
-//   hourgolf.platform.com       → "hourgolf"
-//   testvenue.platform.com:3000 → "testvenue"
+//   hourgolf.ourlee.co          → "hourgolf"
+//   testvenue.ourlee.co:3000    → "testvenue"
+//   ourlee.co                   → null  (apex, falls back)
 //   hour-golf-live.vercel.app   → null  (falls back)
 //   localhost:3000              → null  (falls back)
 function parseSlugFromHost(host) {
