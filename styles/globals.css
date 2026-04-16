@@ -449,12 +449,13 @@ html { overflow-y: scroll; }
 .mem-header-name { font-family: var(--font-body); font-size: 16px; color: #EDF3E3; }
 .mem-tier-badge { padding: 3px 14px; border-radius: var(--radius); font-family: var(--font-display); font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 
-.mem-nav { background: var(--surface); border-bottom: 2px solid var(--primary); overflow: hidden; }
-.mem-nav-inner { display: flex; max-width: 960px; margin: 0 auto; padding: 0 24px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.mem-nav { background: var(--surface); border-bottom: 2px solid #4C8D73; overflow: hidden; }
+.mem-nav-inner { display: flex; max-width: 960px; margin: 0 auto; padding: 0 24px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: auto; scrollbar-width: none; }
 .mem-nav-inner::-webkit-scrollbar { display: none; }
-.mem-nav-btn { padding: 12px 20px; border: none; background: transparent; cursor: pointer; font-size: 16px; font-family: var(--font-mono); color: var(--text-muted); font-weight: 400; text-transform: uppercase; transition: color 0.15s; white-space: nowrap; border-radius: var(--radius) var(--radius) 0 0; }
-.mem-nav-btn:hover { color: var(--text); }
-.mem-nav-btn.active { color: var(--text); font-weight: 600; background: var(--bg); border-bottom: 2px solid var(--primary); margin-bottom: -2px; }
+.mem-nav-btn { padding: 12px 20px; border: none; border-right: 1px solid var(--border); background: transparent; cursor: pointer; font-size: 16px; font-family: var(--font-mono); color: var(--text-muted); font-weight: 400; text-transform: uppercase; transition: background 0.15s, color 0.15s; white-space: nowrap; }
+.mem-nav-btn:last-of-type { border-right: none; }
+.mem-nav-btn:hover { color: var(--text); background: rgba(209,223,203,0.3); }
+.mem-nav-btn.active { color: #EDF3E3; font-weight: 600; background: #4C8D73; }
 
 .mem-content { max-width: 960px; margin: 0 auto; padding: 24px; }
 
