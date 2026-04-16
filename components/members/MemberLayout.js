@@ -392,7 +392,7 @@ export default function MemberLayout({ activeTab, children }) {
       {/* Header */}
       <header className="mem-header" style={{ position: "relative", zIndex: 1 }}>
         <div className="mem-header-inner" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center" }}>
-          <img src="/blobs/MASTERS FLAG.svg" alt="" className="mem-header-logo" style={{ filter: "brightness(0) invert(0.95)", justifySelf: "start" }} />
+          <img src="/blobs/MASTERS FLAG.svg" alt="" className="mem-header-logo" style={{ filter: "brightness(0) invert(0.95)", justifySelf: "center" }} />
           <div style={{ textAlign: "center" }}>
             <img src="/blobs/HG-Script-White.svg" alt="Hour Golf" className="hdr-title-logo" />
           </div>

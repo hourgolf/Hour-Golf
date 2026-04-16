@@ -449,6 +449,7 @@ function ItemCard({ item, discountPct, onClick }) {
         cursor: item.sold_out ? "default" : "pointer",
         opacity: item.sold_out ? 0.6 : 1,
         transition: "box-shadow 0.15s",
+        display: "flex", flexDirection: "column",
       }}
       onMouseEnter={(e) => { if (!item.sold_out) e.currentTarget.style.boxShadow = "0 4px 20px rgba(53,68,59,0.12)"; }}
       onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
@@ -471,11 +472,11 @@ function ItemCard({ item, discountPct, onClick }) {
       ) : (
         <div style={{ width: "100%", aspectRatio: "1", background: "var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, color: "var(--text-muted)" }}>&#9670;</div>
       )}
-      <div style={{ padding: "12px 14px" }}>
+      <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", flex: 1 }}>
         {item.brand && <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>{item.brand}</div>}
         <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{item.title}</div>
         {item.subtitle && <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>{item.subtitle}</div>}
-        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+        <div style={{ marginTop: "auto", display: "flex", alignItems: "baseline", gap: 6 }}>
           {discountPct > 0 ? (
             <>
               <span style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--primary)" }}>${item.member_price.toFixed(0)}</span>
