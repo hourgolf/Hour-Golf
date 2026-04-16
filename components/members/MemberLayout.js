@@ -395,7 +395,7 @@ export default function MemberLayout({ activeTab, children }) {
           <div style={{ textAlign: "center" }}>
             <img src="/blobs/HG-Script-White.svg" alt="Hour Golf" className="hdr-title-logo" />
           </div>
-          <div style={{ textAlign: "right" }}>
+          <div style={{ textAlign: "right", justifySelf: "end" }}>
             <div className="mem-header-name" style={{ marginBottom: 4 }}>{member.name}</div>
             <span className="mem-tier-badge" style={{ background: tierObj.bg, color: tierObj.text }}>{member.tier}</span>
           </div>
