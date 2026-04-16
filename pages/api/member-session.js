@@ -36,6 +36,32 @@ export default async function handler(req, res) {
 
     const member = members[0];
 
+    // Lazy-assign member_number if paying member and doesn't have one yet
+    if (member.tier && member.tier !== "Non-Member" && !member.member_number) {
+      try {
+        const maxResp = await fetch(
+          `${SUPABASE_URL}/rest/v1/members?member_number=not.is.null&select=member_number&order=member_number.desc&limit=1`,
+          { headers: { apikey: key, Authorization: `Bearer ${key}` } }
+        );
+        if (maxResp.ok) {
+          const rows = await maxResp.json();
+          const nextNum = (rows[0]?.member_number || 0) + 1;
+          await fetch(
+            `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}`,
+            {
+              method: "PATCH",
+              headers: {
+                apikey: key, Authorization: `Bearer ${key}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ member_number: nextNum }),
+            }
+          );
+          member.member_number = nextNum;
+        }
+      } catch (_) { /* ignore — non-critical */ }
+    }
+
     // Load tier config
     let tierConfig = null;
     if (member.tier) {
@@ -61,6 +87,7 @@ export default async function handler(req, res) {
         phone: member.phone || "",
         hasPaymentMethod: !!member.stripe_customer_id,
         shop_credit_balance: Number(member.shop_credit_balance || 0),
+        member_number: member.member_number || null,
         verify_token: generateVerifyToken(member.email),
         needsAccountSetup,
       },

@@ -401,7 +401,12 @@ export default function MemberLayout({ activeTab, children }) {
             <img src="/blobs/HG-Script-White.svg" alt="Hour Golf" className="hdr-title-logo" />
           </div>
           <div style={{ textAlign: "right", justifySelf: "end" }}>
-            <div className="mem-header-name" style={{ marginBottom: 4 }}>{member.name}</div>
+            <div className="mem-header-name" style={{ marginBottom: 2 }}>{member.name}</div>
+            {member.member_number && (
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(237,243,227,0.7)", letterSpacing: 1, marginBottom: 4 }}>
+                MEMBER #{String(member.member_number).padStart(3, "0")}
+              </div>
+            )}
             <span className="mem-tier-badge" style={{ background: tierObj.bg, color: tierObj.text }}>{member.tier}</span>
           </div>
         </div>
