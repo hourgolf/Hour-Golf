@@ -1,6 +1,21 @@
 // /pages/api/booking-webhook.js
-// Zapier calls this instead of Supabase directly.
-// This endpoint handles the insert and lets Supabase triggers do duration calc.
+//
+// DEPRECATED — scheduled for removal (1–3 month horizon as of 2026-04-16).
+// This endpoint exists to receive Zapier-relayed bookings from Skedda.
+// Both Skedda and Zapier are being removed; the native customer-book.js
+// flow (which is already tenant-scoped) will be the sole booking path.
+//
+// DO NOT add multi-tenant features to this file. It was intentionally
+// skipped in Phase 2B-3 of the multi-tenant migration (see
+// ~/.claude/plans/lovely-watching-bunny.md). When Skedda/Zapier are
+// decommissioned, delete this file and the WEBHOOK_SECRET env var.
+//
+// Until removed, this endpoint inserts bookings that automatically pick
+// up Hour Golf's tenant_id via the column DEFAULT seeded in migration
+// 20260417000000_multitenant_foundation. That default remains in place
+// through Phase 2C specifically so legacy paths like this keep working.
+//
+// Original behavior: handles the insert; Supabase triggers do duration calc.
 
 import { sendBookingConfirmation } from "../../lib/email";
 
