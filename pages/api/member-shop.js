@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { sendShopOrderNotification } from "../../lib/email";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -305,6 +306,15 @@ export default async function handler(req, res) {
 
       // 6. Clear cart
       await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}`, { method: "DELETE" });
+
+      // 7. Notify admin
+      sendShopOrderNotification({
+        customerName: member.name,
+        customerEmail: member.email,
+        items: lineItems.map((li) => ({ title: li.item.title, size: li.cart.size, quantity: li.cart.quantity, lineTotal: li.lineTotal })),
+        total: grandTotal,
+        discountPct,
+      }).catch((e) => console.error("Shop order notification failed:", e));
 
       return res.status(200).json({
         success: true,
