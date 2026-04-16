@@ -1,29 +1,22 @@
-const CACHE_NAME = "hourgolf-v1";
-const OFFLINE_URL = "/members/dashboard";
+// Minimal service worker — just enables PWA install (standalone mode).
+// Do NOT pre-cache pages or intercept navigation fetches, so members
+// always see the latest deployed version immediately after sign-in.
 
-// Install — cache the offline fallback
+const CACHE_NAME = "hourgolf-v3";
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.add(OFFLINE_URL))
-  );
+  // Activate this SW as soon as possible
   self.skipWaiting();
 });
 
-// Activate — clean old caches
 self.addEventListener("activate", (event) => {
+  // Clear any caches from older SW versions that pre-cached pages
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+      Promise.all(keys.map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Fetch — network first, fall back to cache
-self.addEventListener("fetch", (event) => {
-  if (event.request.mode === "navigate") {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match(OFFLINE_URL))
-    );
-  }
-});
+// Intentionally no fetch handler — browser handles all requests normally,
+// so new deployments are always picked up on the next page load.
