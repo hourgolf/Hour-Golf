@@ -84,6 +84,27 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
         Hey, {firstName}.
       </h1>
 
+      {/* In-Store Discount QR */}
+      {member.verify_token && (
+        <div className="mem-section" style={{ textAlign: "center", padding: "16px 16px 20px", marginBottom: 20 }}>
+          <div className="mem-section-head" style={{ textAlign: "left" }}>In-Store Discount</div>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 12px 0" }}>
+            Show this code at the register to apply your member discount.
+          </p>
+          <img
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+              (typeof window !== "undefined" ? window.location.origin : "https://hourgolf.vercel.app") +
+              "/verify?token=" + member.verify_token
+            )}&color=35443B&bgcolor=FFFFFF`}
+            alt="Member QR Code"
+            style={{ width: 180, height: 180, borderRadius: 8, border: "1px solid var(--border)" }}
+          />
+          <div style={{ marginTop: 10, fontSize: 11, color: "var(--text-muted)" }}>
+            {member.tier} &mdash; {tierConfig?.pro_shop_discount || 0}% discount
+          </div>
+        </div>
+      )}
+
       {/* Usage Cards */}
       <div className="mem-cards">
         <div className="mem-card">

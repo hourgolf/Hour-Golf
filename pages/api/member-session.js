@@ -1,4 +1,5 @@
 import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { generateVerifyToken } from "./verify-member";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -60,6 +61,7 @@ export default async function handler(req, res) {
         phone: member.phone || "",
         hasPaymentMethod: !!member.stripe_customer_id,
         shop_credit_balance: Number(member.shop_credit_balance || 0),
+        verify_token: generateVerifyToken(member.email),
         needsAccountSetup,
       },
       tierConfig,
