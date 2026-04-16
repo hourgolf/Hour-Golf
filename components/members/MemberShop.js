@@ -234,12 +234,12 @@ export default function MemberShop({ member, tierConfig, showToast }) {
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <button
                             onClick={() => c.quantity > 1 && updateCartQty(c.cart_id, c.quantity - 1)}
-                            style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid var(--border)", background: "var(--surface)", cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}
+                            style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid var(--primary)", background: "var(--surface)", color: "var(--primary)", cursor: "pointer", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}
                           >&minus;</button>
                           <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, minWidth: 20, textAlign: "center" }}>{c.quantity}</span>
                           <button
                             onClick={() => updateCartQty(c.cart_id, c.quantity + 1)}
-                            style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid var(--border)", background: "var(--surface)", cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}
+                            style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid var(--primary)", background: "var(--surface)", color: "var(--primary)", cursor: "pointer", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}
                           >+</button>
                         </div>
                         <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, fontSize: 15 }}>${c.line_total.toFixed(2)}</span>
@@ -249,7 +249,7 @@ export default function MemberShop({ member, tierConfig, showToast }) {
                 </div>
               ))}
 
-              {/* Order summary */}
+              {/* Order summary + pickup + checkout — single card */}
               <div className="mem-section" style={{ padding: "16px", marginTop: 8 }}>
                 {discountPct > 0 && (
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--primary)", marginBottom: 6 }}>
@@ -257,30 +257,28 @@ export default function MemberShop({ member, tierConfig, showToast }) {
                     <span>&minus;{discountPct}%</span>
                   </div>
                 )}
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 18, fontWeight: 700, fontFamily: "var(--font-display)", borderTop: discountPct > 0 ? "1px solid var(--border)" : "none", paddingTop: discountPct > 0 ? 8 : 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 18, fontWeight: 700, fontFamily: "var(--font-display)", borderTop: discountPct > 0 ? "1px solid var(--border)" : "none", paddingTop: discountPct > 0 ? 8 : 0, marginBottom: 16 }}>
                   <span>Total</span>
                   <span>${cartTotal.toFixed(2)}</span>
                 </div>
-              </div>
 
-              {/* Pickup info */}
-              <div style={{ background: "var(--primary-bg)", borderRadius: "var(--radius)", padding: "12px 16px", margin: "12px 0", fontSize: 13 }}>
-                <strong style={{ color: "var(--primary)" }}>Pickup at your next visit</strong>
-                <p style={{ margin: "4px 0 0 0", color: "var(--text-muted)", fontSize: 12 }}>
-                  Your items will be held at the front desk. Just let us know your name when you arrive.
+                <div style={{ background: "var(--primary-bg)", borderRadius: "var(--radius)", padding: "10px 14px", marginBottom: 16, fontSize: 13 }}>
+                  <strong style={{ color: "var(--primary)" }}>Pickup at your next visit</strong>
+                  <p style={{ margin: "4px 0 0 0", color: "var(--text-muted)", fontSize: 12 }}>
+                    Your items will be held at the front desk. Just let us know your name when you arrive.
+                  </p>
+                </div>
+
+                <button
+                  className="mem-btn mem-btn-primary mem-btn-full"
+                  onClick={() => setShowCheckout(true)}
+                >
+                  Checkout &mdash; ${cartTotal.toFixed(2)}
+                </button>
+                <p style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", marginTop: 8, marginBottom: 0 }}>
+                  Your card on file will be charged.
                 </p>
               </div>
-
-              <button
-                className="mem-btn mem-btn-primary mem-btn-full"
-                onClick={() => setShowCheckout(true)}
-                style={{ marginTop: 8 }}
-              >
-                Checkout &mdash; ${cartTotal.toFixed(2)}
-              </button>
-              <p style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", marginTop: 6 }}>
-                Your card on file will be charged.
-              </p>
             </>
           )}
         </>
