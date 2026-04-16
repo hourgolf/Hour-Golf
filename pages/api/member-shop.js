@@ -122,6 +122,51 @@ export default async function handler(req, res) {
       return res.status(200).json({ credits, balance: Number(member.shop_credit_balance || 0) });
     }
 
+    // ── GET: loyalty progress ──
+    if (req.method === "GET" && action === "loyalty") {
+      // Fetch enabled rules
+      const rulesResp = await sb(key, "loyalty_rules?enabled=eq.true");
+      const rules = rulesResp.ok ? await rulesResp.json() : [];
+      if (!rules.length) return res.status(200).json({ rules: [], progress: [] });
+
+      // Current month
+      const now = new Date();
+      const period = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+      const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
+
+      // Booking hours + count this month
+      const bkResp = await sb(key, `bookings?booking_status=eq.Confirmed&customer_email=eq.${encodeURIComponent(member.email)}&booking_start=gte.${monthStart}&booking_start=lt.${monthEnd}&select=duration_hours`);
+      const bks = bkResp.ok ? await bkResp.json() : [];
+      const totalHours = bks.reduce((s, b) => s + Number(b.duration_hours || 0), 0);
+      const totalBookings = bks.length;
+
+      // Shop spend this month
+      const ordResp = await sb(key, `shop_orders?status=eq.confirmed&member_email=eq.${encodeURIComponent(member.email)}&created_at=gte.${monthStart}&created_at=lt.${monthEnd}&select=total`);
+      const ords = ordResp.ok ? await ordResp.json() : [];
+      const totalSpend = ords.reduce((s, o) => s + Number(o.total || 0), 0);
+
+      // Recent rewards
+      const ledgerResp = await sb(key, `loyalty_ledger?member_email=eq.${encodeURIComponent(member.email)}&reward_issued=gt.0&order=created_at.desc&limit=10`);
+      const recentRewards = ledgerResp.ok ? await ledgerResp.json() : [];
+
+      const progress = rules.map((r) => {
+        let current = 0;
+        if (r.rule_type === "hours") current = totalHours;
+        else if (r.rule_type === "bookings") current = totalBookings;
+        else if (r.rule_type === "shop_spend") current = totalSpend;
+        return {
+          rule_type: r.rule_type,
+          threshold: Number(r.threshold),
+          reward: Number(r.reward),
+          current: Math.round(current * 100) / 100,
+          pct: Math.min(100, Math.round((current / Number(r.threshold)) * 100)),
+        };
+      });
+
+      return res.status(200).json({ progress, recent_rewards: recentRewards });
+    }
+
     // ── GET: cart ──
     if (req.method === "GET" && action === "cart") {
       const cartResp = await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}&order=created_at.asc`);

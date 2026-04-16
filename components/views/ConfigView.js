@@ -202,6 +202,174 @@ function EmailConfigSection({ jwt }) {
   );
 }
 
+const RULE_LABELS = {
+  hours: { label: "Booking Hours", unit: "hours", icon: "\u23F0" },
+  bookings: { label: "Booking Count", unit: "bookings", icon: "\ud83d\udcc5" },
+  shop_spend: { label: "Pro Shop Spend", unit: "spent", icon: "\ud83d\uded2" },
+};
+
+function LoyaltySection({ jwt }) {
+  const [rules, setRules] = useState([]);
+  const [ledger, setLedger] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(null);
+  const [processing, setProcessing] = useState(false);
+  const [processResult, setProcessResult] = useState(null);
+
+  useEffect(() => { loadLoyalty(); }, []);
+
+  async function loadLoyalty() {
+    try {
+      const r = await fetch("/api/admin-loyalty", { headers: { Authorization: `Bearer ${jwt}` } });
+      if (r.ok) {
+        const data = await r.json();
+        setRules(data.rules || []);
+        setLedger(data.ledger || []);
+      }
+    } catch {}
+    setLoading(false);
+  }
+
+  async function updateRule(id, field, value) {
+    setSaving(id);
+    try {
+      await fetch(`/api/admin-loyalty?id=${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ [field]: value }),
+      });
+      await loadLoyalty();
+    } catch {}
+    setSaving(null);
+  }
+
+  async function processMonth() {
+    setProcessing(true);
+    setProcessResult(null);
+    const now = new Date();
+    const month = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+    try {
+      const r = await fetch("/api/admin-loyalty", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ month }),
+      });
+      const data = await r.json();
+      setProcessResult(data);
+      await loadLoyalty();
+    } catch (e) {
+      setProcessResult({ error: e.message });
+    }
+    setProcessing(false);
+  }
+
+  if (loading) return <div style={{ padding: 12, color: "var(--text-muted)" }}>Loading loyalty config...</div>;
+
+  return (
+    <>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
+        {rules.map((rule) => {
+          const meta = RULE_LABELS[rule.rule_type] || { label: rule.rule_type, unit: "", icon: "" };
+          return (
+            <div key={rule.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "14px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 18 }}>{meta.icon}</span>
+                  <strong style={{ fontSize: 14 }}>{meta.label}</strong>
+                </div>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, cursor: "pointer" }}>
+                  <div
+                    onClick={() => updateRule(rule.id, "enabled", !rule.enabled)}
+                    className={`mem-toggle-switch ${rule.enabled ? "on" : ""}`}
+                  />
+                </label>
+              </div>
+              <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap", opacity: rule.enabled ? 1 : 0.5 }}>
+                <div>
+                  <label style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>
+                    Every
+                  </label>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <input
+                      type="number" min={1} step={1}
+                      value={rule.threshold}
+                      onChange={(e) => updateRule(rule.id, "threshold", Number(e.target.value))}
+                      disabled={saving === rule.id}
+                      style={{ width: 70, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)" }}
+                    />
+                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{meta.unit}</span>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>
+                    Earn
+                  </label>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ fontSize: 13, color: "var(--text-muted)" }}>$</span>
+                    <input
+                      type="number" min={1} step={1}
+                      value={rule.reward}
+                      onChange={(e) => updateRule(rule.id, "reward", Number(e.target.value))}
+                      disabled={saving === rule.id}
+                      style={{ width: 60, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)" }}
+                    />
+                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>credit</span>
+                  </div>
+                </div>
+              </div>
+              {rule.enabled && (
+                <p style={{ fontSize: 11, color: "var(--primary)", marginTop: 8, marginBottom: 0 }}>
+                  Members earn ${rule.reward} for every {rule.threshold} {meta.unit}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+        <button className="btn primary" onClick={processMonth} disabled={processing} style={{ fontSize: 11 }}>
+          {processing ? "Processing..." : "Process Current Month"}
+        </button>
+        {processResult && !processResult.error && (
+          <span style={{ fontSize: 12, color: "var(--primary)" }}>
+            ${processResult.credits_issued} issued to {processResult.members_affected} member{processResult.members_affected !== 1 ? "s" : ""}
+          </span>
+        )}
+        {processResult?.error && (
+          <span style={{ fontSize: 12, color: "var(--red)" }}>{processResult.error}</span>
+        )}
+      </div>
+
+      {ledger.filter((l) => l.reward_issued > 0).length > 0 && (
+        <>
+          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)", marginBottom: 6 }}>Recent Rewards</div>
+          <div className="tbl" style={{ marginBottom: 0 }}>
+            <div className="th">
+              <span style={{ flex: 2 }}>Member</span>
+              <span style={{ flex: 1 }}>Rule</span>
+              <span style={{ flex: 1 }} className="text-r">Progress</span>
+              <span style={{ flex: 1 }} className="text-r">Reward</span>
+              <span style={{ flex: 1 }} className="text-r">Period</span>
+            </div>
+            {ledger.filter((l) => l.reward_issued > 0).slice(0, 20).map((l) => (
+              <div key={l.id} className="tr">
+                <span style={{ flex: 2 }} className="email-sm">{l.member_email}</span>
+                <span style={{ flex: 1 }}>{(RULE_LABELS[l.rule_type] || {}).label || l.rule_type}</span>
+                <span style={{ flex: 1 }} className="text-r tab-num">
+                  {l.rule_type === "shop_spend" ? `$${Number(l.progress).toFixed(0)}` : l.rule_type === "hours" ? `${Number(l.progress).toFixed(1)}h` : l.progress}
+                </span>
+                <span style={{ flex: 1 }} className="text-r tab-num" style={{ color: "var(--primary)", fontWeight: 600 }}>${Number(l.reward_issued).toFixed(0)}</span>
+                <span style={{ flex: 1 }} className="text-r email-sm">{l.period}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStripe, onSaveTier, onSelectMember, jwt }) {
   const [linking, setLinking] = useState(null);
   const [editTier, setEditTier] = useState(null);
@@ -325,6 +493,9 @@ export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStrip
 
       <h2 className="section-head" style={{ marginTop: 24 }}>Email Settings</h2>
       <EmailConfigSection jwt={jwt} />
+
+      <h2 className="section-head" style={{ marginTop: 24 }}>Loyalty Rewards</h2>
+      <LoyaltySection jwt={jwt} />
 
       <TierEditModal
         open={!!editTier || addTier}

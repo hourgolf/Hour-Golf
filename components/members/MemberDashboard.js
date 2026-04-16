@@ -9,6 +9,7 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
   const router = useRouter();
   const [usage, setUsage] = useState(null);
   const [showQR, setShowQR] = useState(false);
+  const [loyalty, setLoyalty] = useState(null);
   const [upcoming, setUpcoming] = useState([]);
   const [monthBookings, setMonthBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,6 +38,11 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
       setUsage(d.usage);
       setUpcoming(d.upcomingBookings || []);
       setMonthBookings(d.monthBookings || []);
+      // Load loyalty progress
+      fetch("/api/member-shop?action=loyalty", { credentials: "include" })
+        .then((lr) => lr.ok ? lr.json() : null)
+        .then((ld) => { if (ld) setLoyalty(ld); })
+        .catch(() => {});
     } catch (e) {
       showToast("Failed to load dashboard data", "error");
     }
@@ -161,6 +167,32 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
           )}
         </div>
       </Modal>
+
+      {/* Loyalty Progress */}
+      {loyalty && loyalty.progress && loyalty.progress.length > 0 && (
+        <div className="mem-section" style={{ marginBottom: 20, padding: "16px" }}>
+          <div className="mem-section-head">Rewards Progress</div>
+          {loyalty.progress.map((p) => {
+            const label = p.rule_type === "hours" ? `${p.current.toFixed(1)}/${p.threshold}h booked`
+              : p.rule_type === "bookings" ? `${p.current}/${p.threshold} bookings`
+              : `$${p.current.toFixed(0)}/$${p.threshold} spent`;
+            return (
+              <div key={p.rule_type} style={{ marginBottom: p === loyalty.progress[loyalty.progress.length - 1] ? 0 : 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+                  <span style={{ fontSize: 13, color: "var(--text)" }}>{label}</span>
+                  <span style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>Earn ${p.reward}</span>
+                </div>
+                <div style={{ height: 8, borderRadius: 4, background: "var(--border)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${p.pct}%`, background: p.pct >= 100 ? "#ddd480" : "var(--primary)", borderRadius: 4, transition: "width 0.3s" }} />
+                </div>
+                {p.pct >= 100 && (
+                  <div style={{ fontSize: 11, color: "#ddd480", fontWeight: 600, marginTop: 2 }}>Threshold reached! Credit issued at month end.</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Upcoming Bookings */}
       <div className="mem-section">
