@@ -4,6 +4,7 @@ import useMemberAuth from "../../hooks/useMemberAuth";
 import { TIER_COLORS } from "../../lib/constants";
 import HelpDrawer from "./HelpDrawer";
 import EventPopup from "./EventPopup";
+import InstallPrompt from "./InstallPrompt";
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Home", href: "/members/dashboard" },
@@ -184,6 +185,7 @@ export default function MemberLayout({ activeTab, children }) {
           margin: "60px auto",
         }}>
           <img src="/blobs/HGC_card2.png" alt="Hour Golf" style={{ width: "100%", maxWidth: 350, marginBottom: 30 }} />
+          <InstallPrompt variant="login" />
           <div className="mem-brand-sub">{mode === "login" ? "Hello Friend." : mode === "forgot" ? "Reset Password." : "Join the Club."}</div>
 
           {mode === "forgot" ? (

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { TZ } from "../../lib/constants";
 import Modal from "../ui/Modal";
+import InstallPrompt from "./InstallPrompt";
 import { fT, fD, fDL } from "../../lib/format";
 
 export default function MemberDashboard({ member, tierConfig, refresh, showToast }) {
@@ -85,6 +86,8 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
       <h1 style={{ fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 700, marginBottom: 20, color: "var(--text)" }}>
         Hey, {firstName}.
       </h1>
+
+      <InstallPrompt variant="banner" />
 
       {/* Usage Cards */}
       <div className="mem-cards">
