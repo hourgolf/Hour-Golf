@@ -112,6 +112,12 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
             <div className="mem-card-lbl">Overage (${(overageHours * overageRate).toFixed(2)})</div>
           </div>
         )}
+        {Number(member.shop_credit_balance || 0) > 0 && (
+          <div className="mem-card" style={{ borderColor: "#ddd480" }}>
+            <div className="mem-card-val" style={{ color: "#ddd480" }}>${Number(member.shop_credit_balance).toFixed(2)}</div>
+            <div className="mem-card-lbl">Pro Shop Credits</div>
+          </div>
+        )}
       </div>
 
       {/* Upcoming Bookings */}

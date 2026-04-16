@@ -59,6 +59,7 @@ export default async function handler(req, res) {
         tier: member.tier,
         phone: member.phone || "",
         hasPaymentMethod: !!member.stripe_customer_id,
+        shop_credit_balance: Number(member.shop_credit_balance || 0),
         needsAccountSetup,
       },
       tierConfig,

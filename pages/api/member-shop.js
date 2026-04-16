@@ -49,7 +49,7 @@ export default async function handler(req, res) {
   if (!token) return res.status(401).json({ error: "Not authenticated" });
 
   try {
-    const mResp = await sb(key, `members?session_token=eq.${encodeURIComponent(token)}&session_expires_at=gt.${new Date().toISOString()}&select=email,name,tier,stripe_customer_id`);
+    const mResp = await sb(key, `members?session_token=eq.${encodeURIComponent(token)}&session_expires_at=gt.${new Date().toISOString()}&select=email,name,tier,stripe_customer_id,shop_credit_balance`);
     if (!mResp.ok) throw new Error("Session lookup failed");
     const members = await mResp.json();
     if (!members.length) return res.status(401).json({ error: "Session expired" });
@@ -115,6 +115,13 @@ export default async function handler(req, res) {
       return res.status(200).json(enriched);
     }
 
+    // ── GET: credit history ──
+    if (req.method === "GET" && action === "credit-history") {
+      const crResp = await sb(key, `shop_credits?member_email=eq.${encodeURIComponent(member.email)}&order=created_at.desc`);
+      const credits = crResp.ok ? await crResp.json() : [];
+      return res.status(200).json({ credits, balance: Number(member.shop_credit_balance || 0) });
+    }
+
     // ── GET: cart ──
     if (req.method === "GET" && action === "cart") {
       const cartResp = await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}&order=created_at.asc`);
@@ -147,7 +154,8 @@ export default async function handler(req, res) {
       });
 
       const cartTotal = enriched.reduce((s, c) => s + c.line_total, 0);
-      return res.status(200).json({ cart: enriched, discount_pct: discountPct, cart_total: Math.round(cartTotal * 100) / 100 });
+      const creditBalance = Number(member.shop_credit_balance || 0);
+      return res.status(200).json({ cart: enriched, discount_pct: discountPct, cart_total: Math.round(cartTotal * 100) / 100, credit_balance: creditBalance });
     }
 
     // ── POST: add to cart ──
@@ -245,41 +253,69 @@ export default async function handler(req, res) {
       }
 
       grandTotal = Math.round(grandTotal * 100) / 100;
-      const amountCents = Math.round(grandTotal * 100);
-      if (amountCents < 50) return res.status(400).json({ error: "Order total too small to process." });
 
-      // 4. Charge Stripe
-      if (!member.stripe_customer_id) {
-        return res.status(400).json({ error: "No payment method on file. Please add a card in the Billing tab." });
-      }
-      const paymentMethod = await findPaymentMethod(member.stripe_customer_id);
-      if (!paymentMethod) {
-        return res.status(400).json({ error: "No payment method found. Please update your card in the Billing tab." });
-      }
+      // 4. Apply pro shop credits
+      const creditBalance = Number(member.shop_credit_balance || 0);
+      const creditsUsed = Math.min(creditBalance, grandTotal);
+      const cardCharge = Math.round((grandTotal - creditsUsed) * 100) / 100;
+      const cardChargeCents = Math.round(cardCharge * 100);
 
-      const itemNames = lineItems.map((li) => li.item.title).join(", ");
-      let pi;
-      try {
-        pi = await stripe.paymentIntents.create({
-          amount: amountCents,
-          currency: "usd",
-          customer: member.stripe_customer_id,
-          payment_method: paymentMethod,
-          off_session: true,
-          confirm: true,
-          description: `Hour Golf Pro Shop — ${itemNames}`.slice(0, 200),
-          metadata: {
-            member_email: member.email,
-            item_count: String(lineItems.length),
-            source: "hour-golf-pro-shop",
-          },
+      // 5. Charge Stripe (if card charge needed)
+      let pi = null;
+      if (cardChargeCents >= 50) {
+        if (!member.stripe_customer_id) {
+          return res.status(400).json({ error: "No payment method on file. Please add a card in the Billing tab." });
+        }
+        const paymentMethod = await findPaymentMethod(member.stripe_customer_id);
+        if (!paymentMethod) {
+          return res.status(400).json({ error: "No payment method found. Please update your card in the Billing tab." });
+        }
+
+        const itemNames = lineItems.map((li) => li.item.title).join(", ");
+        try {
+          pi = await stripe.paymentIntents.create({
+            amount: cardChargeCents,
+            currency: "usd",
+            customer: member.stripe_customer_id,
+            payment_method: paymentMethod,
+            off_session: true,
+            confirm: true,
+            description: `Hour Golf Pro Shop — ${itemNames}`.slice(0, 200),
+            metadata: {
+              member_email: member.email,
+              item_count: String(lineItems.length),
+              credits_used: creditsUsed.toFixed(2),
+              source: "hour-golf-pro-shop",
+            },
+          });
+        } catch (stripeErr) {
+          console.error("Stripe checkout failed:", stripeErr);
+          return res.status(400).json({ error: "Payment failed. Please check your card details in the Billing tab." });
+        }
+      } else if (creditsUsed <= 0) {
+        return res.status(400).json({ error: "Order total too small to process." });
+      }
+      // If cardChargeCents < 50 but creditsUsed > 0, we skip Stripe (fully covered by credits)
+
+      // 6. Deduct credits if used
+      if (creditsUsed > 0) {
+        const newBalance = Math.round((creditBalance - creditsUsed) * 100) / 100;
+        await sb(key, `members?email=eq.${encodeURIComponent(member.email)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ shop_credit_balance: newBalance, updated_at: new Date().toISOString() }),
         });
-      } catch (stripeErr) {
-        console.error("Stripe checkout failed:", stripeErr);
-        return res.status(400).json({ error: "Payment failed. Please check your card details in the Billing tab." });
+        await sb(key, "shop_credits", {
+          method: "POST",
+          body: JSON.stringify({
+            member_email: member.email,
+            amount: creditsUsed,
+            type: "debit",
+            reason: `Pro Shop purchase — ${lineItems.length} item${lineItems.length > 1 ? "s" : ""}`,
+          }),
+        });
       }
 
-      // 5. Create orders for each line item
+      // 7. Create orders for each line item
       for (const li of lineItems) {
         await sb(key, "shop_orders", {
           method: "POST",
@@ -293,7 +329,7 @@ export default async function handler(req, res) {
             discount_pct: discountPct,
             total: li.lineTotal,
             status: "confirmed",
-            stripe_payment_intent_id: pi.id,
+            stripe_payment_intent_id: pi?.id || null,
             notes: "Pick up at next visit",
           }),
         });
@@ -319,8 +355,10 @@ export default async function handler(req, res) {
       return res.status(200).json({
         success: true,
         total: grandTotal,
+        credits_used: creditsUsed,
+        card_charged: cardCharge,
         item_count: lineItems.length,
-        stripe_payment_intent_id: pi.id,
+        stripe_payment_intent_id: pi?.id || null,
       });
     }
 

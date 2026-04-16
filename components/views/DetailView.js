@@ -19,6 +19,10 @@ export default function DetailView({
   const [adjustReason, setAdjustReason] = useState("");
   const [adjusting, setAdjusting] = useState(false);
   const [showAdjust, setShowAdjust] = useState(false);
+  const [creditAmt, setCreditAmt] = useState("");
+  const [creditReason, setCreditReason] = useState("");
+  const [creditAdjusting, setCreditAdjusting] = useState(false);
+  const [showCreditAdjust, setShowCreditAdjust] = useState(false);
 
   const selData = useMemo(() => {
     if (!selMember) return null;
@@ -163,6 +167,71 @@ export default function DetailView({
               }}
             >
               {adjusting ? "..." : "Save"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Pro Shop Credits */}
+      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "14px 16px", marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)" }}>Pro Shop Credits</span>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "var(--primary)", fontVariantNumeric: "tabular-nums" }}>
+              ${Number(selData.member?.shop_credit_balance || 0).toFixed(2)}
+            </div>
+          </div>
+          <button className="btn primary" onClick={() => { setShowCreditAdjust(!showCreditAdjust); setCreditAmt(""); setCreditReason(""); }}>
+            {showCreditAdjust ? "Cancel" : "Adjust"}
+          </button>
+        </div>
+        {showCreditAdjust && (
+          <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+            <div>
+              <label style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>Amount ($) (+/-)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={creditAmt}
+                onChange={(e) => setCreditAmt(e.target.value)}
+                placeholder="e.g. 50 or -10"
+                style={{ width: 120, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, fontFamily: "var(--font)", background: "var(--surface)", color: "var(--text)" }}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 120 }}>
+              <label style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>Reason</label>
+              <input
+                type="text"
+                value={creditReason}
+                onChange={(e) => setCreditReason(e.target.value)}
+                placeholder="e.g. Tournament winner, referral"
+                style={{ width: "100%", padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, fontFamily: "var(--font)", background: "var(--surface)", color: "var(--text)" }}
+              />
+            </div>
+            <button
+              className="btn primary"
+              disabled={creditAdjusting || !creditAmt || Number(creditAmt) === 0}
+              onClick={async () => {
+                setCreditAdjusting(true);
+                try {
+                  const r = await fetch("/api/admin-adjust-credits", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+                    body: JSON.stringify({ member_email: selMember, amount: Number(creditAmt), reason: creditReason }),
+                  });
+                  const d = await r.json();
+                  if (!r.ok) throw new Error(d.error || "Failed");
+                  setShowCreditAdjust(false);
+                  setCreditAmt("");
+                  setCreditReason("");
+                  onRefresh();
+                } catch (e) {
+                  alert(e.message);
+                }
+                setCreditAdjusting(false);
+              }}
+            >
+              {creditAdjusting ? "..." : "Save"}
             </button>
           </div>
         )}

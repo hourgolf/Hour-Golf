@@ -16,6 +16,7 @@ export default function MemberShop({ member, tierConfig, showToast }) {
   const [cartTotal, setCartTotal] = useState(0);
   const [cartCount, setCartCount] = useState(0);
   const [discountPct, setDiscountPct] = useState(0);
+  const [creditBalance, setCreditBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("browse");
 
@@ -49,6 +50,7 @@ export default function MemberShop({ member, tierConfig, showToast }) {
         setCart(data.cart || []);
         setCartTotal(data.cart_total || 0);
         setCartCount((data.cart || []).reduce((s, c) => s + c.quantity, 0));
+        setCreditBalance(data.credit_balance || 0);
       }
     } catch {}
   }, []);
@@ -117,7 +119,10 @@ export default function MemberShop({ member, tierConfig, showToast }) {
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error);
-      showToast(`Purchase complete! $${data.total.toFixed(2)} charged. Pick up at your next visit.`);
+      const msg = data.credits_used > 0
+        ? `Purchase complete! $${data.credits_used.toFixed(2)} in credits used${data.card_charged > 0 ? `, $${data.card_charged.toFixed(2)} charged to card` : ""}. Pick up at your next visit.`
+        : `Purchase complete! $${data.total.toFixed(2)} charged. Pick up at your next visit.`;
+      showToast(msg);
       setShowCheckout(false);
       setCart([]);
       setCartCount(0);
@@ -142,6 +147,8 @@ export default function MemberShop({ member, tierConfig, showToast }) {
 
   const limitedItems = items.filter((it) => it.is_limited);
   const regularItems = items.filter((it) => !it.is_limited);
+  const creditsApplied = Math.min(creditBalance, cartTotal);
+  const cardChargeAmt = Math.round((cartTotal - creditsApplied) * 100) / 100;
   const modalImages = selectedItem?.image_urls?.length > 0 ? selectedItem.image_urls : (selectedItem?.image_url ? [selectedItem.image_url] : []);
 
   return (
@@ -257,10 +264,25 @@ export default function MemberShop({ member, tierConfig, showToast }) {
                     <span>&minus;{discountPct}%</span>
                   </div>
                 )}
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 18, fontWeight: 700, fontFamily: "var(--font-display)", borderTop: discountPct > 0 ? "1px solid var(--border)" : "none", paddingTop: discountPct > 0 ? 8 : 0, marginBottom: 16 }}>
-                  <span>Total</span>
-                  <span>${cartTotal.toFixed(2)}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, borderTop: discountPct > 0 ? "1px solid var(--border)" : "none", paddingTop: discountPct > 0 ? 8 : 0, marginBottom: creditsApplied > 0 ? 6 : 0 }}>
+                  <span>Subtotal</span>
+                  <span className="tab-num" style={{ fontWeight: 600 }}>${cartTotal.toFixed(2)}</span>
                 </div>
+                {creditsApplied > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#ddd480", marginBottom: 6 }}>
+                    <span>Pro Shop Credits</span>
+                    <span>&minus;${creditsApplied.toFixed(2)}</span>
+                  </div>
+                )}
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 18, fontWeight: 700, fontFamily: "var(--font-display)", borderTop: "1px solid var(--border)", paddingTop: 8, marginBottom: 16 }}>
+                  <span>{cardChargeAmt > 0 ? "Card Charge" : "Total"}</span>
+                  <span>{cardChargeAmt > 0 ? `$${cardChargeAmt.toFixed(2)}` : "$0.00"}</span>
+                </div>
+                {creditsApplied > 0 && cardChargeAmt <= 0 && (
+                  <div style={{ background: "#ddd480", borderRadius: "var(--radius)", padding: "10px 14px", marginBottom: 16, fontSize: 13, textAlign: "center", color: "#35443B", fontWeight: 600 }}>
+                    Fully covered by Pro Shop Credits!
+                  </div>
+                )}
 
                 <div style={{ background: "var(--primary-bg)", borderRadius: "var(--radius)", padding: "10px 14px", marginBottom: 16, fontSize: 13 }}>
                   <strong style={{ color: "var(--primary)" }}>Pickup at your next visit</strong>
@@ -273,10 +295,10 @@ export default function MemberShop({ member, tierConfig, showToast }) {
                   className="mem-btn mem-btn-primary mem-btn-full"
                   onClick={() => setShowCheckout(true)}
                 >
-                  Checkout &mdash; ${cartTotal.toFixed(2)}
+                  Checkout &mdash; {cardChargeAmt > 0 ? `$${cardChargeAmt.toFixed(2)}` : "Free"}
                 </button>
                 <p style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", marginTop: 8, marginBottom: 0 }}>
-                  Your card on file will be charged.
+                  {cardChargeAmt > 0 ? "Your card on file will be charged." : "No card charge — covered by credits."}
                 </p>
               </div>
             </>
@@ -411,10 +433,22 @@ export default function MemberShop({ member, tierConfig, showToast }) {
             <span>&minus;{discountPct}%</span>
           </div>
         )}
+        {creditsApplied > 0 && (
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#ddd480", marginBottom: 4 }}>
+            <span>Pro Shop Credits</span>
+            <span>&minus;${creditsApplied.toFixed(2)}</span>
+          </div>
+        )}
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 20, fontWeight: 700, fontFamily: "var(--font-display)", padding: "8px 0", borderTop: "1.5px solid var(--border)" }}>
-          <span>Total</span>
-          <span>${cartTotal.toFixed(2)}</span>
+          <span>{cardChargeAmt > 0 ? "Card Charge" : "Total"}</span>
+          <span>{cardChargeAmt > 0 ? `$${cardChargeAmt.toFixed(2)}` : "$0.00"}</span>
         </div>
+
+        {creditsApplied > 0 && cardChargeAmt <= 0 && (
+          <div style={{ background: "#ddd480", borderRadius: "var(--radius)", padding: "10px 14px", margin: "8px 0 16px", fontSize: 13, textAlign: "center", color: "#35443B", fontWeight: 600 }}>
+            Fully covered by Pro Shop Credits!
+          </div>
+        )}
 
         <div style={{ background: "var(--primary-bg)", borderRadius: "var(--radius)", padding: "12px 16px", margin: "16px 0", fontSize: 13 }}>
           <strong style={{ color: "var(--primary)" }}>Pickup at your next visit</strong>
@@ -428,10 +462,10 @@ export default function MemberShop({ member, tierConfig, showToast }) {
           onClick={handleCheckout}
           disabled={checking}
         >
-          {checking ? "Processing Payment..." : `Confirm Purchase — $${cartTotal.toFixed(2)}`}
+          {checking ? "Processing..." : cardChargeAmt > 0 ? `Confirm Purchase — $${cardChargeAmt.toFixed(2)}` : "Confirm Purchase — Free"}
         </button>
         <p style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", marginTop: 8 }}>
-          Your card on file will be charged ${cartTotal.toFixed(2)}. This is a final sale.
+          {cardChargeAmt > 0 ? `Your card on file will be charged $${cardChargeAmt.toFixed(2)}. This is a final sale.` : "No card charge — covered by credits. This is a final sale."}
         </p>
       </Modal>
     </>
