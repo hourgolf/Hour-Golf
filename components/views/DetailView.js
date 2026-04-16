@@ -76,7 +76,18 @@ export default function DetailView({
     <div className="content">
       <div className="detail-header">
         <div>
-          <h2 style={{ margin: 0, fontSize: 18 }}>{selData.customer?.name || selMember}</h2>
+          <h2 style={{ margin: 0, fontSize: 18, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            {selData.customer?.name || selMember}
+            {selData.member?.member_number && (
+              <span style={{
+                fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, letterSpacing: 1,
+                color: "var(--primary)", background: "var(--primary-bg)",
+                padding: "2px 8px", borderRadius: 10, textTransform: "uppercase",
+              }}>
+                #{String(selData.member.member_number).padStart(3, "0")}
+              </span>
+            )}
+          </h2>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
             <a
               href={`mailto:${selMember}`}

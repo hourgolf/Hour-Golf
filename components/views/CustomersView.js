@@ -4,9 +4,9 @@ import Badge from "../ui/Badge";
 import TierSelect from "../ui/TierSelect";
 
 function exportCSV(rows, filename) {
-  const header = "Name,Email,Tier,Hours,Sessions";
+  const header = "Member #,Name,Email,Tier,Hours,Sessions";
   const lines = rows.map((r) =>
-    `"${(r.name || "").replace(/"/g, '""')}","${r.email}","${r.tier}","${r.hrs.toFixed(1)}","${r.cnt}"`
+    `"${r.member_number ? String(r.member_number).padStart(3, "0") : ""}","${(r.name || "").replace(/"/g, '""')}","${r.email}","${r.tier}","${r.hrs.toFixed(1)}","${r.cnt}"`
   );
   const csv = [header, ...lines].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -41,7 +41,15 @@ export default function CustomersView({
   const filtCust = useMemo(() => {
     let l = [...allCust];
     const q = search.toLowerCase();
-    if (q) l = l.filter((c) => (c.name || "").toLowerCase().includes(q) || c.email.toLowerCase().includes(q));
+    if (q) {
+      // Strip # and leading zeros for member number search (e.g. "#042" or "42" both match member 42)
+      const qNum = q.replace(/[#\s]/g, "").replace(/^0+/, "");
+      l = l.filter((c) => {
+        const m = members.find((x) => x.email === c.email);
+        const memberNum = m?.member_number ? String(m.member_number) : "";
+        return (c.name || "").toLowerCase().includes(q) || c.email.toLowerCase().includes(q) || (qNum && memberNum === qNum);
+      });
+    }
     if (cTier !== "all") l = l.filter((c) => { const m = members.find((x) => x.email === c.email); return (m?.tier || "Non-Member") === cTier; });
     if (cSort === "hours") l.sort((a, b) => b.hrs - a.hrs);
     else if (cSort === "name") l.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
@@ -52,10 +60,16 @@ export default function CustomersView({
   const handleExport = useCallback((tierFilter) => {
     const rows = allCust.map((c) => {
       const m = members.find((x) => x.email === c.email);
-      return { ...c, tier: m?.tier || "Non-Member" };
+      return { ...c, tier: m?.tier || "Non-Member", member_number: m?.member_number || null };
     });
     const filtered = tierFilter === "all" ? rows : rows.filter((r) => r.tier === tierFilter);
-    const sorted = [...filtered].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    const sorted = [...filtered].sort((a, b) => {
+      // Sort by member # if both have one, else by name
+      if (a.member_number && b.member_number) return a.member_number - b.member_number;
+      if (a.member_number) return -1;
+      if (b.member_number) return 1;
+      return (a.name || "").localeCompare(b.name || "");
+    });
     const label = tierFilter === "all" ? "All-Customers" : tierFilter.replace(/\s+/g, "-");
     exportCSV(sorted, `HourGolf-${label}-${new Date().toISOString().slice(0, 10)}.csv`);
   }, [allCust, members]);
@@ -65,7 +79,7 @@ export default function CustomersView({
       <input
         className="search"
         type="text"
-        placeholder="Search name or email... (keyboard shortcut: /)"
+        placeholder="Search by name, email, or member # (shortcut: /)"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
@@ -108,7 +122,13 @@ export default function CustomersView({
           return (
             <div key={c.email} className="tr">
               <span style={{ flex: 2, cursor: "pointer" }} onClick={() => onSelectMember(c.email)}>
-                <strong>{c.name}</strong><br />
+                <strong>{c.name}</strong>
+                {m?.member_number && (
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600, color: "var(--primary)", marginLeft: 6, letterSpacing: 0.5 }}>
+                    #{String(m.member_number).padStart(3, "0")}
+                  </span>
+                )}
+                <br />
                 <span className="email-sm">{c.email}</span>
               </span>
               <span style={{ flex: 1 }}><Badge tier={tier} /></span>
@@ -129,7 +149,14 @@ export default function CustomersView({
           return (
             <div key={c.email} className="usage-card" onClick={() => onSelectMember(c.email)}>
               <div className="usage-card-top">
-                <strong>{c.name}</strong>
+                <div>
+                  <strong>{c.name}</strong>
+                  {m?.member_number && (
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600, color: "var(--primary)", marginLeft: 6, letterSpacing: 0.5 }}>
+                      #{String(m.member_number).padStart(3, "0")}
+                    </span>
+                  )}
+                </div>
                 <Badge tier={tier} />
               </div>
               <div className="usage-card-stats" style={{ justifyContent: "space-between" }}>

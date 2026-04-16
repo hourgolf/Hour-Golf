@@ -441,7 +441,13 @@ export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStrip
         {members.map((m) => (
           <div key={m.email} className="tr">
             <span style={{ flex: 2, cursor: "pointer" }} onClick={() => onSelectMember(m.email)}>
-              <strong>{m.name}</strong><br />
+              <strong>{m.name}</strong>
+              {m.member_number && (
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600, color: "var(--primary)", marginLeft: 6, letterSpacing: 0.5 }}>
+                  #{String(m.member_number).padStart(3, "0")}
+                </span>
+              )}
+              <br />
               <span className="email-sm">{m.email}</span>
             </span>
             <span style={{ flex: 1 }}>
@@ -474,7 +480,14 @@ export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStrip
         {members.map((m) => (
           <div key={m.email} className="usage-card" onClick={() => onSelectMember(m.email)}>
             <div className="usage-card-top">
-              <strong>{m.name}</strong>
+              <div>
+                <strong>{m.name}</strong>
+                {m.member_number && (
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600, color: "var(--primary)", marginLeft: 6, letterSpacing: 0.5 }}>
+                    #{String(m.member_number).padStart(3, "0")}
+                  </span>
+                )}
+              </div>
               <Badge tier={m.tier} />
             </div>
             <div className="usage-card-stats" style={{ justifyContent: "space-between" }}>
