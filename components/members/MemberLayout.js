@@ -7,7 +7,7 @@ import EventPopup from "./EventPopup";
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", href: "/members/dashboard" },
-  { key: "book", label: "Book a Bay", href: "/members/book" },
+  { key: "book", label: "Book Time", href: "/members/book" },
   { key: "events", label: "Events", href: "/members/events" },
   { key: "billing", label: "Billing", href: "/members/billing" },
   { key: "account", label: "Account", href: "/members/account" },
