@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -19,6 +19,7 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies["hg-member-token"];
   if (!token) return res.status(401).json({ error: "Not authenticated" });
@@ -27,9 +28,9 @@ export default async function handler(req, res) {
   if (!event_id) return res.status(400).json({ error: "Missing event_id" });
 
   try {
-    // Verify session
+    // Verify session within this tenant
     const mResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&session_expires_at=gt.${new Date().toISOString()}&select=email,name,stripe_customer_id`,
+      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=email,name,stripe_customer_id`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const members = mResp.ok ? await mResp.json() : [];
@@ -38,7 +39,7 @@ export default async function handler(req, res) {
 
     // Check not already registered
     const checkResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/event_registrations?event_id=eq.${event_id}&member_email=eq.${encodeURIComponent(member.email)}&select=id,status`,
+      `${SUPABASE_URL}/rest/v1/event_registrations?event_id=eq.${event_id}&member_email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}&select=id,status`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const existing = checkResp.ok ? await checkResp.json() : [];
@@ -46,9 +47,9 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: "Already registered", status: existing[0].status });
     }
 
-    // Get event
+    // Get event within this tenant
     const evResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/events?id=eq.${event_id}&is_published=eq.true&select=id,title,cost`,
+      `${SUPABASE_URL}/rest/v1/events?id=eq.${event_id}&tenant_id=eq.${tenantId}&is_published=eq.true&select=id,title,cost`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const events = evResp.ok ? await evResp.json() : [];
@@ -63,7 +64,7 @@ export default async function handler(req, res) {
         method: "POST",
         headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          event_id, member_email: member.email, status: "registered", amount_cents: 0,
+          tenant_id: tenantId, event_id, member_email: member.email, status: "registered", amount_cents: 0,
         }),
       });
       return res.status(200).json({ registered: true, free: true });
@@ -85,7 +86,7 @@ export default async function handler(req, res) {
       }
       // Save customer ID
       await fetch(
-        `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}`,
+        `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}`,
         {
           method: "PATCH",
           headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", Prefer: "return=representation" },
@@ -122,7 +123,7 @@ export default async function handler(req, res) {
       method: "POST",
       headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        event_id, member_email: member.email, status: "registered",
+        tenant_id: tenantId, event_id, member_email: member.email, status: "registered",
         stripe_checkout_session_id: session.id, amount_cents: amountCents,
       }),
     });

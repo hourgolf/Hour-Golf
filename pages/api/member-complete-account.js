@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -17,15 +17,16 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   // Validate session
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies["hg-member-token"];
   if (!token) return res.status(401).json({ error: "Not authenticated" });
 
   try {
-    // Get member from session
+    // Get member from session within this tenant
     const memberResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&session_expires_at=gt.${new Date().toISOString()}&select=email,password_hash,terms_accepted_at`,
+      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=email,password_hash,terms_accepted_at`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (!memberResp.ok) throw new Error("Session lookup failed");
@@ -43,7 +44,7 @@ export default async function handler(req, res) {
     const passwordHash = await bcrypt.hash(password, 10);
 
     const patchResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}`,
+      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}`,
       {
         method: "PATCH",
         headers: {

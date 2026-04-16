@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
@@ -7,6 +7,7 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   const { token, email, password } = req.body || {};
   if (!token || !email || !password) {
     return res.status(400).json({ error: "Token, email, and password are required" });
@@ -18,9 +19,9 @@ export default async function handler(req, res) {
   const cleanEmail = email.toLowerCase().trim();
 
   try {
-    // 1) Look up member by email with valid reset token
+    // 1) Look up member by email with valid reset token within this tenant
     const memberResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&password_reset_expires_at=gt.${new Date().toISOString()}&select=email,password_reset_token`,
+      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}&password_reset_expires_at=gt.${new Date().toISOString()}&select=email,password_reset_token`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (!memberResp.ok) throw new Error("Member lookup failed");
@@ -41,7 +42,7 @@ export default async function handler(req, res) {
     // 3) Hash new password and update, clear reset token
     const newHash = await bcrypt.hash(password, 10);
     const updateResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}`,
+      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}`,
       {
         method: "PATCH",
         headers: {

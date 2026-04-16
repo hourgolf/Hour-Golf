@@ -1,4 +1,4 @@
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -17,13 +17,14 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies["hg-member-token"];
   if (!token) return res.status(401).json({ error: "Not authenticated" });
 
-  // Verify session
+  // Verify session within this tenant
   const mResp = await fetch(
-    `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&session_expires_at=gt.${new Date().toISOString()}&select=email,name`,
+    `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=email,name`,
     { headers: { apikey: key, Authorization: `Bearer ${key}` } }
   );
   const members = mResp.ok ? await mResp.json() : [];
@@ -37,17 +38,17 @@ export default async function handler(req, res) {
       if (!eventId) return res.status(400).json({ error: "Missing event_id" });
 
       const cResp = await fetch(
-        `${SUPABASE_URL}/rest/v1/event_comments?event_id=eq.${eventId}&order=created_at.desc&select=id,member_email,comment_text,created_at`,
+        `${SUPABASE_URL}/rest/v1/event_comments?event_id=eq.${eventId}&tenant_id=eq.${tenantId}&order=created_at.desc&select=id,member_email,comment_text,created_at`,
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       );
       const comments = cResp.ok ? await cResp.json() : [];
 
-      // Get member names
+      // Get member names within this tenant
       const emails = [...new Set(comments.map((c) => c.member_email))];
       const nameMap = {};
       if (emails.length > 0) {
         const nResp = await fetch(
-          `${SUPABASE_URL}/rest/v1/members?select=email,name`,
+          `${SUPABASE_URL}/rest/v1/members?tenant_id=eq.${tenantId}&select=email,name`,
           { headers: { apikey: key, Authorization: `Bearer ${key}` } }
         );
         (nResp.ok ? await nResp.json() : []).forEach((m) => { nameMap[m.email] = m.name || m.email; });
@@ -66,9 +67,9 @@ export default async function handler(req, res) {
       const { event_id, comment_text } = req.body;
       if (!event_id || !comment_text?.trim()) return res.status(400).json({ error: "Missing event_id or comment_text" });
 
-      // Get event title for email
+      // Get event title for email within this tenant
       const evResp = await fetch(
-        `${SUPABASE_URL}/rest/v1/events?id=eq.${event_id}&select=title`,
+        `${SUPABASE_URL}/rest/v1/events?id=eq.${event_id}&tenant_id=eq.${tenantId}&select=title`,
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       );
       const events = evResp.ok ? await evResp.json() : [];
@@ -79,6 +80,7 @@ export default async function handler(req, res) {
         method: "POST",
         headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
+          tenant_id: tenantId,
           event_id,
           member_email: member.email,
           comment_text: comment_text.trim(),

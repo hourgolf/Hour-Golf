@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -17,6 +17,7 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies["hg-member-token"];
   if (!token) return res.status(401).json({ error: "Not authenticated" });
@@ -34,9 +35,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1) Look up current member by session token
+    // 1) Look up current member by session token within this tenant
     const resp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&session_expires_at=gt.${new Date().toISOString()}&select=email,password_hash`,
+      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=email,password_hash`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (!resp.ok) throw new Error("Session lookup failed");
@@ -54,10 +55,10 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: "Incorrect password" });
     }
 
-    // 3) Check if new email is already in use
+    // 3) Check if new email is already in use within this tenant
     if (cleanEmail !== member.email) {
       const existResp = await fetch(
-        `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&select=email`,
+        `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}&select=email`,
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       );
       if (existResp.ok) {
@@ -70,7 +71,7 @@ export default async function handler(req, res) {
 
     // 4) Update email in members table
     const updateResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}`,
+      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}`,
       {
         method: "PATCH",
         headers: {
@@ -90,7 +91,7 @@ export default async function handler(req, res) {
     // 5) Also update email in member_preferences if a row exists
     try {
       await fetch(
-        `${SUPABASE_URL}/rest/v1/member_preferences?email=eq.${encodeURIComponent(member.email)}`,
+        `${SUPABASE_URL}/rest/v1/member_preferences?email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}`,
         {
           method: "PATCH",
           headers: {

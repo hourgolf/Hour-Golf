@@ -1,4 +1,4 @@
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -14,13 +14,14 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies["hg-member-token"];
   if (!token) return res.status(401).json({ error: "Not authenticated" });
 
-  // Verify session
+  // Verify session within this tenant
   const mResp = await fetch(
-    `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&session_expires_at=gt.${new Date().toISOString()}&select=email`,
+    `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=email`,
     { headers: { apikey: key, Authorization: `Bearer ${key}` } }
   );
   const members = mResp.ok ? await mResp.json() : [];
@@ -31,14 +32,14 @@ export default async function handler(req, res) {
     // GET — return undismissed popup events
     if (req.method === "GET") {
       const evResp = await fetch(
-        `${SUPABASE_URL}/rest/v1/events?show_popup=eq.true&is_published=eq.true&order=created_at.desc&select=id,title,subtitle,image_url,start_date`,
+        `${SUPABASE_URL}/rest/v1/events?tenant_id=eq.${tenantId}&show_popup=eq.true&is_published=eq.true&order=created_at.desc&select=id,title,subtitle,image_url,start_date`,
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       );
       const events = evResp.ok ? await evResp.json() : [];
       if (!events.length) return res.status(200).json([]);
 
       const disResp = await fetch(
-        `${SUPABASE_URL}/rest/v1/event_popup_dismissals?member_email=eq.${encodeURIComponent(memberEmail)}&select=event_id`,
+        `${SUPABASE_URL}/rest/v1/event_popup_dismissals?member_email=eq.${encodeURIComponent(memberEmail)}&tenant_id=eq.${tenantId}&select=event_id`,
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       );
       const dismissed = new Set((disResp.ok ? await disResp.json() : []).map((d) => d.event_id));
@@ -59,7 +60,7 @@ export default async function handler(req, res) {
           "Content-Type": "application/json",
           Prefer: "return=representation,resolution=merge-duplicates",
         },
-        body: JSON.stringify({ event_id, member_email: memberEmail }),
+        body: JSON.stringify({ tenant_id: tenantId, event_id, member_email: memberEmail }),
       });
 
       return res.status(200).json({ dismissed: true });

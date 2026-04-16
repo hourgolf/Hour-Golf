@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
@@ -8,15 +8,16 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   const { email, password, rememberMe } = req.body || {};
   if (!email) return res.status(400).json({ error: "Email required" });
 
   const cleanEmail = email.toLowerCase().trim();
 
   try {
-    // 1) Lookup member
+    // 1) Lookup member within this tenant
     const memberResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&select=*`,
+      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}&select=*`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (!memberResp.ok) throw new Error("Member lookup failed");
@@ -46,7 +47,7 @@ export default async function handler(req, res) {
 
     // 4) Store token in members table
     const updateResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}`,
+      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}`,
       {
         method: "PATCH",
         headers: {
@@ -68,7 +69,7 @@ export default async function handler(req, res) {
     if (member.tier) {
       try {
         const tierResp = await fetch(
-          `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(member.tier)}`,
+          `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(member.tier)}&tenant_id=eq.${tenantId}`,
           { headers: { apikey: key, Authorization: `Bearer ${key}` } }
         );
         if (tierResp.ok) {

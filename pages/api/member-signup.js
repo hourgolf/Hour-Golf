@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
@@ -8,6 +8,7 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   const { email, password, name, phone, birthday } = req.body || {};
 
   // Validate required fields
@@ -35,9 +36,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Check if email already exists
+    // Check if email already exists within this tenant
     const existResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&select=email`,
+      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}&select=email`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (existResp.ok) {
@@ -56,6 +57,7 @@ export default async function handler(req, res) {
 
     // Create member record
     const memberData = {
+      tenant_id: tenantId,
       email: cleanEmail,
       name: name.trim(),
       phone: phone.trim(),
@@ -92,6 +94,7 @@ export default async function handler(req, res) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          tenant_id: tenantId,
           email: cleanEmail,
           email_booking_confirmations: true,
           email_cancellations: true,
@@ -105,7 +108,7 @@ export default async function handler(req, res) {
     let tierConfig = null;
     try {
       const tierResp = await fetch(
-        `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.Non-Member`,
+        `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.Non-Member&tenant_id=eq.${tenantId}`,
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       );
       if (tierResp.ok) {

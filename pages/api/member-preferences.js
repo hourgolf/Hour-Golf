@@ -1,4 +1,4 @@
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -10,9 +10,9 @@ function parseCookies(cookieHeader) {
   return cookies;
 }
 
-async function getMemberFromToken(key, token) {
+async function getMemberFromToken(key, token, tenantId) {
   const resp = await fetch(
-    `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&session_expires_at=gt.${new Date().toISOString()}&select=email,name,phone`,
+    `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=email,name,phone`,
     { headers: { apikey: key, Authorization: `Bearer ${key}` } }
   );
   if (!resp.ok) return null;
@@ -24,11 +24,12 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies["hg-member-token"];
   if (!token) return res.status(401).json({ error: "Not authenticated" });
 
-  const member = await getMemberFromToken(key, token);
+  const member = await getMemberFromToken(key, token, tenantId);
   if (!member) return res.status(401).json({ error: "Session expired" });
 
   const email = member.email;
@@ -38,7 +39,7 @@ export default async function handler(req, res) {
     let prefs = null;
     try {
       const prefResp = await fetch(
-        `${SUPABASE_URL}/rest/v1/member_preferences?email=eq.${encodeURIComponent(email)}`,
+        `${SUPABASE_URL}/rest/v1/member_preferences?email=eq.${encodeURIComponent(email)}&tenant_id=eq.${tenantId}`,
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       );
       if (prefResp.ok) {
@@ -69,7 +70,7 @@ export default async function handler(req, res) {
         updates.updated_at = new Date().toISOString();
 
         await fetch(
-          `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(email)}`,
+          `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(email)}&tenant_id=eq.${tenantId}`,
           {
             method: "PATCH",
             headers: {
@@ -92,6 +93,7 @@ export default async function handler(req, res) {
             Prefer: "return=representation,resolution=merge-duplicates",
           },
           body: JSON.stringify({
+            tenant_id: tenantId,
             email,
             ...preferences,
             updated_at: new Date().toISOString(),

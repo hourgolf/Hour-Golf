@@ -1,4 +1,4 @@
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -16,6 +16,7 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies["hg-member-token"];
   if (!token) return res.status(401).json({ error: "Not authenticated" });
@@ -24,18 +25,18 @@ export default async function handler(req, res) {
   if (!eventId) return res.status(400).json({ error: "Missing event id" });
 
   try {
-    // Verify session
+    // Verify session within this tenant
     const mResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&session_expires_at=gt.${new Date().toISOString()}&select=email`,
+      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=email`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const members = mResp.ok ? await mResp.json() : [];
     if (!members.length) return res.status(401).json({ error: "Session expired" });
     const memberEmail = members[0].email;
 
-    // Get the event
+    // Get the event within this tenant
     const evResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/events?id=eq.${eventId}&is_published=eq.true`,
+      `${SUPABASE_URL}/rest/v1/events?id=eq.${eventId}&tenant_id=eq.${tenantId}&is_published=eq.true`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const events = evResp.ok ? await evResp.json() : [];
@@ -44,14 +45,14 @@ export default async function handler(req, res) {
 
     // Interest count + member status
     const intResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/event_interests?event_id=eq.${eventId}&select=member_email`,
+      `${SUPABASE_URL}/rest/v1/event_interests?event_id=eq.${eventId}&tenant_id=eq.${tenantId}&select=member_email`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const interests = intResp.ok ? await intResp.json() : [];
 
     // Registration count + member status
     const regResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/event_registrations?event_id=eq.${eventId}&select=member_email,status`,
+      `${SUPABASE_URL}/rest/v1/event_registrations?event_id=eq.${eventId}&tenant_id=eq.${tenantId}&select=member_email,status`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const regs = regResp.ok ? await regResp.json() : [];

@@ -1,4 +1,4 @@
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -16,15 +16,16 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   // Validate session
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies["hg-member-token"];
   if (!token) return res.status(401).json({ error: "Not authenticated" });
 
   try {
-    // Lookup member by session token
+    // Lookup member by session token within this tenant
     const memberResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&session_expires_at=gt.${new Date().toISOString()}&select=*`,
+      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=*`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (!memberResp.ok) throw new Error("Session lookup failed");
@@ -39,7 +40,7 @@ export default async function handler(req, res) {
     if (member.tier) {
       try {
         const rows = await fetch(
-          `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(member.tier)}`,
+          `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(member.tier)}&tenant_id=eq.${tenantId}`,
           { headers: { apikey: key, Authorization: `Bearer ${key}` } }
         ).then((r) => r.json());
         tierConfig = rows[0] || null;
@@ -56,7 +57,7 @@ export default async function handler(req, res) {
     let upcoming = [];
     try {
       upcoming = await fetch(
-        `${SUPABASE_URL}/rest/v1/bookings?customer_email=eq.${encodeURIComponent(cleanEmail)}&booking_status=eq.Confirmed&booking_start=gte.${now.toISOString()}&order=booking_start.asc&limit=20`,
+        `${SUPABASE_URL}/rest/v1/bookings?customer_email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}&booking_status=eq.Confirmed&booking_start=gte.${now.toISOString()}&order=booking_start.asc&limit=20`,
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       ).then((r) => r.json());
     } catch (_) { upcoming = []; }
@@ -65,7 +66,7 @@ export default async function handler(req, res) {
     let monthBookings = [];
     try {
       monthBookings = await fetch(
-        `${SUPABASE_URL}/rest/v1/bookings?customer_email=eq.${encodeURIComponent(cleanEmail)}&booking_status=eq.Confirmed&booking_start=gte.${monthStart}&booking_start=lt.${monthEnd}&order=booking_start.asc`,
+        `${SUPABASE_URL}/rest/v1/bookings?customer_email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}&booking_status=eq.Confirmed&booking_start=gte.${monthStart}&booking_start=lt.${monthEnd}&order=booking_start.asc`,
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       ).then((r) => r.json());
     } catch (_) { monthBookings = []; }
@@ -94,7 +95,7 @@ export default async function handler(req, res) {
           const pmStart = new Date(ry, rm - 1, 1).toISOString();
           const pmEnd = new Date(ry, rm, 1).toISOString();
           const pmBookings = await fetch(
-            `${SUPABASE_URL}/rest/v1/bookings?customer_email=eq.${encodeURIComponent(cleanEmail)}&booking_status=eq.Confirmed&booking_start=gte.${pmStart}&booking_start=lt.${pmEnd}&select=duration_hours`,
+            `${SUPABASE_URL}/rest/v1/bookings?customer_email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}&booking_status=eq.Confirmed&booking_start=gte.${pmStart}&booking_start=lt.${pmEnd}&select=duration_hours`,
             { headers: { apikey: key, Authorization: `Bearer ${key}` } }
           ).then((r) => r.json()).catch(() => []);
 
@@ -112,7 +113,7 @@ export default async function handler(req, res) {
           const prevY = cm === 1 ? cy - 1 : cy;
           const newRecon = `${prevY}-${String(prevM).padStart(2, "0")}`;
           await fetch(
-            `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}`,
+            `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}`,
             {
               method: "PATCH",
               headers: {

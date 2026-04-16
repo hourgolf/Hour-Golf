@@ -1,4 +1,4 @@
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -16,14 +16,15 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies["hg-member-token"];
   if (!token) return res.status(401).json({ error: "Not authenticated" });
 
   try {
-    // Verify session
+    // Verify session within this tenant
     const mResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&session_expires_at=gt.${new Date().toISOString()}&select=email`,
+      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=email`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (!mResp.ok) throw new Error("Session lookup failed");
@@ -31,23 +32,23 @@ export default async function handler(req, res) {
     if (!members.length) return res.status(401).json({ error: "Session expired" });
     const memberEmail = members[0].email;
 
-    // Get published events
+    // Get published events within this tenant
     const evResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/events?is_published=eq.true&order=start_date.desc`,
+      `${SUPABASE_URL}/rest/v1/events?tenant_id=eq.${tenantId}&is_published=eq.true&order=start_date.desc`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const events = evResp.ok ? await evResp.json() : [];
 
     // Get this member's interests
     const intResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/event_interests?member_email=eq.${encodeURIComponent(memberEmail)}&select=event_id`,
+      `${SUPABASE_URL}/rest/v1/event_interests?member_email=eq.${encodeURIComponent(memberEmail)}&tenant_id=eq.${tenantId}&select=event_id`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const myInterests = new Set((intResp.ok ? await intResp.json() : []).map((i) => i.event_id));
 
     // Get this member's registrations
     const regResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/event_registrations?member_email=eq.${encodeURIComponent(memberEmail)}&select=event_id,status`,
+      `${SUPABASE_URL}/rest/v1/event_registrations?member_email=eq.${encodeURIComponent(memberEmail)}&tenant_id=eq.${tenantId}&select=event_id,status`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const myRegs = {};

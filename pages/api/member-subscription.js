@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -13,9 +13,9 @@ function parseCookies(cookieHeader) {
   return cookies;
 }
 
-async function getMemberFromToken(key, token) {
+async function getMemberFromToken(key, token, tenantId) {
   const resp = await fetch(
-    `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&session_expires_at=gt.${new Date().toISOString()}&select=*`,
+    `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=*`,
     { headers: { apikey: key, Authorization: `Bearer ${key}` } }
   );
   if (!resp.ok) return null;
@@ -27,19 +27,20 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies["hg-member-token"];
   if (!token) return res.status(401).json({ error: "Not authenticated" });
 
-  const member = await getMemberFromToken(key, token);
+  const member = await getMemberFromToken(key, token, tenantId);
   if (!member) return res.status(401).json({ error: "Session expired" });
 
   // --- GET: Available tiers + current subscription ---
   if (req.method === "GET") {
     try {
-      // Fetch public tiers
+      // Fetch public tiers within this tenant
       const tiersResp = await fetch(
-        `${SUPABASE_URL}/rest/v1/tier_config?is_public=eq.true&order=display_order.asc`,
+        `${SUPABASE_URL}/rest/v1/tier_config?tenant_id=eq.${tenantId}&is_public=eq.true&order=display_order.asc`,
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       );
       const tiers = tiersResp.ok ? await tiersResp.json() : [];
@@ -61,7 +62,7 @@ export default async function handler(req, res) {
             const priceId = subs.data[0].items?.data?.[0]?.price?.id || null;
             // Save it for future lookups
             await fetch(
-              `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}`,
+              `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}`,
               {
                 method: "PATCH",
                 headers: {
@@ -115,7 +116,7 @@ export default async function handler(req, res) {
     try {
       // Verify tier is public and get its price ID
       const tierResp = await fetch(
-        `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(tier)}&is_public=eq.true`,
+        `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(tier)}&tenant_id=eq.${tenantId}&is_public=eq.true`,
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       );
       const tierRows = tierResp.ok ? await tierResp.json() : [];
@@ -145,7 +146,7 @@ export default async function handler(req, res) {
         }
         // Save customer ID
         await fetch(
-          `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}`,
+          `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}`,
           {
             method: "PATCH",
             headers: {
@@ -192,7 +193,7 @@ export default async function handler(req, res) {
         if (subs.data.length > 0) {
           subscriptionId = subs.data[0].id;
           await fetch(
-            `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}`,
+            `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}`,
             {
               method: "PATCH",
               headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -208,7 +209,7 @@ export default async function handler(req, res) {
 
       // Get new tier's price ID
       const tierResp = await fetch(
-        `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(tier)}&is_public=eq.true`,
+        `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(tier)}&tenant_id=eq.${tenantId}&is_public=eq.true`,
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       );
       const tierRows = tierResp.ok ? await tierResp.json() : [];
@@ -231,7 +232,7 @@ export default async function handler(req, res) {
 
       // Update member tier immediately
       await fetch(
-        `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}`,
+        `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}`,
         {
           method: "PATCH",
           headers: {

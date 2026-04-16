@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { sendShopOrderNotification } from "../../lib/email";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -44,12 +44,13 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies["hg-member-token"];
   if (!token) return res.status(401).json({ error: "Not authenticated" });
 
   try {
-    const mResp = await sb(key, `members?session_token=eq.${encodeURIComponent(token)}&session_expires_at=gt.${new Date().toISOString()}&select=email,name,tier,stripe_customer_id,shop_credit_balance`);
+    const mResp = await sb(key, `members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=email,name,tier,stripe_customer_id,shop_credit_balance`);
     if (!mResp.ok) throw new Error("Session lookup failed");
     const members = await mResp.json();
     if (!members.length) return res.status(401).json({ error: "Session expired" });
@@ -57,7 +58,7 @@ export default async function handler(req, res) {
 
     let discountPct = 0;
     if (member.tier) {
-      const tcResp = await sb(key, `tier_config?tier=eq.${encodeURIComponent(member.tier)}&select=pro_shop_discount`);
+      const tcResp = await sb(key, `tier_config?tier=eq.${encodeURIComponent(member.tier)}&tenant_id=eq.${tenantId}&select=pro_shop_discount`);
       const tc = tcResp.ok ? await tcResp.json() : [];
       if (tc.length > 0) discountPct = Number(tc[0].pro_shop_discount || 0);
     }
@@ -66,7 +67,7 @@ export default async function handler(req, res) {
 
     // ── GET: browse items ──
     if (req.method === "GET" && action === "browse") {
-      const itResp = await sb(key, "shop_items?is_published=eq.true&order=display_order.asc,created_at.desc");
+      const itResp = await sb(key, `shop_items?tenant_id=eq.${tenantId}&is_published=eq.true&order=display_order.asc,created_at.desc`);
       const items = itResp.ok ? await itResp.json() : [];
       const now = new Date().toISOString();
 
@@ -97,12 +98,12 @@ export default async function handler(req, res) {
 
     // ── GET: my orders ──
     if (req.method === "GET" && action === "my-orders") {
-      const ordResp = await sb(key, `shop_orders?member_email=eq.${encodeURIComponent(member.email)}&order=created_at.desc`);
+      const ordResp = await sb(key, `shop_orders?member_email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}&order=created_at.desc`);
       const orders = ordResp.ok ? await ordResp.json() : [];
       const itemIds = [...new Set(orders.map((o) => o.item_id))];
       let items = [];
       if (itemIds.length > 0) {
-        const itResp = await sb(key, `shop_items?id=in.(${itemIds.join(",")})`);
+        const itResp = await sb(key, `shop_items?id=in.(${itemIds.join(",")})&tenant_id=eq.${tenantId}`);
         items = itResp.ok ? await itResp.json() : [];
       }
       const itemMap = {};
@@ -117,15 +118,15 @@ export default async function handler(req, res) {
 
     // ── GET: credit history ──
     if (req.method === "GET" && action === "credit-history") {
-      const crResp = await sb(key, `shop_credits?member_email=eq.${encodeURIComponent(member.email)}&order=created_at.desc`);
+      const crResp = await sb(key, `shop_credits?member_email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}&order=created_at.desc`);
       const credits = crResp.ok ? await crResp.json() : [];
       return res.status(200).json({ credits, balance: Number(member.shop_credit_balance || 0) });
     }
 
     // ── GET: loyalty progress ──
     if (req.method === "GET" && action === "loyalty") {
-      // Fetch enabled rules
-      const rulesResp = await sb(key, "loyalty_rules?enabled=eq.true");
+      // Fetch enabled rules within this tenant
+      const rulesResp = await sb(key, `loyalty_rules?tenant_id=eq.${tenantId}&enabled=eq.true`);
       const rules = rulesResp.ok ? await rulesResp.json() : [];
       if (!rules.length) return res.status(200).json({ rules: [], progress: [] });
 
@@ -136,18 +137,18 @@ export default async function handler(req, res) {
       const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
 
       // Booking hours + count this month
-      const bkResp = await sb(key, `bookings?booking_status=eq.Confirmed&customer_email=eq.${encodeURIComponent(member.email)}&booking_start=gte.${monthStart}&booking_start=lt.${monthEnd}&select=duration_hours`);
+      const bkResp = await sb(key, `bookings?tenant_id=eq.${tenantId}&booking_status=eq.Confirmed&customer_email=eq.${encodeURIComponent(member.email)}&booking_start=gte.${monthStart}&booking_start=lt.${monthEnd}&select=duration_hours`);
       const bks = bkResp.ok ? await bkResp.json() : [];
       const totalHours = bks.reduce((s, b) => s + Number(b.duration_hours || 0), 0);
       const totalBookings = bks.length;
 
       // Shop spend this month
-      const ordResp = await sb(key, `shop_orders?status=eq.confirmed&member_email=eq.${encodeURIComponent(member.email)}&created_at=gte.${monthStart}&created_at=lt.${monthEnd}&select=total`);
+      const ordResp = await sb(key, `shop_orders?tenant_id=eq.${tenantId}&status=eq.confirmed&member_email=eq.${encodeURIComponent(member.email)}&created_at=gte.${monthStart}&created_at=lt.${monthEnd}&select=total`);
       const ords = ordResp.ok ? await ordResp.json() : [];
       const totalSpend = ords.reduce((s, o) => s + Number(o.total || 0), 0);
 
       // Recent rewards
-      const ledgerResp = await sb(key, `loyalty_ledger?member_email=eq.${encodeURIComponent(member.email)}&reward_issued=gt.0&order=created_at.desc&limit=10`);
+      const ledgerResp = await sb(key, `loyalty_ledger?member_email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}&reward_issued=gt.0&order=created_at.desc&limit=10`);
       const recentRewards = ledgerResp.ok ? await ledgerResp.json() : [];
 
       const progress = rules.map((r) => {
@@ -170,12 +171,12 @@ export default async function handler(req, res) {
 
     // ── GET: cart ──
     if (req.method === "GET" && action === "cart") {
-      const cartResp = await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}&order=created_at.asc`);
+      const cartResp = await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}&order=created_at.asc`);
       const cartItems = cartResp.ok ? await cartResp.json() : [];
       const itemIds = [...new Set(cartItems.map((c) => c.item_id))];
       let items = [];
       if (itemIds.length > 0) {
-        const itResp = await sb(key, `shop_items?id=in.(${itemIds.join(",")})`);
+        const itResp = await sb(key, `shop_items?id=in.(${itemIds.join(",")})&tenant_id=eq.${tenantId}`);
         items = itResp.ok ? await itResp.json() : [];
       }
       const itemMap = {};
@@ -211,13 +212,13 @@ export default async function handler(req, res) {
 
       // Check if same item+size already in cart
       const sizeFilter = size ? `&size=eq.${encodeURIComponent(size)}` : "&size=is.null";
-      const existResp = await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}&item_id=eq.${item_id}${sizeFilter}`);
+      const existResp = await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}&item_id=eq.${item_id}${sizeFilter}`);
       const existing = existResp.ok ? await existResp.json() : [];
 
       if (existing.length > 0) {
         // Increment quantity
         const newQty = existing[0].quantity + Number(quantity || 1);
-        await sb(key, `shop_cart?id=eq.${existing[0].id}`, {
+        await sb(key, `shop_cart?id=eq.${existing[0].id}&tenant_id=eq.${tenantId}`, {
           method: "PATCH",
           body: JSON.stringify({ quantity: newQty, updated_at: new Date().toISOString() }),
         });
@@ -225,6 +226,7 @@ export default async function handler(req, res) {
         await sb(key, "shop_cart", {
           method: "POST",
           body: JSON.stringify({
+            tenant_id: tenantId,
             member_email: member.email,
             item_id,
             size: size || null,
@@ -234,7 +236,7 @@ export default async function handler(req, res) {
       }
 
       // Return updated cart count
-      const countResp = await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}&select=quantity`);
+      const countResp = await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}&select=quantity`);
       const countItems = countResp.ok ? await countResp.json() : [];
       const cartCount = countItems.reduce((s, c) => s + c.quantity, 0);
       return res.status(200).json({ success: true, cart_count: cartCount });
@@ -247,7 +249,7 @@ export default async function handler(req, res) {
       const qty = Number(quantity || 1);
       if (qty < 1) return res.status(400).json({ error: "Quantity must be at least 1" });
 
-      await sb(key, `shop_cart?id=eq.${cart_id}&member_email=eq.${encodeURIComponent(member.email)}`, {
+      await sb(key, `shop_cart?id=eq.${cart_id}&member_email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}`, {
         method: "PATCH",
         body: JSON.stringify({ quantity: qty, updated_at: new Date().toISOString() }),
       });
@@ -259,7 +261,7 @@ export default async function handler(req, res) {
       const cartId = req.query.cart_id || req.body?.cart_id;
       if (!cartId) return res.status(400).json({ error: "Cart ID required" });
 
-      await sb(key, `shop_cart?id=eq.${cartId}&member_email=eq.${encodeURIComponent(member.email)}`, {
+      await sb(key, `shop_cart?id=eq.${cartId}&member_email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}`, {
         method: "DELETE",
       });
       return res.status(200).json({ success: true });
@@ -268,13 +270,13 @@ export default async function handler(req, res) {
     // ── POST: checkout (charge full cart) ──
     if (req.method === "POST" && action === "checkout") {
       // 1. Fetch cart
-      const cartResp = await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}&order=created_at.asc`);
+      const cartResp = await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}&order=created_at.asc`);
       const cartItems = cartResp.ok ? await cartResp.json() : [];
       if (!cartItems.length) return res.status(400).json({ error: "Cart is empty" });
 
       // 2. Fetch all items
       const itemIds = [...new Set(cartItems.map((c) => c.item_id))];
-      const itResp = await sb(key, `shop_items?id=in.(${itemIds.join(",")})`);
+      const itResp = await sb(key, `shop_items?id=in.(${itemIds.join(",")})&tenant_id=eq.${tenantId}`);
       const items = itResp.ok ? await itResp.json() : [];
       const itemMap = {};
       items.forEach((i) => { itemMap[i.id] = i; });
@@ -346,13 +348,14 @@ export default async function handler(req, res) {
       // 6. Deduct credits if used
       if (creditsUsed > 0) {
         const newBalance = Math.round((creditBalance - creditsUsed) * 100) / 100;
-        await sb(key, `members?email=eq.${encodeURIComponent(member.email)}`, {
+        await sb(key, `members?email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}`, {
           method: "PATCH",
           body: JSON.stringify({ shop_credit_balance: newBalance, updated_at: new Date().toISOString() }),
         });
         await sb(key, "shop_credits", {
           method: "POST",
           body: JSON.stringify({
+            tenant_id: tenantId,
             member_email: member.email,
             amount: creditsUsed,
             type: "debit",
@@ -366,6 +369,7 @@ export default async function handler(req, res) {
         await sb(key, "shop_orders", {
           method: "POST",
           body: JSON.stringify({
+            tenant_id: tenantId,
             member_email: member.email,
             member_name: member.name,
             item_id: li.cart.item_id,
@@ -380,14 +384,14 @@ export default async function handler(req, res) {
           }),
         });
         // Increment quantity_claimed
-        await sb(key, `shop_items?id=eq.${li.cart.item_id}`, {
+        await sb(key, `shop_items?id=eq.${li.cart.item_id}&tenant_id=eq.${tenantId}`, {
           method: "PATCH",
           body: JSON.stringify({ quantity_claimed: (li.item.quantity_claimed || 0) + li.cart.quantity }),
         });
       }
 
       // 6. Clear cart
-      await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}`, { method: "DELETE" });
+      await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}`, { method: "DELETE" });
 
       // 7. Notify admin
       sendShopOrderNotification({

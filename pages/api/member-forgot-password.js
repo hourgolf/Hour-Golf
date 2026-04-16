@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { sendPasswordResetEmail } from "../../lib/email";
 
 export default async function handler(req, res) {
@@ -9,15 +9,16 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ error: "Email required" });
 
   const cleanEmail = email.toLowerCase().trim();
 
   try {
-    // 1) Look up member
+    // 1) Look up member within this tenant
     const memberResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&select=email,name`,
+      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}&select=email,name`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (!memberResp.ok) throw new Error("Member lookup failed");
@@ -37,7 +38,7 @@ export default async function handler(req, res) {
 
     // 3) Store hashed token in DB
     const updateResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}`,
+      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}`,
       {
         method: "PATCH",
         headers: {

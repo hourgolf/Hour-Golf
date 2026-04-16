@@ -1,4 +1,4 @@
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -16,6 +16,7 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies["hg-member-token"];
   if (!token) return res.status(401).json({ error: "Not authenticated" });
@@ -24,9 +25,9 @@ export default async function handler(req, res) {
   if (!event_id) return res.status(400).json({ error: "Missing event_id" });
 
   try {
-    // Verify session
+    // Verify session within this tenant
     const mResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&session_expires_at=gt.${new Date().toISOString()}&select=email`,
+      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=email`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const members = mResp.ok ? await mResp.json() : [];
@@ -35,7 +36,7 @@ export default async function handler(req, res) {
 
     // Check if already interested
     const checkResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/event_interests?event_id=eq.${event_id}&member_email=eq.${encodeURIComponent(memberEmail)}&select=id`,
+      `${SUPABASE_URL}/rest/v1/event_interests?event_id=eq.${event_id}&member_email=eq.${encodeURIComponent(memberEmail)}&tenant_id=eq.${tenantId}&select=id`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const existing = checkResp.ok ? await checkResp.json() : [];
@@ -43,7 +44,7 @@ export default async function handler(req, res) {
     if (existing.length > 0) {
       // Remove interest (toggle off)
       await fetch(
-        `${SUPABASE_URL}/rest/v1/event_interests?id=eq.${existing[0].id}`,
+        `${SUPABASE_URL}/rest/v1/event_interests?id=eq.${existing[0].id}&tenant_id=eq.${tenantId}`,
         { method: "DELETE", headers: { apikey: key, Authorization: `Bearer ${key}` } }
       );
       return res.status(200).json({ interested: false });
@@ -52,7 +53,7 @@ export default async function handler(req, res) {
       await fetch(`${SUPABASE_URL}/rest/v1/event_interests`, {
         method: "POST",
         headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ event_id, member_email: memberEmail }),
+        body: JSON.stringify({ tenant_id: tenantId, event_id, member_email: memberEmail }),
       });
       return res.status(200).json({ interested: true });
     }

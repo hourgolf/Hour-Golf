@@ -1,4 +1,4 @@
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { generateVerifyToken } from "./verify-member";
 
 function parseCookies(cookieHeader) {
@@ -17,14 +17,15 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies["hg-member-token"];
   if (!token) return res.status(401).json({ error: "Not authenticated" });
 
   try {
-    // Lookup member by session token where not expired
+    // Lookup member by session token within this tenant
     const resp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&session_expires_at=gt.${new Date().toISOString()}&select=*`,
+      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=*`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (!resp.ok) throw new Error("Session lookup failed");
@@ -40,14 +41,14 @@ export default async function handler(req, res) {
     if (member.tier && member.tier !== "Non-Member" && !member.member_number) {
       try {
         const maxResp = await fetch(
-          `${SUPABASE_URL}/rest/v1/members?member_number=not.is.null&select=member_number&order=member_number.desc&limit=1`,
+          `${SUPABASE_URL}/rest/v1/members?tenant_id=eq.${tenantId}&member_number=not.is.null&select=member_number&order=member_number.desc&limit=1`,
           { headers: { apikey: key, Authorization: `Bearer ${key}` } }
         );
         if (maxResp.ok) {
           const rows = await maxResp.json();
           const nextNum = (rows[0]?.member_number || 0) + 1;
           await fetch(
-            `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}`,
+            `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}`,
             {
               method: "PATCH",
               headers: {
@@ -67,7 +68,7 @@ export default async function handler(req, res) {
     if (member.tier) {
       try {
         const tierResp = await fetch(
-          `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(member.tier)}`,
+          `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(member.tier)}&tenant_id=eq.${tenantId}`,
           { headers: { apikey: key, Authorization: `Bearer ${key}` } }
         );
         if (tierResp.ok) {
