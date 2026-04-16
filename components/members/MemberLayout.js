@@ -6,7 +6,7 @@ import HelpDrawer from "./HelpDrawer";
 import EventPopup from "./EventPopup";
 
 const NAV_ITEMS = [
-  { key: "dashboard", label: "Dashboard", href: "/members/dashboard" },
+  { key: "dashboard", label: "Home", href: "/members/dashboard" },
   { key: "book", label: "Book Time", href: "/members/book" },
   { key: "events", label: "Events", href: "/members/events" },
   { key: "billing", label: "Billing", href: "/members/billing" },
