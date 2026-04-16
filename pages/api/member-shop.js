@@ -164,7 +164,8 @@ export default async function handler(req, res) {
         };
       });
 
-      return res.status(200).json({ progress, recent_rewards: recentRewards });
+      const isMember = !!member.tier && member.tier !== "Non-Member";
+      return res.status(200).json({ progress, recent_rewards: recentRewards, is_member: isMember });
     }
 
     // ── GET: cart ──

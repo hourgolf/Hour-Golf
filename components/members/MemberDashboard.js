@@ -172,25 +172,43 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
       {loyalty && loyalty.progress && loyalty.progress.length > 0 && (
         <div className="mem-section" style={{ marginBottom: 20, padding: "16px" }}>
           <div className="mem-section-head">Rewards Progress</div>
-          {loyalty.progress.map((p) => {
-            const label = p.rule_type === "hours" ? `${p.current.toFixed(1)}/${p.threshold}h booked`
-              : p.rule_type === "bookings" ? `${p.current}/${p.threshold} bookings`
-              : `$${p.current.toFixed(0)}/$${p.threshold} spent`;
-            return (
-              <div key={p.rule_type} style={{ marginBottom: p === loyalty.progress[loyalty.progress.length - 1] ? 0 : 14 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-                  <span style={{ fontSize: 13, color: "var(--text)" }}>{label}</span>
-                  <span style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>Earn ${p.reward}</span>
+
+          {loyalty.is_member === false && (
+            <div style={{ background: "var(--primary-bg)", borderRadius: "var(--radius)", padding: "10px 14px", marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12, color: "var(--text)" }}>
+                <strong style={{ color: "var(--primary)" }}>Members only</strong> — become a member to start earning.
+              </span>
+              <button
+                onClick={() => router.push("/members/billing")}
+                className="mem-btn mem-btn-primary"
+                style={{ fontSize: 11, padding: "6px 14px" }}
+              >
+                Join Now
+              </button>
+            </div>
+          )}
+
+          <div style={{ opacity: loyalty.is_member === false ? 0.45 : 1 }}>
+            {loyalty.progress.map((p) => {
+              const label = p.rule_type === "hours" ? `${p.current.toFixed(1)}/${p.threshold}h booked`
+                : p.rule_type === "bookings" ? `${p.current}/${p.threshold} bookings`
+                : `$${p.current.toFixed(0)}/$${p.threshold} spent`;
+              return (
+                <div key={p.rule_type} style={{ marginBottom: p === loyalty.progress[loyalty.progress.length - 1] ? 0 : 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+                    <span style={{ fontSize: 13, color: "var(--text)" }}>{label}</span>
+                    <span style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>Earn ${p.reward}</span>
+                  </div>
+                  <div style={{ height: 8, borderRadius: 4, background: "var(--border)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${p.pct}%`, background: p.pct >= 100 ? "#ddd480" : "var(--primary)", borderRadius: 4, transition: "width 0.3s" }} />
+                  </div>
+                  {loyalty.is_member !== false && p.pct >= 100 && (
+                    <div style={{ fontSize: 11, color: "#ddd480", fontWeight: 600, marginTop: 2 }}>Threshold reached! Credit issued at month end.</div>
+                  )}
                 </div>
-                <div style={{ height: 8, borderRadius: 4, background: "var(--border)", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${p.pct}%`, background: p.pct >= 100 ? "#ddd480" : "var(--primary)", borderRadius: 4, transition: "width 0.3s" }} />
-                </div>
-                {p.pct >= 100 && (
-                  <div style={{ fontSize: 11, color: "#ddd480", fontWeight: 600, marginTop: 2 }}>Threshold reached! Credit issued at month end.</div>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
 
