@@ -564,6 +564,7 @@ html { overflow-y: scroll; }
   .mem-header-inner { gap: 6px; }
   .mem-header { padding: 14px 14px; }
   .mem-header-logo { height: 64px !important; }
+  .mem-header .hdr-title-logo { height: 15vw; min-height: 45px; max-height: 70px; }
   .mem-brand-break { display: block; font-size: 0; line-height: 0; }
   .mem-header-name { font-size: 15px; }
   .mem-tier-badge { font-size: 13px; padding: 2px 6px; }
