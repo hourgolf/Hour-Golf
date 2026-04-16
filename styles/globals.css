@@ -446,6 +446,7 @@ html { overflow-y: scroll; }
 .mem-header { background: #4C8D73; color: #EDF3E3; padding: 14px 0; border-bottom: none; }
 .mem-header-inner { display: flex; justify-content: space-between; align-items: center; max-width: 960px; margin: 0 auto; padding: 0 24px; }
 .mem-header-right { display: flex; align-items: center; gap: 12px; }
+.mem-header-logo { height: 58px; }
 .mem-header-name { font-family: var(--font-body); font-size: 15px; color: #EDF3E3; }
 .mem-tier-badge { padding: 3px 14px; border-radius: var(--radius); font-family: var(--font-display); font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 
@@ -562,9 +563,10 @@ html { overflow-y: scroll; }
   .mem-punch-grid { grid-template-columns: 1fr; }
   .mem-avail-grid { font-size: 13px; grid-template-columns: 60px 1fr 1fr; }
   .mem-header-inner { gap: 6px; padding: 0 16px; }
-  .mem-header { padding: 14px 0; }
-  .mem-header-logo { height: 64px !important; }
-  .mem-header .hdr-title-logo { height: 18vw; min-height: 50px; max-height: 90px; padding-top: 0; margin-top: 4px; }
+  .mem-nav-inner { padding: 0 16px; }
+  .mem-header { padding: 10px 0; }
+  .mem-header-logo { height: 50px !important; margin-left: 0; }
+  .mem-header .hdr-title-logo { height: 18vw; min-height: 50px; max-height: 90px; padding-top: 0; margin-top: 0; }
   .mem-brand-break { display: block; font-size: 0; line-height: 0; }
   .mem-header-name { font-size: 14px; }
   .mem-tier-badge { font-size: 13px; padding: 2px 6px; }
