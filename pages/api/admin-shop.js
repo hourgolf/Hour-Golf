@@ -163,7 +163,11 @@ export default async function handler(req, res) {
       const id = req.query.id || req.body.id;
       if (!id) return res.status(400).json({ error: "Missing id" });
 
-      // Delete associated orders first
+      // Cascade delete all FK references before dropping the item itself.
+      // shop_cart.item_id → shop_items.id (added 2026-04-16 with shop_cart table).
+      // Without this, deletion fails with FK constraint when any member has
+      // this item in their cart.
+      await sb(key, `shop_cart?item_id=eq.${id}`, { method: "DELETE" });
       await sb(key, `shop_orders?item_id=eq.${id}`, { method: "DELETE" });
       const r = await sb(key, `shop_items?id=eq.${id}`, { method: "DELETE" });
       if (!r.ok) throw new Error(await r.text());

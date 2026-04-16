@@ -239,13 +239,19 @@ export default function ShopAdminView({ apiKey }) {
   async function handleDelete() {
     if (!delTarget) return;
     try {
-      await fetch(`/api/admin-shop?id=${delTarget.id}`, {
+      const r = await fetch(`/api/admin-shop?id=${delTarget.id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${apiKey}` },
       });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+        throw new Error(err.error || "Delete failed");
+      }
       setDelTarget(null);
       await fetchItems();
-    } catch {}
+    } catch (e) {
+      alert("Delete failed: " + e.message);
+    }
   }
 
   async function updateOrderStatus(orderId, status) {
