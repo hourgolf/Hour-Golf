@@ -23,6 +23,7 @@ import ConfigView from "../components/views/ConfigView";
 import DetailView from "../components/views/DetailView";
 import ReportsView from "../components/views/ReportsView";
 import EventsView from "../components/views/EventsView";
+import ShopAdminView from "../components/views/ShopAdminView";
 import SettingsView from "../components/views/SettingsView";
 
 export default function Dashboard() {
@@ -407,6 +408,10 @@ export default function Dashboard() {
 
       {view === "events" && (
         <EventsView apiKey={apiKey} />
+      )}
+
+      {view === "shop" && (
+        <ShopAdminView apiKey={apiKey} />
       )}
 
       {view === "tiers" && (

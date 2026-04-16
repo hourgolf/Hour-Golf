@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { key: "dashboard", label: "Home", href: "/members/dashboard" },
   { key: "book", label: "Book Time", href: "/members/book" },
   { key: "events", label: "Events", href: "/members/events" },
+  { key: "shop", label: "Pro Shop", href: "/members/shop" },
   { key: "billing", label: "Billing", href: "/members/billing" },
   { key: "account", label: "Account", href: "/members/account" },
 ];
