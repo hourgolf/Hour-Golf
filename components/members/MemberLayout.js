@@ -173,6 +173,9 @@ export default function MemberLayout({ activeTab, children }) {
         {/* Background — same azalea as main dash */}
         <img src="/blobs/azalea_bg.png" alt="" style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.50, pointerEvents: "none", zIndex: 0 }} />
 
+        <div style={{ position: "relative", zIndex: 1, maxWidth: 400, width: "calc(100% - 40px)", margin: "40px auto 0" }}>
+          <InstallPrompt variant="login" />
+        </div>
         <div className="mem-login" style={{
           position: "relative", zIndex: 1,
           background: "var(--surface, #fff)",
@@ -182,10 +185,9 @@ export default function MemberLayout({ activeTab, children }) {
           padding: "28px 28px",
           maxWidth: 400,
           width: "calc(100% - 40px)",
-          margin: "60px auto",
+          margin: "16px auto 60px",
         }}>
           <img src="/blobs/HGC_card2.png" alt="Hour Golf" style={{ width: "100%", maxWidth: 350, marginBottom: 30 }} />
-          <InstallPrompt variant="login" />
           <div className="mem-brand-sub">{mode === "login" ? "Hello Friend." : mode === "forgot" ? "Reset Password." : "Join the Club."}</div>
 
           {mode === "forgot" ? (
