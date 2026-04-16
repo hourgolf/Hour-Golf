@@ -88,12 +88,13 @@ html { overflow-y: scroll; }
 .hdr-logo-img { display: block; flex-shrink: 0; max-height: 58px; }
 
 /* ── Nav ── */
-.nav { border-bottom: 2px solid var(--primary); background: var(--surface); overflow: hidden; }
+.nav { border-bottom: 2px solid #4C8D73; background: var(--surface); overflow: hidden; }
 .nav-inner-wrap { display: flex; max-width: 1200px; margin: 0 auto; padding: 0 20px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .nav-inner-wrap::-webkit-scrollbar { display: none; }
-.nav-btn { padding: 12px 18px; border: none; background: transparent; cursor: pointer; font-family: var(--font-mono); font-size: 14px; color: var(--text-muted); font-weight: 400; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; border-radius: var(--radius) var(--radius) 0 0; transition: background 0.15s, color 0.15s; }
+.nav-btn { padding: 12px 18px; border: none; border-right: 1px solid var(--border); background: transparent; cursor: pointer; font-family: var(--font-mono); font-size: 14px; color: var(--text-muted); font-weight: 400; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; transition: background 0.15s, color 0.15s; }
+.nav-btn:last-of-type { border-right: none; }
 .nav-btn:hover { color: var(--text); background: rgba(209,223,203,0.3); }
-.nav-btn.active { color: var(--text); font-weight: 600; background: var(--bg); border-bottom: 2px solid var(--primary); margin-bottom: -2px; text-transform: uppercase; }
+.nav-btn.active { color: #EDF3E3; font-weight: 600; background: #4C8D73; margin-bottom: -2px; text-transform: uppercase; }
 .nav-btn .cnt { background: var(--primary); color: #EDF3E3; font-family: var(--font-display); font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 4px; }
 
 
