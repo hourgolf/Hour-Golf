@@ -13,7 +13,7 @@ function sb(key, path, opts = {}) {
 }
 
 export default async function handler(req, res) {
-  const { user, reason } = await verifyAdmin(req);
+  const { user, tenantId, reason } = await verifyAdmin(req);
   if (!user) return res.status(401).json({ error: "Unauthorized", detail: reason });
 
   const key = getServiceKey();
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     if (req.method === "GET") {
       if (action === "orders") {
         const statusFilter = req.query.status ? `&status=eq.${req.query.status}` : "";
-        const ordResp = await sb(key, `shop_orders?order=created_at.desc${statusFilter}`);
+        const ordResp = await sb(key, `shop_orders?tenant_id=eq.${tenantId}&order=created_at.desc${statusFilter}`);
         if (!ordResp.ok) throw new Error(`Orders fetch: ${ordResp.status}`);
         const orders = await ordResp.json();
 
@@ -34,7 +34,7 @@ export default async function handler(req, res) {
         const itemIds = [...new Set(orders.map((o) => o.item_id))];
         let items = [];
         if (itemIds.length > 0) {
-          const itResp = await sb(key, `shop_items?id=in.(${itemIds.join(",")})`);
+          const itResp = await sb(key, `shop_items?id=in.(${itemIds.join(",")})&tenant_id=eq.${tenantId}`);
           items = itResp.ok ? await itResp.json() : [];
         }
         const itemMap = {};
@@ -49,11 +49,11 @@ export default async function handler(req, res) {
       }
 
       // Default: list items with order counts
-      const itResp = await sb(key, "shop_items?order=display_order.asc,created_at.desc");
+      const itResp = await sb(key, `shop_items?tenant_id=eq.${tenantId}&order=display_order.asc,created_at.desc`);
       if (!itResp.ok) throw new Error(`Items fetch: ${itResp.status}`);
       const items = await itResp.json();
 
-      const ordResp = await sb(key, "shop_orders?select=item_id,status");
+      const ordResp = await sb(key, `shop_orders?tenant_id=eq.${tenantId}&select=item_id,status`);
       const orders = ordResp.ok ? await ordResp.json() : [];
       const countByItem = {};
       const pendingByItem = {};
@@ -82,6 +82,7 @@ export default async function handler(req, res) {
       const r = await sb(key, "shop_items", {
         method: "POST",
         body: JSON.stringify({
+          tenant_id: tenantId,
           title, subtitle: subtitle || null, description: description || null,
           image_url: primaryImage, image_urls: urls.length > 0 ? urls : null,
           price: Number(price),
@@ -111,15 +112,15 @@ export default async function handler(req, res) {
 
         // If cancelling, decrement quantity_claimed on the item
         if (status === "cancelled") {
-          const ordResp = await sb(key, `shop_orders?id=eq.${id}`);
+          const ordResp = await sb(key, `shop_orders?id=eq.${id}&tenant_id=eq.${tenantId}`);
           const ords = ordResp.ok ? await ordResp.json() : [];
           if (ords.length > 0) {
             const ord = ords[0];
-            const itResp = await sb(key, `shop_items?id=eq.${ord.item_id}`);
+            const itResp = await sb(key, `shop_items?id=eq.${ord.item_id}&tenant_id=eq.${tenantId}`);
             const its = itResp.ok ? await itResp.json() : [];
             if (its.length > 0) {
               const newClaimed = Math.max(0, (its[0].quantity_claimed || 0) - (ord.quantity || 1));
-              await sb(key, `shop_items?id=eq.${ord.item_id}`, {
+              await sb(key, `shop_items?id=eq.${ord.item_id}&tenant_id=eq.${tenantId}`, {
                 method: "PATCH",
                 body: JSON.stringify({ quantity_claimed: newClaimed }),
               });
@@ -127,7 +128,7 @@ export default async function handler(req, res) {
           }
         }
 
-        const r = await sb(key, `shop_orders?id=eq.${id}`, {
+        const r = await sb(key, `shop_orders?id=eq.${id}&tenant_id=eq.${tenantId}`, {
           method: "PATCH",
           body: JSON.stringify(update),
         });
@@ -149,7 +150,7 @@ export default async function handler(req, res) {
         data.image_url = urls[0] || null;
       }
 
-      const r = await sb(key, `shop_items?id=eq.${id}`, {
+      const r = await sb(key, `shop_items?id=eq.${id}&tenant_id=eq.${tenantId}`, {
         method: "PATCH",
         body: JSON.stringify(data),
       });
@@ -167,9 +168,9 @@ export default async function handler(req, res) {
       // shop_cart.item_id → shop_items.id (added 2026-04-16 with shop_cart table).
       // Without this, deletion fails with FK constraint when any member has
       // this item in their cart.
-      await sb(key, `shop_cart?item_id=eq.${id}`, { method: "DELETE" });
-      await sb(key, `shop_orders?item_id=eq.${id}`, { method: "DELETE" });
-      const r = await sb(key, `shop_items?id=eq.${id}`, { method: "DELETE" });
+      await sb(key, `shop_cart?item_id=eq.${id}&tenant_id=eq.${tenantId}`, { method: "DELETE" });
+      await sb(key, `shop_orders?item_id=eq.${id}&tenant_id=eq.${tenantId}`, { method: "DELETE" });
+      const r = await sb(key, `shop_items?id=eq.${id}&tenant_id=eq.${tenantId}`, { method: "DELETE" });
       if (!r.ok) throw new Error(await r.text());
       return res.status(200).json({ deleted: true });
     }

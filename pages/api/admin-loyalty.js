@@ -13,7 +13,7 @@ function sb(key, path, opts = {}) {
 }
 
 export default async function handler(req, res) {
-  const { user, reason } = await verifyAdmin(req);
+  const { user, tenantId, reason } = await verifyAdmin(req);
   if (!user) return res.status(401).json({ error: "Unauthorized", detail: reason });
 
   const key = getServiceKey();
@@ -22,10 +22,10 @@ export default async function handler(req, res) {
   try {
     // ── GET: rules + recent ledger ──
     if (req.method === "GET") {
-      const rulesResp = await sb(key, "loyalty_rules?order=rule_type.asc");
+      const rulesResp = await sb(key, `loyalty_rules?tenant_id=eq.${tenantId}&order=rule_type.asc`);
       const rules = rulesResp.ok ? await rulesResp.json() : [];
 
-      const ledgerResp = await sb(key, "loyalty_ledger?order=created_at.desc&limit=50");
+      const ledgerResp = await sb(key, `loyalty_ledger?tenant_id=eq.${tenantId}&order=created_at.desc&limit=50`);
       const ledger = ledgerResp.ok ? await ledgerResp.json() : [];
 
       return res.status(200).json({ rules, ledger });
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
       if (reward !== undefined) update.reward = Number(reward);
       if (enabled !== undefined) update.enabled = !!enabled;
 
-      const r = await sb(key, `loyalty_rules?id=eq.${id}`, {
+      const r = await sb(key, `loyalty_rules?id=eq.${id}&tenant_id=eq.${tenantId}`, {
         method: "PATCH",
         body: JSON.stringify(update),
       });
@@ -62,22 +62,22 @@ export default async function handler(req, res) {
       const monthStart = new Date(Date.UTC(yr, mo - 1, 1)).toISOString();
       const monthEnd = new Date(Date.UTC(yr, mo, 1)).toISOString();
 
-      // Fetch enabled rules
-      const rulesResp = await sb(key, "loyalty_rules?enabled=eq.true");
+      // Fetch enabled rules within this tenant
+      const rulesResp = await sb(key, `loyalty_rules?tenant_id=eq.${tenantId}&enabled=eq.true`);
       const rules = rulesResp.ok ? await rulesResp.json() : [];
       if (!rules.length) return res.status(200).json({ processed: 0, message: "No enabled rules" });
 
-      // Fetch active members
-      const memResp = await sb(key, "members?tier=neq.Non-Member&select=email,name,shop_credit_balance");
+      // Fetch active members within this tenant
+      const memResp = await sb(key, `members?tenant_id=eq.${tenantId}&tier=neq.Non-Member&select=email,name,shop_credit_balance`);
       const members = memResp.ok ? await memResp.json() : [];
       if (!members.length) return res.status(200).json({ processed: 0, message: "No members" });
 
       // Fetch existing ledger entries for this period to prevent double-issue
-      const ledgerResp = await sb(key, `loyalty_ledger?period=eq.${period}&select=member_email,rule_type`);
+      const ledgerResp = await sb(key, `loyalty_ledger?tenant_id=eq.${tenantId}&period=eq.${period}&select=member_email,rule_type`);
       const existingLedger = new Set((ledgerResp.ok ? await ledgerResp.json() : []).map((l) => `${l.member_email}|${l.rule_type}`));
 
       // Fetch bookings for the month
-      const bkResp = await sb(key, `bookings?booking_status=eq.Confirmed&booking_start=gte.${monthStart}&booking_start=lt.${monthEnd}&select=customer_email,duration_hours`);
+      const bkResp = await sb(key, `bookings?tenant_id=eq.${tenantId}&booking_status=eq.Confirmed&booking_start=gte.${monthStart}&booking_start=lt.${monthEnd}&select=customer_email,duration_hours`);
       const bookings = bkResp.ok ? await bkResp.json() : [];
 
       // Aggregate booking data per member
@@ -88,8 +88,8 @@ export default async function handler(req, res) {
         memberBookings[b.customer_email] = (memberBookings[b.customer_email] || 0) + 1;
       });
 
-      // Fetch shop orders for the month
-      const ordResp = await sb(key, `shop_orders?status=eq.confirmed&created_at=gte.${monthStart}&created_at=lt.${monthEnd}&select=member_email,total`);
+      // Fetch shop orders for the month within this tenant
+      const ordResp = await sb(key, `shop_orders?tenant_id=eq.${tenantId}&status=eq.confirmed&created_at=gte.${monthStart}&created_at=lt.${monthEnd}&select=member_email,total`);
       const orders = ordResp.ok ? await ordResp.json() : [];
 
       const memberSpend = {};
@@ -119,6 +119,7 @@ export default async function handler(req, res) {
           await sb(key, "loyalty_ledger", {
             method: "POST",
             body: JSON.stringify({
+              tenant_id: tenantId,
               member_email: member.email,
               rule_type: rule.rule_type,
               period,
@@ -132,7 +133,7 @@ export default async function handler(req, res) {
             const currentBalance = Number(member.shop_credit_balance || 0);
             const newBalance = Math.round((currentBalance + rewardAmt) * 100) / 100;
 
-            await sb(key, `members?email=eq.${encodeURIComponent(member.email)}`, {
+            await sb(key, `members?email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}`, {
               method: "PATCH",
               body: JSON.stringify({ shop_credit_balance: newBalance, updated_at: new Date().toISOString() }),
             });
@@ -143,6 +144,7 @@ export default async function handler(req, res) {
             await sb(key, "shop_credits", {
               method: "POST",
               body: JSON.stringify({
+                tenant_id: tenantId,
                 member_email: member.email,
                 amount: rewardAmt,
                 type: "credit",

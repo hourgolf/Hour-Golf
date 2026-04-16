@@ -3,7 +3,7 @@ import { SUPABASE_URL, getServiceKey, verifyAdmin } from "../../lib/api-helpers"
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
-  const { user, reason } = await verifyAdmin(req);
+  const { user, tenantId, reason } = await verifyAdmin(req);
   if (!user) return res.status(401).json({ error: "Unauthorized", reason });
 
   const key = getServiceKey();
@@ -15,9 +15,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Get current bonus_hours
+    // Get current bonus_hours within this tenant
     const memberResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member_email)}&select=email,bonus_hours`,
+      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member_email)}&tenant_id=eq.${tenantId}&select=email,bonus_hours`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (!memberResp.ok) throw new Error("Member lookup failed");
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
 
     // Update bonus_hours
     const patchResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member_email)}`,
+      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member_email)}&tenant_id=eq.${tenantId}`,
       {
         method: "PATCH",
         headers: {

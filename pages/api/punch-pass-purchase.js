@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -25,14 +25,15 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies["hg-member-token"];
   if (!token) return res.status(401).json({ error: "Not authenticated" });
 
   try {
-    // Get member from session
+    // Get member from session within this tenant
     const memberResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&session_expires_at=gt.${new Date().toISOString()}&select=*`,
+      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=*`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (!memberResp.ok) throw new Error("Session lookup failed");
@@ -44,9 +45,9 @@ export default async function handler(req, res) {
     const pass = PASS_OPTIONS[hours];
     if (!pass) return res.status(400).json({ error: "Invalid pass option. Choose 1, 5, or 10 hours." });
 
-    // Get tier config for overage rate
+    // Get tier config for overage rate within this tenant
     const tierResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(member.tier)}`,
+      `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(member.tier)}&tenant_id=eq.${tenantId}`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const tierCfg = tierResp.ok ? await tierResp.json() : [];
@@ -77,7 +78,7 @@ export default async function handler(req, res) {
       }
       // Save customer ID
       await fetch(
-        `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}`,
+        `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}`,
         {
           method: "PATCH",
           headers: {

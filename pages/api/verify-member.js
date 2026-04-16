@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 
 // Verify a member's QR token. The token is a HMAC of the member's email
 // using a server-side secret — no database lookup for the token itself,
@@ -20,10 +20,12 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
+
   try {
-    // Find member whose email produces this token
+    // Find member whose email produces this token, scoped to this tenant
     const memResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?select=email,name,tier,shop_credit_balance&tier=neq.Non-Member`,
+      `${SUPABASE_URL}/rest/v1/members?tenant_id=eq.${tenantId}&select=email,name,tier,shop_credit_balance&tier=neq.Non-Member`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (!memResp.ok) throw new Error("Member lookup failed");
@@ -32,11 +34,11 @@ export default async function handler(req, res) {
     const member = members.find((m) => generateVerifyToken(m.email) === token);
     if (!member) return res.status(404).json({ error: "Member not found" });
 
-    // Get tier discount
+    // Get tier discount within this tenant
     let discount = 0;
     if (member.tier) {
       const tcResp = await fetch(
-        `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(member.tier)}&select=pro_shop_discount`,
+        `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(member.tier)}&tenant_id=eq.${tenantId}&select=pro_shop_discount`,
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       );
       const tc = tcResp.ok ? await tcResp.json() : [];
