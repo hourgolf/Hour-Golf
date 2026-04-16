@@ -1,4 +1,4 @@
-import { SUPABASE_URL, getSupabaseKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getSupabaseKey, getTenantId } from "../../lib/api-helpers";
 import { sendBookingConfirmation } from "../../lib/email";
 
 const TZ = "America/Los_Angeles";
@@ -17,6 +17,7 @@ export default async function handler(req, res) {
   const key = getSupabaseKey(req);
   if (!key) return res.status(401).json({ error: "API key required" });
 
+  const tenantId = getTenantId(req);
   const { email, name, date, startTime, endTime, bay, terms_accepted } = req.body;
   if (!email || !date || !startTime || !endTime || !bay) {
     return res.status(400).json({ error: "Missing required fields" });
@@ -29,7 +30,7 @@ export default async function handler(req, res) {
     let hasPaymentMethod = false;
     try {
       const memberResp = await fetch(
-        `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&select=tier,stripe_customer_id`,
+        `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}&select=tier,stripe_customer_id`,
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       );
       if (memberResp.ok) {
@@ -70,9 +71,9 @@ export default async function handler(req, res) {
     const bookingStartISO = sD.toISOString();
     const bookingEndISO = eD.toISOString();
 
-    // Check overlapping bookings
+    // Check overlapping bookings within this tenant
     const conflicts = await fetch(
-      `${SUPABASE_URL}/rest/v1/bookings?bay=eq.${encodeURIComponent(bay)}&booking_status=eq.Confirmed&booking_start=lt.${bookingEndISO}&booking_end=gt.${bookingStartISO}`,
+      `${SUPABASE_URL}/rest/v1/bookings?bay=eq.${encodeURIComponent(bay)}&tenant_id=eq.${tenantId}&booking_status=eq.Confirmed&booking_start=lt.${bookingEndISO}&booking_end=gt.${bookingStartISO}`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const conflictData = await conflicts.json();
@@ -82,6 +83,7 @@ export default async function handler(req, res) {
     }
 
     const record = {
+      tenant_id: tenantId,
       booking_id: `portal_${Date.now()}`,
       customer_email: email.toLowerCase().trim(),
       customer_name: name || email,

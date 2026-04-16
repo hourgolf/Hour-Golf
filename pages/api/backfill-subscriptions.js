@@ -6,16 +6,16 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
-  const { user, reason } = await verifyAdmin(req);
+  const { user, tenantId, reason } = await verifyAdmin(req);
   if (!user) return res.status(401).json({ error: "Unauthorized", detail: reason });
 
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
   try {
-    // Get all members with stripe_customer_id but no stripe_subscription_id
+    // Get all members with stripe_customer_id but no stripe_subscription_id within this tenant
     const mResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?stripe_customer_id=not.is.null&stripe_subscription_id=is.null&tier=not.eq.Non-Member&select=email,stripe_customer_id,tier`,
+      `${SUPABASE_URL}/rest/v1/members?tenant_id=eq.${tenantId}&stripe_customer_id=not.is.null&stripe_subscription_id=is.null&tier=not.eq.Non-Member&select=email,stripe_customer_id,tier`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const members = mResp.ok ? await mResp.json() : [];
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
 
           // Save subscription ID and price ID to members table
           await fetch(
-            `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(m.email)}`,
+            `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(m.email)}&tenant_id=eq.${tenantId}`,
             {
               method: "PATCH",
               headers: {

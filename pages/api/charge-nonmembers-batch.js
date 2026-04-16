@@ -25,41 +25,41 @@ async function findPaymentMethod(customerId) {
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
-  const { user, reason } = await verifyAdmin(req);
+  const { user, tenantId, reason } = await verifyAdmin(req);
   if (!user) return res.status(401).json({ error: "Unauthorized", detail: reason });
 
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
   try {
-    // 1. Get Non-Member overage rate
+    // 1. Get Non-Member overage rate within this tenant
     const tcResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.Non-Member&select=overage_rate`,
+      `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.Non-Member&tenant_id=eq.${tenantId}&select=overage_rate`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const tcRows = tcResp.ok ? await tcResp.json() : [];
     const rate = Number(tcRows[0]?.overage_rate || 60);
 
-    // 2. Get all members and build lookup
+    // 2. Get all members in this tenant and build lookup
     const memResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?select=email,tier,stripe_customer_id`,
+      `${SUPABASE_URL}/rest/v1/members?tenant_id=eq.${tenantId}&select=email,tier,stripe_customer_id`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const allMembers = memResp.ok ? await memResp.json() : [];
     const memberTiers = {};
     allMembers.forEach((m) => { memberTiers[m.email] = m; });
 
-    // 3. Get all existing charged_booking_ids to skip
+    // 3. Get all existing charged_booking_ids in this tenant to skip
     const pResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/payments?charged_booking_id=not.is.null&select=charged_booking_id`,
+      `${SUPABASE_URL}/rest/v1/payments?tenant_id=eq.${tenantId}&charged_booking_id=not.is.null&select=charged_booking_id`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const paidBookings = new Set((pResp.ok ? await pResp.json() : []).map((p) => p.charged_booking_id));
 
-    // 4. Get confirmed non-member bookings that ended 12+ hours ago
+    // 4. Get confirmed non-member bookings that ended 12+ hours ago within this tenant
     const cutoff = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
     const bkResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/bookings?booking_status=eq.Confirmed&booking_end=lt.${encodeURIComponent(cutoff)}&select=booking_id,customer_email,customer_name,booking_start,booking_end,duration_hours&order=booking_start.asc&limit=200`,
+      `${SUPABASE_URL}/rest/v1/bookings?tenant_id=eq.${tenantId}&booking_status=eq.Confirmed&booking_end=lt.${encodeURIComponent(cutoff)}&select=booking_id,customer_email,customer_name,booking_start,booking_end,duration_hours&order=booking_start.asc&limit=200`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const allBookings = bkResp.ok ? await bkResp.json() : [];
@@ -97,7 +97,7 @@ export default async function handler(req, res) {
             // Save back to members table
             if (stripeId) {
               await fetch(
-                `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(bk.customer_email)}`,
+                `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(bk.customer_email)}&tenant_id=eq.${tenantId}`,
                 {
                   method: "PATCH",
                   headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -140,6 +140,7 @@ export default async function handler(req, res) {
           method: "POST",
           headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
           body: JSON.stringify({
+            tenant_id: tenantId,
             member_email: bk.customer_email,
             billing_month: billingMonth,
             amount_cents: amountCents,

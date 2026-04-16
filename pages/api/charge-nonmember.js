@@ -28,7 +28,7 @@ async function findPaymentMethod(customerId) {
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
-  const { user, reason } = await verifyAdmin(req);
+  const { user, tenantId, reason } = await verifyAdmin(req);
   if (!user) return res.status(401).json({ error: "Unauthorized", detail: reason });
 
   const { booking_id } = req.body;
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
   try {
     // 1. Check if already charged (idempotency via charged_booking_id unique index)
     const dupResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/payments?charged_booking_id=eq.${encodeURIComponent(booking_id)}&select=id`,
+      `${SUPABASE_URL}/rest/v1/payments?charged_booking_id=eq.${encodeURIComponent(booking_id)}&tenant_id=eq.${tenantId}&select=id`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (dupResp.ok) {
@@ -48,9 +48,9 @@ export default async function handler(req, res) {
       if (dups.length > 0) return res.status(409).json({ error: "Already charged", booking_id });
     }
 
-    // 2. Get the booking
+    // 2. Get the booking within this tenant
     const bkResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/bookings?booking_id=eq.${encodeURIComponent(booking_id)}&select=*`,
+      `${SUPABASE_URL}/rest/v1/bookings?booking_id=eq.${encodeURIComponent(booking_id)}&tenant_id=eq.${tenantId}&select=*`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (!bkResp.ok) throw new Error(`Booking lookup failed: ${bkResp.status}`);
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
 
     // 3. Find Stripe customer: check members table first, then search Stripe by email
     const mResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(bk.customer_email)}&select=stripe_customer_id,name`,
+      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(bk.customer_email)}&tenant_id=eq.${tenantId}&select=stripe_customer_id,name`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const mRows = mResp.ok ? await mResp.json() : [];
@@ -72,7 +72,7 @@ export default async function handler(req, res) {
       // Save it back to members table for future use
       if (stripeCustomerId && mRows.length > 0) {
         await fetch(
-          `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(bk.customer_email)}`,
+          `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(bk.customer_email)}&tenant_id=eq.${tenantId}`,
           {
             method: "PATCH",
             headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -86,9 +86,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "No Stripe customer", detail: `No Stripe account found for ${bk.customer_email}.` });
     }
 
-    // 4. Get Non-Member overage rate from tier_config
+    // 4. Get Non-Member overage rate from tier_config within this tenant
     const tcResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.Non-Member&select=overage_rate`,
+      `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.Non-Member&tenant_id=eq.${tenantId}&select=overage_rate`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const tcRows = tcResp.ok ? await tcResp.json() : [];
@@ -133,6 +133,7 @@ export default async function handler(req, res) {
       method: "POST",
       headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
+        tenant_id: tenantId,
         member_email: bk.customer_email,
         billing_month: billingMonth,
         amount_cents: amountCents,

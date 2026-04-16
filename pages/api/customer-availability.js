@@ -1,4 +1,4 @@
-import { getSupabaseKey, supaFetch } from "../../lib/api-helpers";
+import { getSupabaseKey, supaFetch, getTenantId } from "../../lib/api-helpers";
 
 const TZ = "America/Los_Angeles";
 
@@ -16,6 +16,7 @@ export default async function handler(req, res) {
   const key = getSupabaseKey(req);
   if (!key) return res.status(401).json({ error: "API key required" });
 
+  const tenantId = getTenantId(req);
   const { date } = req.query;
   if (!date) return res.status(400).json({ error: "date parameter required (YYYY-MM-DD)" });
 
@@ -25,7 +26,7 @@ export default async function handler(req, res) {
     const dayEndUTC = pacificToUTC(date, "23:59").toISOString();
 
     const bookings = await supaFetch(key, "bookings",
-      `?booking_status=eq.Confirmed&booking_start=gte.${dayStartUTC}&booking_start=lte.${dayEndUTC}&order=booking_start.asc&select=booking_start,booking_end,bay`
+      `?tenant_id=eq.${tenantId}&booking_status=eq.Confirmed&booking_start=gte.${dayStartUTC}&booking_start=lte.${dayEndUTC}&order=booking_start.asc&select=booking_start,booking_end,bay`
     );
 
     return res.status(200).json({ date, bookings });

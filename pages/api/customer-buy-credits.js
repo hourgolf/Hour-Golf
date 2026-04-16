@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { SUPABASE_URL, getSupabaseKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getSupabaseKey, getTenantId } from "../../lib/api-helpers";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -9,6 +9,7 @@ export default async function handler(req, res) {
   const key = getSupabaseKey(req);
   if (!key) return res.status(401).json({ error: "API key required" });
 
+  const tenantId = getTenantId(req);
   const { email, hours } = req.body;
   if (!email || !hours || hours < 1) {
     return res.status(400).json({ error: "Email and hours (min 1) required" });
@@ -16,7 +17,7 @@ export default async function handler(req, res) {
 
   try {
     const memberResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(email.toLowerCase().trim())}`,
+      `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(email.toLowerCase().trim())}&tenant_id=eq.${tenantId}`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const members = await memberResp.json();
@@ -24,7 +25,7 @@ export default async function handler(req, res) {
     const member = members[0];
 
     const tierResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(member.tier)}`,
+      `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(member.tier)}&tenant_id=eq.${tenantId}`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     const tierCfg = await tierResp.json();
