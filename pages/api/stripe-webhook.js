@@ -180,21 +180,28 @@ export default async function handler(req, res) {
           }
         } catch (_) {}
 
-        // Get member name for email
+        // Get member name + tenant for email
         let memberName = memberEmail;
+        let welcomeTenantId = null;
         try {
           const mResp = await fetch(
-            `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(memberEmail)}&select=name`,
+            `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(memberEmail)}&select=name,tenant_id`,
             { headers: { apikey: key, Authorization: `Bearer ${key}` } }
           );
           if (mResp.ok) {
             const rows = await mResp.json();
-            if (rows.length) memberName = rows[0].name || memberEmail;
+            if (rows.length) {
+              memberName = rows[0].name || memberEmail;
+              welcomeTenantId = rows[0].tenant_id;
+            }
           }
         } catch (_) {}
 
-        // Send welcome email
+        // Send welcome email. tenant_id comes from the member row; this
+        // webhook is still single-tenant per Phase 7C, but the email
+        // already renders with the right tenant branding regardless.
         sendWelcomeEmail({
+          tenantId: welcomeTenantId,
           to: memberEmail,
           customerName: memberName,
           tier,
@@ -280,8 +287,9 @@ export default async function handler(req, res) {
           body: JSON.stringify(paymentInsert),
         });
 
-        // Send receipt email
+        // Send receipt email scoped to the member's tenant
         sendPaymentReceiptEmail({
+          tenantId: memberTenantId,
           to: memberEmail,
           customerName: memberName || memberEmail,
           amount: amountPaid,

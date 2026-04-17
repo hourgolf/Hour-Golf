@@ -413,6 +413,7 @@ export default async function handler(req, res) {
 
       // 7. Notify admin
       sendShopOrderNotification({
+        tenantId,
         customerName: member.name,
         customerEmail: member.email,
         items: lineItems.map((li) => ({ title: li.item.title, size: li.cart.size, quantity: li.cart.quantity, lineTotal: li.lineTotal })),

@@ -63,6 +63,7 @@ export default async function handler(req, res) {
 
     // 5) Send email
     await sendPasswordResetEmail({
+      tenantId,
       to: cleanEmail,
       customerName: member.name,
       resetUrl,

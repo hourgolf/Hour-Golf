@@ -129,6 +129,7 @@ export default async function handler(req, res) {
 
     // Send cancellation email (fire-and-forget)
     sendCancellationEmail({
+      tenantId,
       to: member.email,
       customerName: member.name || member.email,
       bay: booking.bay,

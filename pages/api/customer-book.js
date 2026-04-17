@@ -112,6 +112,7 @@ export default async function handler(req, res) {
 
     // Send booking confirmation email immediately (fire-and-forget)
     sendBookingConfirmation({
+      tenantId,
       to: booked.customer_email,
       customerName: booked.customer_name || booked.customer_email,
       bay: booked.bay,
