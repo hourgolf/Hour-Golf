@@ -1,19 +1,10 @@
 import { useState, useCallback, useMemo } from "react";
 import { supaPost, supaPatch, supaDelete } from "../lib/supabase";
 
-// Force per-request rendering so Vercel's Edge CDN never caches this page.
-// Without this, the tenant-branded HTML (colors, logo, bg URL baked inline
-// by _document.js) gets cached for minutes and admin brand edits don't
-// propagate. next.config.js headers() and middleware response headers both
-// failed to override Vercel's rewrite-caching layer; getServerSideProps is
-// the documented way to mark a page as uncacheable per request.
-//
-// Empty props — the page reads its data client-side via hooks. This just
-// opts out of static optimization.
-export async function getServerSideProps({ res }) {
-  res.setHeader("Cache-Control", "private, no-store");
-  return { props: {} };
-}
+// Per-request render so Vercel's Edge CDN never caches this tenant-branded
+// page. See lib/no-cache-ssr.js for why this is required on every page
+// that renders tenant branding.
+export { noCacheSSR as getServerSideProps } from "../lib/no-cache-ssr";
 import { mL, lds, tds } from "../lib/format";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
