@@ -22,6 +22,7 @@ const KNOWN_KEYS = [
   "subscriptions",
   "stripe_enabled",
   "email_notifications",
+  "access_codes",
 ];
 
 function defaultFeatures() {

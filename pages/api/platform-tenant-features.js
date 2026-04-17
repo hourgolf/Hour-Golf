@@ -28,6 +28,7 @@ const ALLOWED_FEATURE_KEYS = new Set([
   "subscriptions",
   "stripe_enabled",
   "email_notifications",
+  "access_codes",
 ]);
 
 function isUuid(value) {

@@ -8,7 +8,7 @@ import TenantBranding from "../../../components/settings/TenantBranding";
 const TABS = ["Overview", "Branding", "Stripe", "Features"];
 
 const FEATURE_KEYS = [
-  { key: "bookings", label: "Bookings", hint: "Bay reservations, Skedda sync, access code emails" },
+  { key: "bookings", label: "Bookings", hint: "Bay reservations, Skedda sync" },
   { key: "pro_shop", label: "Pro Shop", hint: "Shop items, cart, checkout, credits" },
   { key: "loyalty", label: "Loyalty", hint: "Monthly loyalty rules + rewards" },
   { key: "events", label: "Events", hint: "Event pages, RSVPs, paid event tickets" },
@@ -16,6 +16,7 @@ const FEATURE_KEYS = [
   { key: "subscriptions", label: "Subscriptions", hint: "Tier-based Stripe subscriptions" },
   { key: "stripe_enabled", label: "Stripe Enabled", hint: "Master switch for any Stripe-backed flow" },
   { key: "email_notifications", label: "Email Notifications", hint: "Transactional emails via Resend" },
+  { key: "access_codes", label: "Access Codes", hint: "Smart-lock door codes, access troubleshooting, code-delivery email copy" },
 ];
 
 export default function PlatformTenantDetail() {

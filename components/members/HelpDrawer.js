@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useBranding } from "../../hooks/useBranding";
+import { useTenantFeatures } from "../../hooks/useTenantFeatures";
 
 // Strip everything that isn't a digit so `tel:` links work consistently
 // regardless of how the tenant formats support_phone for display.
@@ -9,7 +10,7 @@ function telHref(phone) {
   return digits ? `tel:${digits}` : null;
 }
 
-function buildFaqCategories(branding) {
+function buildFaqCategories(branding, { accessCodesEnabled } = {}) {
   const hoursText =
     branding?.facility_hours ||
     "Please see your venue for hours of access.";
@@ -17,26 +18,28 @@ function buildFaqCategories(branding) {
   const supportPhone = branding?.support_phone;
   const venueName = branding?.app_name || "us";
 
+  // Visiting category adapts to the access_codes feature flag. When on,
+  // it's the familiar "Access & Door Codes" grouping with the smart-
+  // lock troubleshooting entry at the top. When off, the troubleshoot
+  // entry disappears and the category re-labels to just "Visiting" so
+  // venues without keypad access aren't implying one to their members.
+  const visitingItems = [
+    ...(accessCodesEnabled
+      ? [{ q: "My access code isn't working", a: null, troubleshoot: true }]
+      : []),
+    { q: "What are the facility hours?", a: hoursText },
+    {
+      q: "Can I bring a guest?",
+      a: "Absolutely! You can bring up to 3 guests per bay per booking. Just make sure they\u2019re with you when you enter.",
+    },
+  ];
+
   return [
   {
     key: "access",
-    label: "Access & Door Codes",
-    icon: "\uD83D\uDD11",
-    items: [
-      {
-        q: "My access code isn't working",
-        a: null,
-        troubleshoot: true,
-      },
-      {
-        q: "What are the facility hours?",
-        a: hoursText,
-      },
-      {
-        q: "Can I bring a guest?",
-        a: "Absolutely! You can bring up to 3 guests per bay per booking. Just make sure they\u2019re with you when you enter.",
-      },
-    ],
+    label: accessCodesEnabled ? "Access & Door Codes" : "Visiting",
+    icon: accessCodesEnabled ? "\uD83D\uDD11" : "\uD83D\uDEAA",
+    items: visitingItems,
   },
   {
     key: "booking",
@@ -167,7 +170,9 @@ const ACCESS_STEPS = [
 /* ══════════════════════════════════════════════════ */
 export default function HelpDrawer({ open, onClose }) {
   const branding = useBranding();
-  const faqCategories = buildFaqCategories(branding);
+  const { isEnabled } = useTenantFeatures();
+  const accessCodesEnabled = isEnabled("access_codes");
+  const faqCategories = buildFaqCategories(branding, { accessCodesEnabled });
   const supportEmail = branding?.support_email || null;
   const supportPhone = branding?.support_phone || null;
   const supportTelHref = telHref(supportPhone);
