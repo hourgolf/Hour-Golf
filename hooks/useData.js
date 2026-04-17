@@ -25,13 +25,27 @@ export function useData(apiKey, connected) {
   const refresh = useCallback(async () => {
     const key = apiKeyRef.current;
     if (!key) return;
+    // Scope every admin-dashboard read to the current tenant. SSR-injected
+    // in _document.js alongside window.__TENANT_BRANDING__. Without this,
+    // the RLS `admin_all` policy on members/bookings/etc. (EXISTS in admins
+    // by user_id only, no tenant check) lets any authenticated admin see
+    // every tenant's rows — a real cross-tenant leak that surfaced once
+    // Parts Dept rows appeared alongside Hour Golf's in the admin list.
+    //
+    // monthly_usage is intentionally NOT filtered here: it's a view that
+    // does not expose tenant_id as a column, so PostgREST can't filter on
+    // it. Fixing requires a view recreate and is tracked as tech debt
+    // alongside the broader RLS hardening (admin_all policy scoping).
+    const tid =
+      (typeof window !== "undefined" && window.__TENANT_ID__) || "";
+    const tenantQ = tid ? `tenant_id=eq.${encodeURIComponent(tid)}&` : "";
     try {
       const [members, bookings, tierCfg, usage, payments] = await Promise.all([
-        supa(key, "members", "?order=name"),
-        supa(key, "bookings", "?order=booking_start.desc&limit=5000"),
-        supa(key, "tier_config", "?order=display_order"),
+        supa(key, "members", `?${tenantQ}order=name`),
+        supa(key, "bookings", `?${tenantQ}order=booking_start.desc&limit=5000`),
+        supa(key, "tier_config", `?${tenantQ}order=display_order`),
         supa(key, "monthly_usage", "?order=billing_month.desc,overage_charge.desc"),
-        supa(key, "payments", "?order=created_at.desc").catch(() => []),
+        supa(key, "payments", `?${tenantQ}order=created_at.desc`).catch(() => []),
       ]);
       setAll({ members, bookings, tierCfg, usage, payments });
     } catch (e) {

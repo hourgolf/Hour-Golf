@@ -23,19 +23,20 @@ function escapeHtml(s) {
 class MyDocument extends Document {
   static async getInitialProps(ctx) {
     const initialProps = await Document.getInitialProps(ctx);
+    const tenantId = tenantIdFromReq(ctx.req);
     let branding = FALLBACK_BRANDING;
     try {
-      const tenantId = tenantIdFromReq(ctx.req);
       branding = await loadBranding(tenantId);
     } catch {
       // Never fail the page render because of a branding fetch error.
       branding = FALLBACK_BRANDING;
     }
-    return { ...initialProps, branding };
+    return { ...initialProps, branding, tenantId };
   }
 
   render() {
     const branding = this.props.branding || FALLBACK_BRANDING;
+    const tenantId = this.props.tenantId || "";
     const cssVars = buildRootCssVars(branding);
     const fontFace = buildDisplayFontFace(branding);
     const bgRule = buildBackgroundImageRule(branding);
@@ -102,7 +103,7 @@ class MyDocument extends Document {
           */}
           <script
             dangerouslySetInnerHTML={{
-              __html: `window.__TENANT_BRANDING__ = ${JSON.stringify(branding).replace(/</g, "\\u003c")};`,
+              __html: `window.__TENANT_BRANDING__ = ${JSON.stringify(branding).replace(/</g, "\\u003c")};window.__TENANT_ID__ = ${JSON.stringify(tenantId)};`,
             }}
           />
         </Head>
