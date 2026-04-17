@@ -1,7 +1,23 @@
 import { useState } from "react";
+import { useBranding } from "../../hooks/useBranding";
 
-/* ── FAQ Data ─────────────────────────────────────── */
-const FAQ_CATEGORIES = [
+// Strip everything that isn't a digit so `tel:` links work consistently
+// regardless of how the tenant formats support_phone for display.
+function telHref(phone) {
+  if (!phone) return null;
+  const digits = String(phone).replace(/\D+/g, "");
+  return digits ? `tel:${digits}` : null;
+}
+
+function buildFaqCategories(branding) {
+  const hoursText =
+    branding?.facility_hours ||
+    "Please see your venue for hours of access.";
+  const supportEmail = branding?.support_email;
+  const supportPhone = branding?.support_phone;
+  const venueName = branding?.app_name || "us";
+
+  return [
   {
     key: "access",
     label: "Access & Door Codes",
@@ -14,7 +30,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: "What are the facility hours?",
-        a: "Hour Golf is accessible 24/7 for members with a Starter tier or above. Non-member bookings are available 10 AM \u2013 8 PM.",
+        a: hoursText,
       },
       {
         q: "Can I bring a guest?",
@@ -97,12 +113,20 @@ const FAQ_CATEGORIES = [
     icon: "\uD83D\uDCE9",
     items: [
       {
-        q: "How do I reach Hour Golf?",
-        a: "Email us at starter@hour.golf or call/text (503) 765-6906. We'll try to get return your message as quickly as possible",
+        q: `How do I reach ${venueName}?`,
+        a: (() => {
+          if (supportEmail && supportPhone) {
+            return `Email us at ${supportEmail} or call/text ${supportPhone}. We'll get back to you as quickly as possible.`;
+          }
+          if (supportEmail) return `Email us at ${supportEmail}. We'll get back to you as quickly as possible.`;
+          if (supportPhone) return `Call or text us at ${supportPhone}. We'll get back to you as quickly as possible.`;
+          return "Contact info hasn't been set up yet — check with your venue staff.";
+        })(),
       },
     ],
   },
-];
+  ];
+}
 
 /* ── Access Code Troubleshooting Steps ───────────── */
 const ACCESS_STEPS = [
@@ -128,9 +152,13 @@ const ACCESS_STEPS = [
     nextOnSecond: 3,
   },
   {
-    question: "No worries \u2014 use backup code 2138 to get in.",
-    detail: "Enter 2138 on the keypad. This is a temporary backup code. If this also doesn\u2019t work, call or text us at (503) 765-6906.",
-    options: ["I\u2019m in, thanks!", "Backup code didn\u2019t work either"],
+    // The backup code + support phone are both tenant-specific. We leave
+    // them as placeholders here and patch them in at render time from
+    // branding (support_phone) + a tenant-scoped backup code field if we
+    // ever add one. For now, if support_phone is configured it's shown.
+    question: "No worries \u2014 let\u2019s get you through to the team.",
+    detail: "__ESCALATE_TO_CONTACT__",
+    options: ["I\u2019m in, thanks!", "Still locked out"],
     nextOnFirst: "resolved",
     nextOnSecond: "escalate",
   },
@@ -138,6 +166,12 @@ const ACCESS_STEPS = [
 
 /* ══════════════════════════════════════════════════ */
 export default function HelpDrawer({ open, onClose }) {
+  const branding = useBranding();
+  const faqCategories = buildFaqCategories(branding);
+  const supportEmail = branding?.support_email || null;
+  const supportPhone = branding?.support_phone || null;
+  const supportTelHref = telHref(supportPhone);
+
   const [view, setView] = useState("categories");
   const [activeCat, setActiveCat] = useState(null);
   const [activeQ, setActiveQ] = useState(null);
@@ -212,7 +246,7 @@ export default function HelpDrawer({ open, onClose }) {
           {/* Category List */}
           {view === "categories" && (
             <div className="help-categories">
-              {FAQ_CATEGORIES.map((cat) => (
+              {faqCategories.map((cat) => (
                 <button
                   key={cat.key}
                   className="help-cat-btn"
@@ -255,15 +289,33 @@ export default function HelpDrawer({ open, onClose }) {
           )}
 
           {/* Troubleshooting Flow */}
-          {view === "troubleshoot" && (
+          {view === "troubleshoot" && (() => {
+            const step = ACCESS_STEPS[troubleStep];
+            let detail = step.detail;
+            // The last step's detail is a placeholder — fill with live
+            // support contact info if the tenant has it configured,
+            // otherwise hide the sentence entirely (rather than show
+            // HG-specific numbers).
+            if (detail === "__ESCALATE_TO_CONTACT__") {
+              if (supportPhone && supportEmail) {
+                detail = `Call or text us at ${supportPhone}, or email ${supportEmail}.`;
+              } else if (supportPhone) {
+                detail = `Call or text us at ${supportPhone}.`;
+              } else if (supportEmail) {
+                detail = `Email us at ${supportEmail}.`;
+              } else {
+                detail = "";
+              }
+            }
+            return (
             <div className="help-trouble">
               <div className="help-trouble-step">
                 Step {troubleStep + 1} of {ACCESS_STEPS.length}
               </div>
-              <p className="help-trouble-q">{ACCESS_STEPS[troubleStep].question}</p>
-              <p className="help-trouble-detail">{ACCESS_STEPS[troubleStep].detail}</p>
+              <p className="help-trouble-q">{step.question}</p>
+              {detail && <p className="help-trouble-detail">{detail}</p>}
               <div className="help-trouble-options">
-                {ACCESS_STEPS[troubleStep].options.map((opt, i) => (
+                {step.options.map((opt, i) => (
                   <button
                     key={i}
                     className={`help-trouble-btn ${i === 0 ? "primary" : ""}`}
@@ -274,7 +326,8 @@ export default function HelpDrawer({ open, onClose }) {
                 ))}
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* Resolved */}
           {view === "resolved" && (
@@ -295,18 +348,32 @@ export default function HelpDrawer({ open, onClose }) {
             <div className="help-resolved">
               <div style={{ fontSize: 48, marginBottom: 16 }}>{"\uD83D\uDCDE"}</div>
               <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>We&rsquo;ll get this sorted.</p>
-              <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 8, lineHeight: 1.6 }}>
-                Call or text us right now:
-              </p>
-              <a
-                href="tel:5032062222"
-                style={{ fontSize: 20, fontFamily: "var(--font-display)", color: "var(--primary)", textDecoration: "none", display: "block", marginBottom: 20 }}
-              >
-                (503) 206-2222
-              </a>
-              <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20 }}>
-                Or email <a href="mailto:hello@hour.golf" style={{ color: "var(--primary)", fontWeight: 600 }}>hello@hour.golf</a>
-              </p>
+              {supportPhone && supportTelHref && (
+                <>
+                  <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 8, lineHeight: 1.6 }}>
+                    Call or text us right now:
+                  </p>
+                  <a
+                    href={supportTelHref}
+                    style={{ fontSize: 20, fontFamily: "var(--font-display)", color: "var(--primary)", textDecoration: "none", display: "block", marginBottom: 20 }}
+                  >
+                    {supportPhone}
+                  </a>
+                </>
+              )}
+              {supportEmail && (
+                <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20 }}>
+                  {supportPhone ? "Or email " : "Email us at "}
+                  <a href={`mailto:${supportEmail}`} style={{ color: "var(--primary)", fontWeight: 600 }}>
+                    {supportEmail}
+                  </a>
+                </p>
+              )}
+              {!supportPhone && !supportEmail && (
+                <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20 }}>
+                  Please check with your venue staff directly.
+                </p>
+              )}
               <button className="help-trouble-btn" onClick={onClose}>
                 Close.
               </button>

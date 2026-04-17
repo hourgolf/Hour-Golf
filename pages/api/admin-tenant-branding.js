@@ -33,6 +33,11 @@ const EDITABLE_COLUMNS = [
   "welcome_logo_size",
   "header_logo_size",
   "icon_size",
+  "legal_url",
+  "terms_url",
+  "support_email",
+  "support_phone",
+  "facility_hours",
   "background_image_url",
   "font_display_name",
   "font_display_url",
@@ -117,6 +122,14 @@ export default async function handler(req, res) {
           }
           if (typeof value === "string" && value.length > 200) {
             return res.status(400).json({ error: `${col} too long (max 200 chars)` });
+          }
+        } else if (["support_email", "support_phone", "facility_hours"].includes(col)) {
+          if (value !== null && typeof value !== "string") {
+            return res.status(400).json({ error: `Invalid string for ${col}` });
+          }
+          const max = col === "facility_hours" ? 500 : 120;
+          if (typeof value === "string" && value.length > max) {
+            return res.status(400).json({ error: `${col} too long (max ${max} chars)` });
           }
         }
 

@@ -384,7 +384,7 @@ export default function MemberLayout({ activeTab, children }) {
               <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "var(--text-muted)", marginBottom: 16, textAlign: "left", cursor: "pointer" }}>
                 <input type="checkbox" checked={signupTerms} onChange={(e) => setSignupTerms(e.target.checked)} style={{ marginTop: 2, accentColor: "#4C8D73" }} />
                 <span>
-                  I agree to the <a href="https://hour.golf/legal/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Terms &amp; Conditions</a> and <a href="https://hour.golf/terms/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Club Policies</a>
+                  I agree to the {branding?.legal_url ? <a href={branding.legal_url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Terms &amp; Conditions</a> : <span style={{ fontWeight: 600 }}>Terms &amp; Conditions</span>} and {branding?.terms_url ? <a href={branding.terms_url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Club Policies</a> : <span style={{ fontWeight: 600 }}>Club Policies</span>}
                 </span>
               </label>
               {formError && <p className="mem-err">{formError}</p>}

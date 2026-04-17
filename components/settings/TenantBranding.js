@@ -298,6 +298,11 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
       payload.font_display_url = branding.font_display_url || null;
       payload.font_body_family = branding.font_body_family || null;
       payload.welcome_message = branding.welcome_message || null;
+      payload.legal_url = branding.legal_url || null;
+      payload.terms_url = branding.terms_url || null;
+      payload.support_email = branding.support_email || null;
+      payload.support_phone = branding.support_phone || null;
+      payload.facility_hours = branding.facility_hours || null;
 
       // Platform-mode PATCH requires the target tenant_id in the body
       // (tenant-admin mode resolves from subdomain, no extra field).
@@ -520,6 +525,72 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
           <div className="muted" style={{ marginTop: 4 }}>
             Shown under the logo on the member portal login screen. Leave blank to use a neutral default.
           </div>
+        </div>
+      </div>
+
+      {/* Support & Legal */}
+      <div>
+        <h4 style={{ fontFamily: "var(--font-display)", fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, color: "var(--text-muted)", marginBottom: 10 }}>
+          Support &amp; Legal
+        </h4>
+        <p className="muted" style={{ fontSize: 12, marginTop: -4, marginBottom: 14 }}>
+          These surface in the Help drawer, the signup consent checkbox, and the contact escalation flow. Leave blank and the matching UI section hides cleanly instead of showing someone else&rsquo;s info.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+          <div className="mf">
+            <label>Terms &amp; Conditions URL</label>
+            <input
+              type="text"
+              value={branding.legal_url || ""}
+              onChange={(e) => update("legal_url", e.target.value)}
+              placeholder="https://..."
+              style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontFamily: "var(--font-mono)", fontSize: 11, background: "var(--surface)", color: "var(--text)" }}
+            />
+          </div>
+          <div className="mf">
+            <label>Club Policies URL</label>
+            <input
+              type="text"
+              value={branding.terms_url || ""}
+              onChange={(e) => update("terms_url", e.target.value)}
+              placeholder="https://..."
+              style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontFamily: "var(--font-mono)", fontSize: 11, background: "var(--surface)", color: "var(--text)" }}
+            />
+          </div>
+          <div className="mf">
+            <label>Support Email</label>
+            <input
+              type="email"
+              value={branding.support_email || ""}
+              onChange={(e) => update("support_email", e.target.value)}
+              placeholder="hello@example.com"
+              maxLength={120}
+              style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)" }}
+            />
+          </div>
+          <div className="mf">
+            <label>Support Phone</label>
+            <input
+              type="text"
+              value={branding.support_phone || ""}
+              onChange={(e) => update("support_phone", e.target.value)}
+              placeholder="(555) 123-4567"
+              maxLength={120}
+              style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)" }}
+            />
+            <div className="muted" style={{ marginTop: 4 }}>Any display format. The tel: link strips non-digits automatically.</div>
+          </div>
+        </div>
+        <div className="mf" style={{ marginTop: 14 }}>
+          <label>Facility Hours (for FAQ)</label>
+          <textarea
+            value={branding.facility_hours || ""}
+            onChange={(e) => update("facility_hours", e.target.value)}
+            placeholder="Members have 24/7 access. Non-member bookings are available 10 AM – 8 PM."
+            maxLength={500}
+            rows={2}
+            style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)", fontFamily: "inherit" }}
+          />
         </div>
       </div>
 

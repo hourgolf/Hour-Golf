@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { BAYS, TZ } from "../../lib/constants";
 import { fT, fDL } from "../../lib/format";
+import { useBranding } from "../../hooks/useBranding";
 
 function buildHours(startHour, endHour) {
   const hours = [];
@@ -23,6 +24,7 @@ function nowPacific() {
 export default function MemberBooking({ member, tierConfig, refresh, showToast }) {
   const isNonMember = member.tier === "Non-Member";
   const hasCard = member.hasPaymentMethod;
+  const branding = useBranding();
 
   const bookStart = Number(tierConfig?.booking_hours_start ?? (isNonMember ? 10 : 0));
   const bookEnd = Number(tierConfig?.booking_hours_end ?? (isNonMember ? 20 : 24));
@@ -222,7 +224,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
               style={{ marginTop: 2, accentColor: "#4C8D73" }}
             />
             <span>
-              I agree to the <a href="https://hour.golf/legal/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Terms &amp; Conditions</a> and <a href="https://hour.golf/terms/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Club Policies</a>
+              I agree to the {branding?.legal_url ? <a href={branding.legal_url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Terms &amp; Conditions</a> : <span style={{ fontWeight: 600 }}>Terms &amp; Conditions</span>} and {branding?.terms_url ? <a href={branding.terms_url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>Club Policies</a> : <span style={{ fontWeight: 600 }}>Club Policies</span>}
             </span>
           </label>
 
