@@ -1,7 +1,8 @@
-import Stripe from "stripe";
 import { verifyAdmin, getServiceKey, SUPABASE_URL } from "../../lib/api-helpers";
+import { getStripeClient } from "../../lib/stripe-config";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Phase 7B-1: per-tenant Stripe client. See stripe-config.js for the
+// resolution path (reads public.tenant_stripe_config by tenant_id).
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
@@ -11,6 +12,17 @@ export default async function handler(req, res) {
 
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
+
+  let stripe;
+  try {
+    stripe = await getStripeClient(tenantId);
+  } catch (err) {
+    console.error("backfill-subscriptions getStripeClient failed:", err?.message || err);
+    return res.status(503).json({
+      error: "stripe_not_configured",
+      detail: "Stripe is not set up for this tenant yet.",
+    });
+  }
 
   try {
     // Get all members with stripe_customer_id but no stripe_subscription_id within this tenant
