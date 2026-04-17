@@ -15,7 +15,22 @@ export default function LoginForm({ onLogin, loading, error }) {
   return (
     <div className="setup">
       {branding?.logo_url ? (
-        <img src={branding.logo_url} alt={appName} style={{ maxWidth: 260, maxHeight: 80, marginBottom: 12 }} />
+        <>
+          <img src={branding.logo_url} alt={appName} style={{ maxWidth: 260, maxHeight: 80, marginBottom: 6 }} />
+          {appName && (
+            <div
+              style={{
+                fontSize: 18,
+                color: "var(--primary)",
+                fontFamily: "var(--font-display)",
+                letterSpacing: 1,
+                marginBottom: 4,
+              }}
+            >
+              {appName}
+            </div>
+          )}
+        </>
       ) : (
         <div
           className="logo"

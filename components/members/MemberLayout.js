@@ -197,11 +197,27 @@ export default function MemberLayout({ activeTab, children }) {
           margin: "16px auto 60px",
         }}>
           {branding?.logo_url ? (
-            <img
-              src={branding.logo_url}
-              alt={branding.app_name || ""}
-              style={{ width: "100%", maxWidth: 350, marginBottom: 30 }}
-            />
+            <>
+              <img
+                src={branding.logo_url}
+                alt={branding.app_name || ""}
+                style={{ width: "100%", maxWidth: 350, marginBottom: 8 }}
+              />
+              {branding?.app_name && (
+                <div
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: 20,
+                    color: "var(--primary)",
+                    textAlign: "center",
+                    letterSpacing: 1,
+                    marginBottom: 22,
+                  }}
+                >
+                  {branding.app_name}
+                </div>
+              )}
+            </>
           ) : (
             <div
               style={{
