@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { BAYS } from "../../lib/constants";
 import { fT, fD, mL, hrs, dlr, allD } from "../../lib/format";
+import { overageStatus, remainingOverageCents } from "../../lib/overage";
 import Badge from "../ui/Badge";
 import TierSelect from "../ui/TierSelect";
 import BulkBar from "../ui/BulkBar";
@@ -56,6 +57,8 @@ export default function DetailView({
     };
   }, [selMember, members, bookings, usage, showCanc, bayFilter]);
 
+  // Legacy boolean — kept as a thin wrapper in case other code paths call it.
+  // New overage-aware logic lives in lib/overage.js (overageStatus).
   function isPaid(email, month) {
     return payments.some((p) => p.member_email === email && p.billing_month === month && p.status === "succeeded");
   }
@@ -259,44 +262,70 @@ export default function DetailView({
           <span style={{ flex: 1 }} className="text-r">Status</span>
         </div>
         {selData.usage.map((u) => {
-          const ho = Number(u.overage_charge) > 0;
-          const pd = isPaid(u.customer_email, u.billing_month);
+          const hasOverage = Number(u.overage_hours) > 0;
+          const expectedCents = Math.round(Number(u.overage_charge || 0) * 100);
+          const remainingCents = remainingOverageCents(u, payments);
+          const remainingUsd = remainingCents / 100;
+          const status = overageStatus(u, payments);
           const mr = members.find((m) => m.email === u.customer_email);
           const hasStripe = !!mr?.stripe_customer_id;
+          const paidSoFarUsd = (expectedCents - remainingCents) / 100;
+          const chargeColTitle =
+            status === "partial" || status === "sub_min" || status === "paid"
+              ? `Expected $${(expectedCents / 100).toFixed(2)} \u2014 Paid $${paidSoFarUsd.toFixed(2)} \u2014 Remaining $${remainingUsd.toFixed(2)}`
+              : undefined;
           return (
             <div key={u.billing_month} className="tr">
               <span style={{ flex: 1 }}>{mL(u.billing_month)}</span>
               <span style={{ flex: 1 }} className="text-r tab-num">{hrs(u.total_hours)}</span>
               <span style={{ flex: 1 }} className="text-r tab-num">{allD(u.included_hours)}</span>
-              <span style={{ flex: 1 }} className={`text-r tab-num ${Number(u.overage_hours) > 0 ? "red" : ""}`}>
-                {Number(u.overage_hours) > 0 ? hrs(u.overage_hours) : "\u2014"}
+              <span style={{ flex: 1 }} className={`text-r tab-num ${hasOverage ? "red" : ""}`}>
+                {hasOverage ? hrs(u.overage_hours) : "\u2014"}
               </span>
-              <span style={{ flex: 1 }} className={`text-r tab-num ${ho ? "red bold" : ""}`}>
-                {ho ? dlr(u.overage_charge) : "\u2014"}
+              <span
+                style={{ flex: 1 }}
+                className={`text-r tab-num ${remainingCents > 0 ? "red bold" : ""}`}
+                title={chargeColTitle}
+              >
+                {status === "none" && "\u2014"}
+                {status === "paid" && dlr(0)}
+                {(status === "unpaid" || status === "partial" || status === "sub_min") &&
+                  dlr(remainingUsd)}
               </span>
               <span style={{ flex: 1 }} className="text-r">
-                {ho && pd && <span className="badge" style={{ background: "#4a7c59", fontSize: 9 }}>PAID</span>}
-                {ho && !pd && hasStripe && (
+                {status === "none" && <span className="muted">&mdash;</span>}
+                {status === "paid" && (
+                  <span className="badge" style={{ background: "#4a7c59", fontSize: 9 }}>PAID</span>
+                )}
+                {status === "sub_min" && (
+                  <span className="muted" style={{ fontSize: 10 }} title={`$${remainingUsd.toFixed(2)} remaining \u2014 below Stripe's $0.50 minimum, treating as paid`}>
+                    PAID*
+                  </span>
+                )}
+                {(status === "unpaid" || status === "partial") && hasStripe && (
                   <button
                     className="btn primary"
                     style={{ fontSize: 10 }}
                     disabled={saving}
+                    title={status === "partial" ? chargeColTitle : undefined}
                     onClick={(e) => {
                       e.stopPropagation();
                       onChargeOverage({
                         email: u.customer_email,
                         month: u.billing_month,
-                        amount: Number(u.overage_charge),
+                        amount: remainingUsd,
                         stripe_customer_id: mr.stripe_customer_id,
                         name: u.customer_name,
                       });
                     }}
                   >
-                    Charge {dlr(u.overage_charge)}
+                    Charge {dlr(remainingUsd)}
+                    {status === "partial" ? " rem." : ""}
                   </button>
                 )}
-                {ho && !pd && !hasStripe && <span className="muted" style={{ fontSize: 10 }}>No Stripe</span>}
-                {!ho && <span className="muted">&mdash;</span>}
+                {(status === "unpaid" || status === "partial") && !hasStripe && (
+                  <span className="muted" style={{ fontSize: 10 }}>No Stripe</span>
+                )}
               </span>
             </div>
           );

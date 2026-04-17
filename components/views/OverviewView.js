@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { TIERS } from "../../lib/constants";
 import { mL, hrs, dlr, allD } from "../../lib/format";
+import { overageStatus, remainingOverageCents } from "../../lib/overage";
 import Badge from "../ui/Badge";
 
 export default function OverviewView({
@@ -156,8 +157,16 @@ export default function OverviewView({
               <span style={{ flex: 1 }} className="text-r">Status</span>
             </div>
             {memMonth.map((r) => {
-              const ho = Number(r.overage_charge) > 0;
-              const pd = isPaid(r.customer_email, r.billing_month);
+              const hasOverage = Number(r.overage_hours) > 0;
+              const expectedCents = Math.round(Number(r.overage_charge || 0) * 100);
+              const remainingCents = remainingOverageCents(r, payments);
+              const remainingUsd = remainingCents / 100;
+              const status = overageStatus(r, payments);
+              const paidSoFarUsd = (expectedCents - remainingCents) / 100;
+              const tooltip =
+                status === "partial" || status === "sub_min" || status === "paid"
+                  ? `Expected $${(expectedCents / 100).toFixed(2)} \u2014 Paid $${paidSoFarUsd.toFixed(2)} \u2014 Remaining $${remainingUsd.toFixed(2)}`
+                  : undefined;
               return (
                 <div key={r.customer_email} className="tr click" onClick={() => onSelectMember(r.customer_email)}>
                   <span style={{ flex: 2 }}>
@@ -167,16 +176,24 @@ export default function OverviewView({
                   <span style={{ flex: 1 }}><Badge tier={r.tier} /></span>
                   <span style={{ flex: 1 }} className="text-r tab-num">{hrs(r.total_hours)}</span>
                   <span style={{ flex: 1 }} className="text-r tab-num">{allD(r.included_hours)}</span>
-                  <span style={{ flex: 1 }} className={`text-r tab-num ${Number(r.overage_hours) > 0 ? "red" : ""}`}>
-                    {Number(r.overage_hours) > 0 ? hrs(r.overage_hours) : "\u2014"}
+                  <span style={{ flex: 1 }} className={`text-r tab-num ${hasOverage ? "red" : ""}`}>
+                    {hasOverage ? hrs(r.overage_hours) : "\u2014"}
                   </span>
-                  <span style={{ flex: 1 }} className={`text-r tab-num ${ho ? "red bold" : ""}`}>
-                    {ho ? dlr(r.overage_charge) : "\u2014"}
+                  <span
+                    style={{ flex: 1 }}
+                    className={`text-r tab-num ${remainingCents > 0 ? "red bold" : ""}`}
+                    title={tooltip}
+                  >
+                    {status === "none" && "\u2014"}
+                    {status === "paid" && dlr(0)}
+                    {(status === "unpaid" || status === "partial" || status === "sub_min") && dlr(remainingUsd)}
                   </span>
                   <span style={{ flex: 1 }} className="text-r">
-                    {ho && pd && <span className="badge" style={{ background: "#4C8D73", color: "#EDF3E3", fontSize: 9 }}>PAID</span>}
-                    {ho && !pd && <span className="badge" style={{ background: "var(--red)", color: "#EDF3E3", fontSize: 9 }}>UNPAID</span>}
-                    {!ho && <span className="muted">&mdash;</span>}
+                    {status === "none" && <span className="muted">&mdash;</span>}
+                    {status === "paid" && <span className="badge" style={{ background: "#4C8D73", color: "#EDF3E3", fontSize: 9 }}>PAID</span>}
+                    {status === "sub_min" && <span className="badge" style={{ background: "#4C8D73", color: "#EDF3E3", fontSize: 9 }} title={tooltip}>PAID*</span>}
+                    {status === "partial" && <span className="badge" style={{ background: "#C77B3C", color: "#EDF3E3", fontSize: 9 }} title={tooltip}>PARTIAL</span>}
+                    {status === "unpaid" && <span className="badge" style={{ background: "var(--red)", color: "#EDF3E3", fontSize: 9 }}>UNPAID</span>}
                   </span>
                 </div>
               );
@@ -185,8 +202,16 @@ export default function OverviewView({
           {/* Mobile cards */}
           <div className="usage-mobile">
             {memMonth.map((r) => {
-              const ho = Number(r.overage_charge) > 0;
-              const pd = isPaid(r.customer_email, r.billing_month);
+              const hasOverage = Number(r.overage_hours) > 0;
+              const expectedCents = Math.round(Number(r.overage_charge || 0) * 100);
+              const remainingCents = remainingOverageCents(r, payments);
+              const remainingUsd = remainingCents / 100;
+              const status = overageStatus(r, payments);
+              const paidSoFarUsd = (expectedCents - remainingCents) / 100;
+              const tooltip =
+                status === "partial" || status === "sub_min" || status === "paid"
+                  ? `Expected $${(expectedCents / 100).toFixed(2)} \u2014 Paid $${paidSoFarUsd.toFixed(2)} \u2014 Remaining $${remainingUsd.toFixed(2)}`
+                  : undefined;
               return (
                 <div key={r.customer_email} className="usage-card" onClick={() => onSelectMember(r.customer_email)}>
                   <div className="usage-card-top">
@@ -195,9 +220,11 @@ export default function OverviewView({
                       <Badge tier={r.tier} />
                     </div>
                     <div>
-                      {ho && pd && <span className="badge" style={{ background: "#4C8D73", color: "#EDF3E3", fontSize: 9 }}>PAID</span>}
-                      {ho && !pd && <span className="badge" style={{ background: "var(--red)", color: "#EDF3E3", fontSize: 9 }}>UNPAID</span>}
-                      {!ho && <span className="muted">&mdash;</span>}
+                      {status === "none" && <span className="muted">&mdash;</span>}
+                      {status === "paid" && <span className="badge" style={{ background: "#4C8D73", color: "#EDF3E3", fontSize: 9 }}>PAID</span>}
+                      {status === "sub_min" && <span className="badge" style={{ background: "#4C8D73", color: "#EDF3E3", fontSize: 9 }} title={tooltip}>PAID*</span>}
+                      {status === "partial" && <span className="badge" style={{ background: "#C77B3C", color: "#EDF3E3", fontSize: 9 }} title={tooltip}>PARTIAL</span>}
+                      {status === "unpaid" && <span className="badge" style={{ background: "var(--red)", color: "#EDF3E3", fontSize: 9 }}>UNPAID</span>}
                     </div>
                   </div>
                   <div className="usage-card-stats">
@@ -210,16 +237,21 @@ export default function OverviewView({
                       <span className="usage-card-lbl">Allot</span>
                     </div>
                     <div className="usage-card-stat">
-                      <span className={`usage-card-val tab-num ${Number(r.overage_hours) > 0 ? "red" : ""}`}>
-                        {Number(r.overage_hours) > 0 ? hrs(r.overage_hours) : "\u2014"}
+                      <span className={`usage-card-val tab-num ${hasOverage ? "red" : ""}`}>
+                        {hasOverage ? hrs(r.overage_hours) : "\u2014"}
                       </span>
                       <span className="usage-card-lbl">Over</span>
                     </div>
                     <div className="usage-card-stat">
-                      <span className={`usage-card-val tab-num ${ho ? "red bold" : ""}`}>
-                        {ho ? dlr(r.overage_charge) : "\u2014"}
+                      <span
+                        className={`usage-card-val tab-num ${remainingCents > 0 ? "red bold" : ""}`}
+                        title={tooltip}
+                      >
+                        {status === "none" && "\u2014"}
+                        {status === "paid" && dlr(0)}
+                        {(status === "unpaid" || status === "partial" || status === "sub_min") && dlr(remainingUsd)}
                       </span>
-                      <span className="usage-card-lbl">Charge</span>
+                      <span className="usage-card-lbl">Owed</span>
                     </div>
                   </div>
                 </div>
