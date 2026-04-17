@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
+import Link from "next/link";
 import { usePlatformAuth } from "../../hooks/usePlatformAuth";
 
 export default function PlatformHome() {
@@ -89,7 +90,12 @@ export default function PlatformHome() {
               <span style={{ flex: 1 }} className="text-r">Stripe</span>
             </div>
             {tenants.map((t) => (
-              <div key={t.id} className="tr">
+              <div
+                key={t.id}
+                className="tr click"
+                onClick={() => router.push(`/platform/tenants/${t.slug}`)}
+                style={{ cursor: "pointer" }}
+              >
                 <span style={{ flex: 2 }}>
                   <strong>{t.name}</strong>
                   <br />
@@ -125,7 +131,8 @@ export default function PlatformHome() {
         )}
 
         <p style={{ marginTop: 32, fontSize: 11, color: "var(--text-muted)" }}>
-          Read-only for now. Tenant detail, create, and edit land in S2.
+          Click a tenant to edit Stripe config or feature flags. Create / delete /
+          branding-from-platform come in a later slice.
         </p>
       </div>
     </>
