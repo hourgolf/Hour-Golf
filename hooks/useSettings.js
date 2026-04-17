@@ -95,18 +95,53 @@ export function useSettings({ user, apiKey, connected } = {}) {
   }, [connected]);
 
   // 3) Apply visual side-effects + persist locally on every change.
+  //
+  // IMPORTANT re: multi-tenant branding:
+  // The tenant's primary color is injected by _document.js as
+  // `:root:root { --primary: ... }`. Setting an inline style here with
+  // document.documentElement.style.setProperty would beat that selector
+  // and hide the tenant brand. So we only override --primary when the
+  // admin has explicitly picked a custom color (settings.customColor or
+  // picked a non-brand preset theme). A "clean" admin gets the tenant
+  // brand color automatically via the injected CSS.
   useEffect(() => {
     if (!hydrated) return;
     saveLocal(settings);
-    const primaryColor = settings.customColor || (THEMES[settings.theme] || THEMES.brand).primary;
-    document.documentElement.style.setProperty("--primary", primaryColor);
-    document.documentElement.style.setProperty("--primary-light", primaryColor + "cc");
+
+    const hasCustomPrimary =
+      !!settings.customColor ||
+      (settings.theme && settings.theme !== "brand");
+
+    if (hasCustomPrimary) {
+      const primaryColor =
+        settings.customColor || (THEMES[settings.theme] || THEMES.brand).primary;
+      document.documentElement.style.setProperty("--primary", primaryColor);
+      document.documentElement.style.setProperty(
+        "--primary-light",
+        primaryColor + "cc"
+      );
+    } else {
+      // No personal override — clear any inline values so the tenant
+      // brand's CSS variable (from :root:root injection) shows through.
+      document.documentElement.style.removeProperty("--primary");
+      document.documentElement.style.removeProperty("--primary-light");
+    }
+
     document.documentElement.style.setProperty("--font", settings.font);
-    document.documentElement.style.setProperty("--font-size", settings.fontSize + "px");
-    document.documentElement.style.setProperty("--hdr-btn-size", (settings.headerBtnSize || 16) + "px");
+    document.documentElement.style.setProperty(
+      "--font-size",
+      settings.fontSize + "px"
+    );
+    document.documentElement.style.setProperty(
+      "--hdr-btn-size",
+      (settings.headerBtnSize || 16) + "px"
+    );
     document.body.style.fontFamily = settings.font;
     document.body.style.fontSize = settings.fontSize + "px";
-    document.documentElement.setAttribute("data-theme", settings.dark ? "dark" : "light");
+    document.documentElement.setAttribute(
+      "data-theme",
+      settings.dark ? "dark" : "light"
+    );
     document.documentElement.setAttribute("data-density", settings.density);
   }, [settings, hydrated]);
 

@@ -5,6 +5,7 @@ import {
   tenantIdFromReq,
   buildRootCssVars,
   buildDisplayFontFace,
+  buildBackgroundImageRule,
 } from "../lib/branding";
 
 // Escape helper: keep user-supplied branding values from breaking out of
@@ -37,6 +38,7 @@ class MyDocument extends Document {
     const branding = this.props.branding || FALLBACK_BRANDING;
     const cssVars = buildRootCssVars(branding);
     const fontFace = buildDisplayFontFace(branding);
+    const bgRule = buildBackgroundImageRule(branding);
     const appName = branding.app_name || "Hour Golf";
     const themeColor = branding.pwa_theme_color || branding.primary_color;
 
@@ -86,7 +88,7 @@ class MyDocument extends Document {
           */}
           <style
             data-tenant-branding=""
-            dangerouslySetInnerHTML={{ __html: `${cssVars}\n${fontFace}` }}
+            dangerouslySetInnerHTML={{ __html: `${cssVars}\n${fontFace}\n${bgRule}` }}
           />
           {/*
             Inject the branding object as a global for client components.
