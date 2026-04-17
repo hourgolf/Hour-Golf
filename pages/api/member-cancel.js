@@ -130,15 +130,20 @@ export default async function handler(req, res) {
       }
     } catch (_) { /* access code cleanup is best-effort */ }
 
-    // Send cancellation email (fire-and-forget)
-    sendCancellationEmail({
-      tenantId,
-      to: member.email,
-      customerName: member.name || member.email,
-      bay: booking.bay,
-      bookingStart: booking.booking_start,
-      bookingEnd: booking.booking_end,
-    }).catch(() => {});
+    // Await the cancellation email (Vercel freeze-after-return would
+    // otherwise drop the Resend call silently).
+    try {
+      await sendCancellationEmail({
+        tenantId,
+        to: member.email,
+        customerName: member.name || member.email,
+        bay: booking.bay,
+        bookingStart: booking.booking_start,
+        bookingEnd: booking.booking_end,
+      });
+    } catch (emailErr) {
+      console.error("Cancellation email failed:", emailErr);
+    }
 
     return res.status(200).json({ success: true });
   } catch (e) {

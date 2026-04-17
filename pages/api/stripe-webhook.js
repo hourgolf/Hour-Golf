@@ -200,14 +200,18 @@ export default async function handler(req, res) {
         // Send welcome email. tenant_id comes from the member row; this
         // webhook is still single-tenant per Phase 7C, but the email
         // already renders with the right tenant branding regardless.
-        sendWelcomeEmail({
-          tenantId: welcomeTenantId,
-          to: memberEmail,
-          customerName: memberName,
-          tier,
-          monthlyFee: tierConfig?.monthly_fee || 0,
-          includedHours: tierConfig?.included_hours || 0,
-        }).catch(() => {});
+        try {
+          await sendWelcomeEmail({
+            tenantId: welcomeTenantId,
+            to: memberEmail,
+            customerName: memberName,
+            tier,
+            monthlyFee: tierConfig?.monthly_fee || 0,
+            includedHours: tierConfig?.included_hours || 0,
+          });
+        } catch (e) {
+          console.error("Welcome email failed:", e);
+        }
 
         console.log(`Member ${memberEmail} subscribed to ${tier}`);
         break;
@@ -288,16 +292,20 @@ export default async function handler(req, res) {
         });
 
         // Send receipt email scoped to the member's tenant
-        sendPaymentReceiptEmail({
-          tenantId: memberTenantId,
-          to: memberEmail,
-          customerName: memberName || memberEmail,
-          amount: amountPaid,
-          description,
-          date: new Date(invoice.created * 1000).toLocaleDateString("en-US", {
-            month: "long", day: "numeric", year: "numeric",
-          }),
-        }).catch(() => {});
+        try {
+          await sendPaymentReceiptEmail({
+            tenantId: memberTenantId,
+            to: memberEmail,
+            customerName: memberName || memberEmail,
+            amount: amountPaid,
+            description,
+            date: new Date(invoice.created * 1000).toLocaleDateString("en-US", {
+              month: "long", day: "numeric", year: "numeric",
+            }),
+          });
+        } catch (e) {
+          console.error("Payment receipt email failed:", e);
+        }
 
         console.log(`Payment recorded for ${memberEmail}: $${(amountPaid / 100).toFixed(2)}`);
         break;

@@ -28,6 +28,20 @@ async function createSeamAccessCode(apiKey: string, deviceId: string, name: stri
   return { accessCodeId: ac.access_code_id, code: ac.code };
 }
 
+async function deleteSeamAccessCode(apiKey: string, accessCodeId: string): Promise<void> {
+  const resp = await fetch("https://connect.getseam.com/access_codes/delete", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ access_code_id: accessCodeId }),
+  });
+  // Seam returns 200 with { ok: true } for successful deletes. 404 is
+  // acceptable — code was already deleted, treat as idempotent success.
+  if (!resp.ok && resp.status !== 404) {
+    const text = await resp.text();
+    throw new Error(`Seam delete ${resp.status}: ${text.substring(0, 500)}`);
+  }
+}
+
 function buildEmailHtml(venueName: string, customerName: string, bay: string, bookingStart: Date, bookingEnd: Date, accessCode: string, footerText: string): string {
   const start = toPacific(bookingStart);
   const end = toPacific(bookingEnd);
@@ -91,9 +105,37 @@ Deno.serve(async (_req: Request) => {
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  const cutoff = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
-  const { data: jobs, error: queryError } = await supabase.from("access_code_jobs").select("*").in("status", ["pending", "failed"]).lte("code_start", cutoff).order("code_start", { ascending: true }).limit(20);
+  // Pick up jobs whose code_start has arrived (no lookahead). Previously
+  // we added a 5-min buffer so the email would land a bit early, but
+  // that caused a UX gap — the member would have the code in hand
+  // before Seam activated it on the lock. Failed keypad attempts could
+  // trigger lockout, so the correct code would fail when the window
+  // finally opened. Now the email fires at or just after code_start,
+  // so by the time the member reads it the code is live on the lock.
+  const cutoff = new Date(Date.now()).toISOString();
+
+  // pending/failed jobs ready to send (code_start has arrived)
+  const { data: sendJobs, error: sendErr } = await supabase
+    .from("access_code_jobs")
+    .select("*")
+    .in("status", ["pending", "failed"])
+    .lte("code_start", cutoff)
+    .order("code_start", { ascending: true })
+    .limit(20);
+
+  // pending_delete jobs — booking was cancelled AFTER the code was
+  // already sent. No code_start filter: could be future-dated, we
+  // want to delete the Seam code as soon as possible regardless.
+  const { data: deleteJobs, error: deleteErr } = await supabase
+    .from("access_code_jobs")
+    .select("*")
+    .eq("status", "pending_delete")
+    .order("created_at", { ascending: true })
+    .limit(20);
+
+  const queryError = sendErr || deleteErr;
+  const jobs = [...(sendJobs || []), ...(deleteJobs || [])];
 
   if (queryError) {
     console.error("Query error:", queryError.message);
@@ -134,6 +176,31 @@ Deno.serve(async (_req: Request) => {
       if (!ctx.seamEnabled) {
         await supabase.from("access_code_jobs").update({ status: "cancelled", processed_at: new Date().toISOString(), error_message: "[config] seam_enabled=false for tenant" }).eq("id", job.id);
         results.push({ booking_id: job.booking_id, status: "cancelled", reason: "seam_disabled" });
+        continue;
+      }
+
+      // pending_delete branch: booking was cancelled after the code was
+      // sent. Delete the Seam code and mark row as `deleted`. Don't run
+      // the send flow below.
+      if (job.status === "pending_delete") {
+        if (job.seam_access_code_id) {
+          try {
+            await deleteSeamAccessCode(ctx.seamApiKey, job.seam_access_code_id);
+          } catch (err) {
+            // On Seam delete failure, surface the error and retry on
+            // next tick. We don't escalate to failed_permanent here —
+            // the code stays active while we retry, which is worse
+            // than a transient log line.
+            console.error(`Seam delete failed for ${job.booking_id}: ${err}`);
+            results.push({ booking_id: job.booking_id, status: "pending_delete", error: String(err).substring(0, 200) });
+            continue;
+          }
+        }
+        await supabase.from("access_code_jobs")
+          .update({ status: "deleted", processed_at: new Date().toISOString() })
+          .eq("id", job.id);
+        console.log(`Seam code deleted for cancelled booking ${job.booking_id}`);
+        results.push({ booking_id: job.booking_id, status: "deleted", reason: "booking_cancelled_after_send" });
         continue;
       }
 

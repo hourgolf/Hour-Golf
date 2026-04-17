@@ -110,15 +110,23 @@ export default async function handler(req, res) {
     const data = await resp.json();
     const booked = data[0];
 
-    // Send booking confirmation email immediately (fire-and-forget)
-    sendBookingConfirmation({
-      tenantId,
-      to: booked.customer_email,
-      customerName: booked.customer_name || booked.customer_email,
-      bay: booked.bay,
-      bookingStart: booked.booking_start,
-      bookingEnd: booked.booking_end,
-    }).catch(() => {});
+    // Await the confirmation email. Previously this was fire-and-forget
+    // with a swallowed catch, but Vercel can freeze/terminate the
+    // serverless process the moment res.json() returns — the Resend
+    // fetch then never completes and the email silently vanishes.
+    // Caught errors are logged but don't fail the booking response.
+    try {
+      await sendBookingConfirmation({
+        tenantId,
+        to: booked.customer_email,
+        customerName: booked.customer_name || booked.customer_email,
+        bay: booked.bay,
+        bookingStart: booked.booking_start,
+        bookingEnd: booked.booking_end,
+      });
+    } catch (emailErr) {
+      console.error("Booking confirmation email failed:", emailErr);
+    }
 
     return res.status(200).json({ success: true, booking: booked });
   } catch (e) {

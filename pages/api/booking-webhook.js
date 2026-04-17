@@ -79,15 +79,21 @@ export default async function handler(req, res) {
           // This endpoint is deprecated (Skedda/Zapier removal pending),
           // and bookings here always fall back to Hour Golf's tenant_id
           // via the DB DEFAULT. Pin the email to Hour Golf branding
-          // accordingly until the file is deleted.
-          sendBookingConfirmation({
-            tenantId: "11111111-1111-4111-8111-111111111111",
-            to: booked.customer_email,
-            customerName: booked.customer_name || booked.customer_email,
-            bay: booked.bay,
-            bookingStart: booked.booking_start,
-            bookingEnd: booked.booking_end,
-          }).catch(() => {});
+          // accordingly until the file is deleted. Awaited for the
+          // same reason as customer-book.js — fire-and-forget on Vercel
+          // drops the Resend call when the process freezes.
+          try {
+            await sendBookingConfirmation({
+              tenantId: "11111111-1111-4111-8111-111111111111",
+              to: booked.customer_email,
+              customerName: booked.customer_name || booked.customer_email,
+              bay: booked.bay,
+              bookingStart: booked.booking_start,
+              bookingEnd: booked.booking_end,
+            });
+          } catch (e) {
+            console.error("Booking confirmation email failed:", e);
+          }
         }
       } else {
         const err = await resp.text();
