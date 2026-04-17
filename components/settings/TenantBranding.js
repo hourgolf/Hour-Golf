@@ -58,13 +58,67 @@ const COLOR_FIELDS = [
   { key: "text_color", label: "Text", hint: "Primary body text color" },
 ];
 
+// Compact logo slot with preview, upload, URL input, and on/off toggle.
+// Rendered three times in the Logos section — welcome, header, icon.
+function LogoSlot({ label, hint, urlKey, toggleKey, uploadHandler, uploading, branding, update }) {
+  const url = branding[urlKey];
+  const enabled = branding[toggleKey] !== false;
+  return (
+    <div className="mf">
+      <label>{label}</label>
+      <div className="muted" style={{ fontSize: 11, marginTop: -4, marginBottom: 6 }}>{hint}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            background: "var(--primary)",
+            borderRadius: 6,
+            padding: 8,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            opacity: enabled ? 1 : 0.35,
+          }}
+        >
+          {url ? (
+            <img src={url} alt={label} style={{ maxWidth: "100%", maxHeight: "100%", filter: "brightness(0) invert(0.95)" }} />
+          ) : (
+            <span style={{ color: "rgba(237,243,227,0.5)", fontSize: 10 }}>none</span>
+          )}
+        </div>
+        <input type="file" accept="image/*" onChange={uploadHandler} disabled={uploading} style={{ fontSize: 11, maxWidth: 140 }} />
+      </div>
+      <input
+        type="text"
+        value={url || ""}
+        onChange={(e) => update(urlKey, e.target.value)}
+        placeholder="https://..."
+        style={{ width: "100%", padding: "4px 8px", border: "1px solid var(--border)", borderRadius: 4, fontFamily: "var(--font-mono)", fontSize: 10, background: "var(--surface)", color: "var(--text)" }}
+      />
+      <label style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12 }}>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => update(toggleKey, e.target.checked)}
+        />
+        <span>Show</span>
+      </label>
+      {uploading && <div className="muted" style={{ marginTop: 4 }}>Uploading…</div>}
+    </div>
+  );
+}
+
 export default function TenantBranding({ apiKey, tenantIdOverride }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [branding, setBranding] = useState(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
-  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingWelcome, setUploadingWelcome] = useState(false);
+  const [uploadingHeader, setUploadingHeader] = useState(false);
+  const [uploadingIcon, setUploadingIcon] = useState(false);
   const [uploadingBg, setUploadingBg] = useState(false);
   const [uploadingFont, setUploadingFont] = useState(false);
 
@@ -156,9 +210,19 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
     }
   }
 
-  async function handleLogoUpload(e) {
-    const url = await uploadAsset(e.target.files?.[0], "logo", "logo", setUploadingLogo);
-    if (url) update("logo_url", url);
+  async function handleWelcomeLogoUpload(e) {
+    const url = await uploadAsset(e.target.files?.[0], "logo", "welcome", setUploadingWelcome);
+    if (url) update("welcome_logo_url", url);
+  }
+
+  async function handleHeaderLogoUpload(e) {
+    const url = await uploadAsset(e.target.files?.[0], "logo", "header", setUploadingHeader);
+    if (url) update("header_logo_url", url);
+  }
+
+  async function handleIconUpload(e) {
+    const url = await uploadAsset(e.target.files?.[0], "logo", "icon", setUploadingIcon);
+    if (url) update("icon_url", url);
   }
 
   async function handleBgUpload(e) {
@@ -191,6 +255,14 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
       for (const { key } of COLOR_FIELDS) payload[key] = branding[key];
       payload.pwa_theme_color = branding.pwa_theme_color || branding.primary_color;
       payload.logo_url = branding.logo_url || null;
+      payload.welcome_logo_url = branding.welcome_logo_url || null;
+      payload.header_logo_url = branding.header_logo_url || null;
+      payload.icon_url = branding.icon_url || null;
+      payload.show_welcome_logo = branding.show_welcome_logo !== false;
+      payload.show_welcome_title = branding.show_welcome_title !== false;
+      payload.show_header_logo = branding.show_header_logo !== false;
+      payload.show_header_title = branding.show_header_title === true;
+      payload.show_icon = branding.show_icon === true;
       payload.background_image_url = branding.background_image_url || null;
       payload.font_display_name = branding.font_display_name || null;
       payload.font_display_url = branding.font_display_url || null;
@@ -259,51 +331,88 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
         </div>
       </div>
 
-      {/* Assets */}
+      {/* Logos */}
       <div>
         <h4 style={{ fontFamily: "var(--font-display)", fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, color: "var(--text-muted)", marginBottom: 10 }}>
-          Assets
+          Logos
         </h4>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-          <div className="mf">
-            <label>Brand Logo (shown in header)</label>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-              {branding.logo_url && (
-                <div style={{ width: 80, height: 80, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--primary)", borderRadius: 6, padding: 8 }}>
-                  <img src={branding.logo_url} alt="Logo" style={{ maxWidth: "100%", maxHeight: "100%", filter: "brightness(0) invert(0.95)" }} />
-                </div>
-              )}
-              <input type="file" accept="image/*" onChange={handleLogoUpload} disabled={uploadingLogo} />
-            </div>
-            <input
-              type="text"
-              value={branding.logo_url || ""}
-              onChange={(e) => update("logo_url", e.target.value)}
-              placeholder="https://... or /path/to/logo.svg"
-              style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontFamily: "var(--font-mono)", fontSize: 11, background: "var(--surface)", color: "var(--text)" }}
-            />
-            {uploadingLogo && <div className="muted" style={{ marginTop: 4 }}>Uploading…</div>}
-          </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20 }}>
+          <LogoSlot
+            label="Welcome Logo"
+            hint="Big hero on login pages"
+            urlKey="welcome_logo_url"
+            toggleKey="show_welcome_logo"
+            uploadHandler={handleWelcomeLogoUpload}
+            uploading={uploadingWelcome}
+            branding={branding}
+            update={update}
+          />
+          <LogoSlot
+            label="Header Logo"
+            hint="Compact, shown in persistent nav"
+            urlKey="header_logo_url"
+            toggleKey="show_header_logo"
+            uploadHandler={handleHeaderLogoUpload}
+            uploading={uploadingHeader}
+            branding={branding}
+            update={update}
+          />
+          <LogoSlot
+            label="Icon"
+            hint="Decorative mark (secondary)"
+            urlKey="icon_url"
+            toggleKey="show_icon"
+            uploadHandler={handleIconUpload}
+            uploading={uploadingIcon}
+            branding={branding}
+            update={update}
+          />
+        </div>
 
-          <div className="mf">
-            <label>Background Image (optional)</label>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-              {branding.background_image_url && (
-                <div style={{ width: 80, height: 80, borderRadius: 6, overflow: "hidden", border: "1px solid var(--border)" }}>
-                  <img src={branding.background_image_url} alt="Background" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                </div>
-              )}
-              <input type="file" accept="image/*" onChange={handleBgUpload} disabled={uploadingBg} />
-            </div>
+        <div style={{ marginTop: 16, padding: 12, background: "var(--bg)", borderRadius: 8, fontSize: 12 }}>
+          <div style={{ fontWeight: 600, marginBottom: 8, color: "var(--text-muted)" }}>Show tenant name as text:</div>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, marginRight: 18 }}>
             <input
-              type="text"
-              value={branding.background_image_url || ""}
-              onChange={(e) => update("background_image_url", e.target.value)}
-              placeholder="https://... or leave empty"
-              style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontFamily: "var(--font-mono)", fontSize: 11, background: "var(--surface)", color: "var(--text)" }}
+              type="checkbox"
+              checked={branding.show_welcome_title !== false}
+              onChange={(e) => update("show_welcome_title", e.target.checked)}
             />
-            {uploadingBg && <div className="muted" style={{ marginTop: 4 }}>Uploading…</div>}
+            <span>On login pages</span>
+          </label>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <input
+              type="checkbox"
+              checked={branding.show_header_title === true}
+              onChange={(e) => update("show_header_title", e.target.checked)}
+            />
+            <span>In persistent header</span>
+          </label>
+        </div>
+      </div>
+
+      {/* Background */}
+      <div>
+        <h4 style={{ fontFamily: "var(--font-display)", fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, color: "var(--text-muted)", marginBottom: 10 }}>
+          Background
+        </h4>
+        <div className="mf" style={{ maxWidth: 360 }}>
+          <label>Page background image (optional)</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+            {branding.background_image_url && (
+              <div style={{ width: 80, height: 80, borderRadius: 6, overflow: "hidden", border: "1px solid var(--border)" }}>
+                <img src={branding.background_image_url} alt="Background" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </div>
+            )}
+            <input type="file" accept="image/*" onChange={handleBgUpload} disabled={uploadingBg} />
           </div>
+          <input
+            type="text"
+            value={branding.background_image_url || ""}
+            onChange={(e) => update("background_image_url", e.target.value)}
+            placeholder="https://... or leave empty"
+            style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontFamily: "var(--font-mono)", fontSize: 11, background: "var(--surface)", color: "var(--text)" }}
+          />
+          {uploadingBg && <div className="muted" style={{ marginTop: 4 }}>Uploading…</div>}
         </div>
       </div>
 

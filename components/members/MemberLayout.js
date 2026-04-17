@@ -196,43 +196,40 @@ export default function MemberLayout({ activeTab, children }) {
           width: "calc(100% - 40px)",
           margin: "16px auto 60px",
         }}>
-          {branding?.logo_url ? (
-            <>
-              <img
-                src={branding.logo_url}
-                alt={branding.app_name || ""}
-                style={{ width: "100%", maxWidth: 350, marginBottom: 8 }}
-              />
-              {branding?.app_name && (
-                <div
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    fontSize: 20,
-                    color: "var(--primary)",
-                    textAlign: "center",
-                    letterSpacing: 1,
-                    marginBottom: 22,
-                  }}
-                >
-                  {branding.app_name}
-                </div>
-              )}
-            </>
-          ) : (
-            <div
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: 32,
-                color: "var(--primary)",
-                textAlign: "center",
-                marginBottom: 30,
-                marginTop: 20,
-                letterSpacing: 1,
-              }}
-            >
-              {branding?.app_name || ""}
-            </div>
-          )}
+          {(() => {
+            // Welcome logo + title visibility is controlled by the new
+            // show_welcome_logo / show_welcome_title toggles. welcome_logo_url
+            // falls back to the legacy logo_url if unset.
+            const welcomeLogoUrl = branding?.welcome_logo_url || branding?.logo_url;
+            const showLogo = branding?.show_welcome_logo !== false && !!welcomeLogoUrl;
+            const showTitle = branding?.show_welcome_title !== false && !!(branding?.app_name);
+            return (
+              <>
+                {showLogo && (
+                  <img
+                    src={welcomeLogoUrl}
+                    alt={branding.app_name || ""}
+                    style={{ width: "100%", maxWidth: 350, marginBottom: showTitle ? 8 : 30 }}
+                  />
+                )}
+                {showTitle && (
+                  <div
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: showLogo ? 20 : 32,
+                      color: "var(--primary)",
+                      textAlign: "center",
+                      letterSpacing: 1,
+                      marginBottom: showLogo ? 22 : 30,
+                      marginTop: showLogo ? 0 : 20,
+                    }}
+                  >
+                    {branding.app_name}
+                  </div>
+                )}
+              </>
+            );
+          })()}
           <div className="mem-brand-sub">{
             mode === "login"
               ? (branding?.welcome_message || "Welcome.")
@@ -453,23 +450,42 @@ export default function MemberLayout({ activeTab, children }) {
               equivalent asset, so rather than a per-tenant slot for a decorative
               mark (which would need its own branding column), we drop it and
               keep the header clean for every tenant. */}
-          <div aria-hidden="true" style={{ justifySelf: "start" }} />
-          <div style={{ textAlign: "center" }}>
-            {branding?.logo_url ? (
-              <img src={branding.logo_url} alt={branding.app_name || ""} className="hdr-title-logo" />
-            ) : (
-              <div
-                className="hdr-title-logo"
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: 22,
-                  color: "var(--bg)",
-                  letterSpacing: 1,
-                }}
-              >
-                {branding?.app_name || ""}
-              </div>
+          <div aria-hidden="true" style={{ justifySelf: "start" }}>
+            {branding?.show_icon && branding?.icon_url && (
+              <img
+                src={branding.icon_url}
+                alt=""
+                style={{ height: 28, width: "auto", opacity: 0.9 }}
+              />
             )}
+          </div>
+          <div style={{ textAlign: "center" }}>
+            {(() => {
+              const headerLogoUrl = branding?.header_logo_url || branding?.logo_url;
+              const showLogo = branding?.show_header_logo !== false && !!headerLogoUrl;
+              const showTitle = branding?.show_header_title === true && !!(branding?.app_name);
+              if (showLogo) {
+                return (
+                  <img src={headerLogoUrl} alt={branding.app_name || ""} className="hdr-title-logo" />
+                );
+              }
+              if (showTitle || !headerLogoUrl) {
+                return (
+                  <div
+                    className="hdr-title-logo"
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: 22,
+                      color: "var(--bg)",
+                      letterSpacing: 1,
+                    }}
+                  >
+                    {branding?.app_name || ""}
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
           <div style={{ textAlign: "right", justifySelf: "end" }}>
             <div className="mem-header-name" style={{ marginBottom: 2 }}>{member.name}</div>

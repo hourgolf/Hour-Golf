@@ -12,34 +12,28 @@ export default function LoginForm({ onLogin, loading, error }) {
   }
 
   const appName = branding?.app_name || "";
+  const welcomeLogoUrl = branding?.welcome_logo_url || branding?.logo_url;
+  const showLogo = branding?.show_welcome_logo !== false && !!welcomeLogoUrl;
+  const showTitle = branding?.show_welcome_title !== false && !!appName;
   return (
     <div className="setup">
-      {branding?.logo_url ? (
-        <>
-          <img src={branding.logo_url} alt={appName} style={{ maxWidth: 260, maxHeight: 80, marginBottom: 6 }} />
-          {appName && (
-            <div
-              style={{
-                fontSize: 18,
-                color: "var(--primary)",
-                fontFamily: "var(--font-display)",
-                letterSpacing: 1,
-                marginBottom: 4,
-              }}
-            >
-              {appName}
-            </div>
-          )}
-        </>
-      ) : (
+      {showLogo && (
+        <img
+          src={welcomeLogoUrl}
+          alt={appName}
+          style={{ maxWidth: 260, maxHeight: 80, marginBottom: showTitle ? 6 : 12 }}
+        />
+      )}
+      {showTitle && (
         <div
-          className="logo"
+          className={showLogo ? "" : "logo"}
           style={{
-            fontSize: 28,
+            fontSize: showLogo ? 18 : 28,
             color: "var(--primary)",
             fontFamily: "var(--font-display)",
-            textTransform: "uppercase",
+            textTransform: showLogo ? "none" : "uppercase",
             letterSpacing: 1,
+            marginBottom: showLogo ? 4 : 0,
           }}
         >
           {appName}

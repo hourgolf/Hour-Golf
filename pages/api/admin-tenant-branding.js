@@ -22,6 +22,14 @@ const EDITABLE_COLUMNS = [
   "text_color",
   "pwa_theme_color",
   "logo_url",
+  "welcome_logo_url",
+  "header_logo_url",
+  "icon_url",
+  "show_welcome_logo",
+  "show_welcome_title",
+  "show_header_logo",
+  "show_header_title",
+  "show_icon",
   "background_image_url",
   "font_display_name",
   "font_display_url",
@@ -84,6 +92,10 @@ export default async function handler(req, res) {
         } else if (col.endsWith("_url")) {
           if (!isValidUrl(value)) {
             return res.status(400).json({ error: `Invalid URL for ${col}` });
+          }
+        } else if (col.startsWith("show_")) {
+          if (value !== null && typeof value !== "boolean") {
+            return res.status(400).json({ error: `${col} must be boolean` });
           }
         } else if (col.startsWith("font_")) {
           if (value !== null && typeof value !== "string") {
