@@ -83,6 +83,7 @@ export async function middleware(request) {
   const strict = process.env.MULTI_TENANT_STRICT === 'true';
   const host = request.headers.get('host') || '';
   const slug = parseSlugFromHost(host);
+  const pathname = request.nextUrl.pathname;
 
   let tenantId = HOURGOLF_TENANT_ID;
   let source = 'fallback';
@@ -102,18 +103,30 @@ export async function middleware(request) {
   headers.set('x-tenant-id', tenantId);
   headers.set('x-tenant-source', source);
 
-  const response = NextResponse.next({ request: { headers } });
+  // /manifest.json -> /api/manifest rewrite. Lives here (not in
+  // next.config.js `rewrites()`) because any rewrites entry in next.config.js
+  // makes Vercel attach `x-vercel-enable-rewrite-caching: 1` to every
+  // response, which Edge-caches HTML for minutes and ignores
+  // Cache-Control: no-store. Middleware-level rewrites don't trigger that.
+  let response;
+  if (pathname === '/manifest.json') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/api/manifest';
+    response = NextResponse.rewrite(url, { request: { headers } });
+  } else {
+    response = NextResponse.next({ request: { headers } });
+  }
 
   // Every page response has tenant-specific HTML (colors, logo, bg URL baked
   // inline by _document.js). Vercel's Edge CDN MUST NOT cache these across
   // tenants or across admin brand edits — the default Next.js Cache-Control
-  // (`public, max-age=0, must-revalidate`) turned out to let Vercel HIT for
-  // 15+ minutes after an edit. Setting `private, no-store` in middleware
-  // overrides the downstream default at the Edge layer.
+  // (`public, max-age=0, must-revalidate`) let Vercel HIT for 15+ minutes
+  // after an edit. Setting `private, no-store` in middleware overrides the
+  // downstream default at the Edge layer.
   //
   // Skip /api/* so API handlers keep control of their own caching (webhooks,
   // uploads, JSON endpoints set their own Cache-Control where relevant).
-  if (!request.nextUrl.pathname.startsWith('/api/')) {
+  if (!pathname.startsWith('/api/')) {
     response.headers.set('Cache-Control', 'private, no-store');
   }
 

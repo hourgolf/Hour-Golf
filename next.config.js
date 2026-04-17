@@ -2,18 +2,12 @@
 const nextConfig = {
   reactStrictMode: true,
 
-  // Route /manifest.json to the dynamic tenant-aware handler.
-  // The static public/manifest.json sits underneath as a last-resort
-  // fallback if the rewrite ever breaks. Installed PWAs that already
-  // have /manifest.json bookmarked continue to work transparently.
-  async rewrites() {
-    return [
-      {
-        source: "/manifest.json",
-        destination: "/api/manifest",
-      },
-    ];
-  },
+  // Note: the /manifest.json -> /api/manifest rewrite used to live here.
+  // Moved into middleware.js because any `rewrites()` config in this file
+  // makes Vercel attach `x-vercel-enable-rewrite-caching: 1` to every
+  // response, which caches the HTML at the Edge for minutes regardless of
+  // Cache-Control: no-store. Per-tenant SSR pages must not be Edge-cached.
+  // `NextResponse.rewrite()` in middleware avoids that header.
 };
 
 module.exports = nextConfig;
