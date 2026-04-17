@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import useMemberAuth from "../../hooks/useMemberAuth";
+import { useBranding } from "../../hooks/useBranding";
 import { TIER_COLORS } from "../../lib/constants";
 import HelpDrawer from "./HelpDrawer";
 import EventPopup from "./EventPopup";
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
 export default function MemberLayout({ activeTab, children }) {
   const router = useRouter();
   const { member, tierConfig, loading, error, login, signup, completeAccount, logout, refresh } = useMemberAuth();
+  const branding = useBranding();
   const [mode, setMode] = useState("login");
 
   // Login fields
@@ -188,7 +190,27 @@ export default function MemberLayout({ activeTab, children }) {
           width: "calc(100% - 40px)",
           margin: "16px auto 60px",
         }}>
-          <img src="/blobs/HGC_card2.png" alt="Hour Golf" style={{ width: "100%", maxWidth: 350, marginBottom: 30 }} />
+          {branding?.logo_url ? (
+            <img
+              src={branding.logo_url}
+              alt={branding.app_name || ""}
+              style={{ width: "100%", maxWidth: 350, marginBottom: 30 }}
+            />
+          ) : (
+            <div
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 32,
+                color: "var(--primary)",
+                textAlign: "center",
+                marginBottom: 30,
+                marginTop: 20,
+                letterSpacing: 1,
+              }}
+            >
+              {branding?.app_name || ""}
+            </div>
+          )}
           <div className="mem-brand-sub">{mode === "login" ? "Hello Friend." : mode === "forgot" ? "Reset Password." : "Join the Club."}</div>
 
           {mode === "forgot" ? (
@@ -398,9 +420,28 @@ export default function MemberLayout({ activeTab, children }) {
       {/* Header */}
       <header className="mem-header" style={{ position: "relative", zIndex: 1 }}>
         <div className="mem-header-inner" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center" }}>
-          <img src="/blobs/MASTERS FLAG.svg" alt="" className="mem-header-logo" style={{ filter: "brightness(0) invert(0.95)", justifySelf: "start", marginLeft: 16 }} />
+          {/* Left-side decorative mark removed as part of de-Hour-Golf-ification.
+              Hour Golf used MASTERS FLAG.svg here; new tenants don't have an
+              equivalent asset, so rather than a per-tenant slot for a decorative
+              mark (which would need its own branding column), we drop it and
+              keep the header clean for every tenant. */}
+          <div aria-hidden="true" style={{ justifySelf: "start" }} />
           <div style={{ textAlign: "center" }}>
-            <img src="/blobs/HG-Script-White.svg" alt="Hour Golf" className="hdr-title-logo" />
+            {branding?.logo_url ? (
+              <img src={branding.logo_url} alt={branding.app_name || ""} className="hdr-title-logo" />
+            ) : (
+              <div
+                className="hdr-title-logo"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: 22,
+                  color: "var(--bg)",
+                  letterSpacing: 1,
+                }}
+              >
+                {branding?.app_name || ""}
+              </div>
+            )}
           </div>
           <div style={{ textAlign: "right", justifySelf: "end" }}>
             <div className="mem-header-name" style={{ marginBottom: 2 }}>{member.name}</div>

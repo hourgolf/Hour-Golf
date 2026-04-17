@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
+import { useBranding } from "../hooks/useBranding";
 
 export default function VerifyMember() {
   const router = useRouter();
   const { token } = router.query;
+  const branding = useBranding();
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -37,7 +39,13 @@ export default function VerifyMember() {
         width: "calc(100% - 40px)", textAlign: "center",
         boxShadow: "0 4px 24px rgba(53,68,59,0.12)", border: "1px solid #D1DFCB",
       }}>
-        <img src="/blobs/MASTERS FLAG.svg" alt="" style={{ height: 48, marginBottom: 16, opacity: 0.3 }} />
+        {branding?.logo_url && (
+          <img
+            src={branding.logo_url}
+            alt=""
+            style={{ height: 48, marginBottom: 16, opacity: 0.3 }}
+          />
+        )}
 
         {loading && <p style={{ color: "#8BB5A0" }}>Verifying member...</p>}
 

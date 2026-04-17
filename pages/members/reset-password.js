@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
+import { useBranding } from "../../hooks/useBranding";
 
 export default function ResetPassword() {
   const router = useRouter();
   const { token, email } = router.query;
+  const branding = useBranding();
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -59,7 +61,27 @@ export default function ResetPassword() {
         width: "calc(100% - 40px)",
         margin: "60px auto",
       }}>
-        <img src="/blobs/HGC_card2.png" alt="Hour Golf" style={{ width: "100%", maxWidth: 350, marginBottom: 30 }} />
+        {branding?.logo_url ? (
+          <img
+            src={branding.logo_url}
+            alt={branding.app_name || ""}
+            style={{ width: "100%", maxWidth: 350, marginBottom: 30 }}
+          />
+        ) : (
+          <div
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 28,
+              color: "var(--primary)",
+              textAlign: "center",
+              marginBottom: 30,
+              marginTop: 20,
+              letterSpacing: 1,
+            }}
+          >
+            {branding?.app_name || ""}
+          </div>
+        )}
 
         {success ? (
           <>
