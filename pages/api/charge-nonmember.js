@@ -1,16 +1,14 @@
-import Stripe from "stripe";
 import { verifyAdmin, SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { getStripeClient } from "../../lib/stripe-config";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Phase 7B-2d: per-tenant Stripe client via lib/stripe-config.
 
-// Find a Stripe customer by email, return customer ID or null
-async function findStripeCustomer(email) {
+async function findStripeCustomer(stripe, email) {
   const customers = await stripe.customers.list({ email, limit: 1 });
   return customers.data.length > 0 ? customers.data[0].id : null;
 }
 
-// Find a usable payment method on a Stripe customer
-async function findPaymentMethod(customerId) {
+async function findPaymentMethod(stripe, customerId) {
   const customer = await stripe.customers.retrieve(customerId);
   let pm = customer.invoice_settings?.default_payment_method || customer.default_source;
 
@@ -36,6 +34,17 @@ export default async function handler(req, res) {
 
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
+
+  let stripe;
+  try {
+    stripe = await getStripeClient(tenantId);
+  } catch (err) {
+    console.error("charge-nonmember getStripeClient failed:", err?.message || err);
+    return res.status(503).json({
+      error: "stripe_not_configured",
+      detail: "Stripe is not set up for this tenant yet.",
+    });
+  }
 
   try {
     // 1. Check if already charged (idempotency via charged_booking_id unique index)
@@ -68,7 +77,7 @@ export default async function handler(req, res) {
 
     // Fallback: search Stripe directly by email
     if (!stripeCustomerId) {
-      stripeCustomerId = await findStripeCustomer(bk.customer_email);
+      stripeCustomerId = await findStripeCustomer(stripe, bk.customer_email);
       // Save it back to members table for future use
       if (stripeCustomerId && mRows.length > 0) {
         await fetch(
@@ -101,7 +110,7 @@ export default async function handler(req, res) {
     if (amountCents < 50) return res.status(400).json({ error: "Amount too small to charge" });
 
     // 6. Find payment method
-    const paymentMethod = await findPaymentMethod(stripeCustomerId);
+    const paymentMethod = await findPaymentMethod(stripe, stripeCustomerId);
     if (!paymentMethod) {
       return res.status(400).json({ error: "No payment method found", detail: `No cards attached to ${bk.customer_email}.` });
     }
