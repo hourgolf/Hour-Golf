@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import Head from "next/head";
 import { usePlatformAuth } from "../../../hooks/usePlatformAuth";
+import TenantBranding from "../../../components/settings/TenantBranding";
 
 const TABS = ["Overview", "Branding", "Stripe", "Features"];
 
@@ -113,7 +114,7 @@ export default function PlatformTenantDetail() {
 
             <div style={{ padding: "24px 0" }}>
               {tab === "Overview" && <OverviewTab detail={detail} />}
-              {tab === "Branding" && <BrandingTab detail={detail} />}
+              {tab === "Branding" && <BrandingTab detail={detail} apiKey={apiKey} />}
               {tab === "Stripe" && <StripeTab detail={detail} apiKey={apiKey} onSaved={reload} />}
               {tab === "Features" && <FeaturesTab detail={detail} apiKey={apiKey} onSaved={reload} />}
             </div>
@@ -180,64 +181,15 @@ function OverviewTab({ detail }) {
   );
 }
 
-function BrandingTab({ detail }) {
-  const b = detail.branding;
-  if (!b) return <p className="muted">No tenant_branding row exists for this tenant.</p>;
-  const COLOR_KEYS = [
-    ["primary_color", "Primary"],
-    ["accent_color", "Accent"],
-    ["danger_color", "Danger"],
-    ["cream_color", "Background"],
-    ["text_color", "Text"],
-  ];
+function BrandingTab({ detail, apiKey }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      <p className="muted" style={{ fontSize: 12 }}>
-        Branding edits live at <code>{detail.tenant.slug}.ourlee.co/admin → Settings → Tenant Brand</code>.
-        A super-admin branding editor is on the roadmap.
-      </p>
-
-      <div>
-        <h3 className="section-head">Colors</h3>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          {COLOR_KEYS.map(([k, label]) => (
-            <div key={k} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 4, background: b[k] || "#000", border: "1px solid var(--border, #ccc)" }} />
-              <div>
-                <div>{label}</div>
-                <code style={{ fontSize: 10, color: "var(--text-muted)" }}>{b[k] || "—"}</code>
-              </div>
-            </div>
-          ))}
-        </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ background: "#f6f7f4", padding: 14, borderRadius: 8, fontSize: 12, color: "var(--text-muted)" }}>
+        Editing <strong>{detail.tenant.name}</strong>&rsquo;s branding. Uploads land in that tenant&rsquo;s
+        folder; saves flush the branding cache so changes show up on
+        <code> {detail.tenant.slug}.ourlee.co</code> within the next request.
       </div>
-
-      <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
-        <div>
-          <h3 className="section-head">Logo</h3>
-          {b.logo_url ? (
-            <div style={{ width: 120, height: 120, background: b.primary_color || "#4C8D73", borderRadius: 8, padding: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <img src={b.logo_url} alt="Logo" style={{ maxWidth: "100%", maxHeight: "100%", filter: "brightness(0) invert(0.95)" }} />
-            </div>
-          ) : <p className="muted">No logo</p>}
-        </div>
-        <div>
-          <h3 className="section-head">Background</h3>
-          {b.background_image_url ? (
-            <div style={{ width: 200, height: 120, borderRadius: 8, overflow: "hidden", border: "1px solid var(--border, #ccc)" }}>
-              <img src={b.background_image_url} alt="Background" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            </div>
-          ) : <p className="muted">No background image</p>}
-        </div>
-      </div>
-
-      <div>
-        <h3 className="section-head">Fonts</h3>
-        <div style={{ fontSize: 13 }}>
-          <div>Display: <strong>{b.font_display_name || "—"}</strong> {b.font_display_url && <span className="muted">(custom)</span>}</div>
-          <div>Body: <strong>{b.font_body_family || "—"}</strong></div>
-        </div>
-      </div>
+      <TenantBranding apiKey={apiKey} tenantIdOverride={detail.tenant.id} />
     </div>
   );
 }

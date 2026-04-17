@@ -1,20 +1,30 @@
 import { useEffect, useState } from "react";
 
-// Tenant-level branding editor. Each field reflects a column on the
-// tenant_branding row for the current tenant (resolved from subdomain via
-// middleware). Changes persist to DB on Save; the in-memory branding
-// cache is flushed server-side so edits are visible on next page load.
+// Tenant-level branding editor.
 //
-// Scope (matches the product decision recorded in the plan):
+// Two operating modes, selected by whether tenantIdOverride is supplied:
+//
+// 1. TENANT-ADMIN MODE (default) — no tenantIdOverride. Fetches and
+//    writes the CURRENT tenant's branding row via /api/admin-tenant-branding
+//    (verifyAdmin, subdomain-scoped). Uploads go to /api/upload-logo and
+//    /api/upload-font. This is what's mounted at
+//    <slug>.ourlee.co/admin → Settings → Tenant Brand.
+//
+// 2. PLATFORM MODE — tenantIdOverride set to a target tenant UUID.
+//    Fetches and writes that tenant's row via /api/platform-tenant-branding
+//    (verifyPlatformAdmin). Uploads go to /api/platform-upload with kind
+//    + tenant_id query params. Used inside /platform/tenants/[slug] so
+//    super-admins can manage any tenant's branding.
+//
+// Scope (shared by both modes):
 //   - 5 colors: primary, accent, danger, cream, text
-//   - Logo upload (/logos/<tenantId>/...)
-//   - Background image upload (/logos/<tenantId>/... — same bucket)
+//   - Logo upload (logos bucket)
+//   - Background image upload (logos bucket)
 //   - Display font: uploaded .woff2 OR Google Font name from curated list
 //   - Body font: name from curated list
 //
 // What this intentionally does NOT do:
 //   - Let admins pick arbitrary Google Fonts (curated list only)
-//   - Edit other tenants' branding (super-admin job, future phase)
 //   - Modify structural CSS vars like --surface or --radius
 
 const BODY_FONT_OPTIONS = [
@@ -48,7 +58,7 @@ const COLOR_FIELDS = [
   { key: "text_color", label: "Text", hint: "Primary body text color" },
 ];
 
-export default function TenantBranding({ apiKey }) {
+export default function TenantBranding({ apiKey, tenantIdOverride }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [branding, setBranding] = useState(null);
@@ -58,12 +68,34 @@ export default function TenantBranding({ apiKey }) {
   const [uploadingBg, setUploadingBg] = useState(false);
   const [uploadingFont, setUploadingFont] = useState(false);
 
-  // Load the current tenant's branding once on mount.
+  const isPlatform = !!tenantIdOverride;
+
+  // Endpoint routing. Platform mode targets the super-admin endpoints
+  // and carries tenant_id explicitly on every request; tenant-admin
+  // mode uses the subdomain-scoped endpoints without it.
+  const brandingGetUrl = isPlatform
+    ? `/api/platform-tenant-branding?tenant_id=${encodeURIComponent(tenantIdOverride)}`
+    : "/api/admin-tenant-branding";
+  const brandingPatchUrl = isPlatform
+    ? "/api/platform-tenant-branding"
+    : "/api/admin-tenant-branding";
+  function buildUploadUrl(kind, filename) {
+    const fn = encodeURIComponent(filename);
+    if (isPlatform) {
+      return `/api/platform-upload?kind=${kind}&tenant_id=${encodeURIComponent(tenantIdOverride)}&filename=${fn}`;
+    }
+    const path = kind === "font" ? "upload-font" : "upload-logo";
+    return `/api/${path}?filename=${fn}`;
+  }
+
+  // Load branding once on mount (or whenever the target tenant changes
+  // in platform mode).
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      setLoading(true);
       try {
-        const r = await fetch("/api/admin-tenant-branding", {
+        const r = await fetch(brandingGetUrl, {
           headers: { Authorization: `Bearer ${apiKey}` },
         });
         const d = await r.json().catch(() => ({}));
@@ -72,6 +104,7 @@ export default function TenantBranding({ apiKey }) {
           setError(d.detail || d.error || `Load failed (${r.status})`);
         } else {
           setBranding(d);
+          setError("");
         }
       } catch (e) {
         if (!cancelled) setError(e.message || "Failed to load branding");
@@ -81,7 +114,7 @@ export default function TenantBranding({ apiKey }) {
     }
     load();
     return () => { cancelled = true; };
-  }, [apiKey]);
+  }, [apiKey, brandingGetUrl]);
 
   function update(key, value) {
     setBranding((b) => ({ ...b, [key]: value }));
@@ -90,7 +123,7 @@ export default function TenantBranding({ apiKey }) {
     setError("");
   }
 
-  async function uploadAsset(file, endpoint, filenameBase, setUploading) {
+  async function uploadAsset(file, kind, filenameBase, setUploading) {
     if (!file) return null;
     if (file.size > 4 * 1024 * 1024) {
       setError("File too large. Keep under 4MB.");
@@ -101,7 +134,7 @@ export default function TenantBranding({ apiKey }) {
     try {
       const ext = file.name.split(".").pop();
       const name = `${filenameBase}_${Date.now()}.${ext}`;
-      const r = await fetch(`${endpoint}?filename=${encodeURIComponent(name)}`, {
+      const r = await fetch(buildUploadUrl(kind, name), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -124,12 +157,12 @@ export default function TenantBranding({ apiKey }) {
   }
 
   async function handleLogoUpload(e) {
-    const url = await uploadAsset(e.target.files?.[0], "/api/upload-logo", "logo", setUploadingLogo);
+    const url = await uploadAsset(e.target.files?.[0], "logo", "logo", setUploadingLogo);
     if (url) update("logo_url", url);
   }
 
   async function handleBgUpload(e) {
-    const url = await uploadAsset(e.target.files?.[0], "/api/upload-logo", "bg", setUploadingBg);
+    const url = await uploadAsset(e.target.files?.[0], "bg", "bg", setUploadingBg);
     if (url) update("background_image_url", url);
   }
 
@@ -144,7 +177,7 @@ export default function TenantBranding({ apiKey }) {
       setError("Font file too large. Keep under 2MB.");
       return;
     }
-    const url = await uploadAsset(file, "/api/upload-font", "displayfont", setUploadingFont);
+    const url = await uploadAsset(file, "font", "displayfont", setUploadingFont);
     if (url) update("font_display_url", url);
   }
 
@@ -163,7 +196,11 @@ export default function TenantBranding({ apiKey }) {
       payload.font_display_url = branding.font_display_url || null;
       payload.font_body_family = branding.font_body_family || null;
 
-      const r = await fetch("/api/admin-tenant-branding", {
+      // Platform-mode PATCH requires the target tenant_id in the body
+      // (tenant-admin mode resolves from subdomain, no extra field).
+      if (isPlatform) payload.tenant_id = tenantIdOverride;
+
+      const r = await fetch(brandingPatchUrl, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${apiKey}`,
