@@ -1,7 +1,7 @@
-import Stripe from "stripe";
 import { SUPABASE_URL, getSupabaseKey, getTenantId } from "../../lib/api-helpers";
+import { getStripeClient } from "../../lib/stripe-config";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Phase 7B-2b: per-tenant Stripe client via lib/stripe-config.
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
@@ -31,6 +31,17 @@ export default async function handler(req, res) {
     const tierCfg = await tierResp.json();
     const rate = tierCfg[0]?.overage_rate || 60;
     const amountCents = Math.round(hours * rate * 100);
+
+    let stripe;
+    try {
+      stripe = await getStripeClient(tenantId);
+    } catch (err) {
+      console.error("customer-buy-credits getStripeClient failed:", err?.message || err);
+      return res.status(503).json({
+        error: "stripe_not_configured",
+        detail: "Stripe is not set up for this tenant yet.",
+      });
+    }
 
     let stripeCustomerId = member.stripe_customer_id;
     if (!stripeCustomerId) {

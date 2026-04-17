@@ -1,10 +1,10 @@
-import Stripe from "stripe";
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
+import { getStripeClient } from "../../lib/stripe-config";
 import { sendShopOrderNotification } from "../../lib/email";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Phase 7B-2b: per-tenant Stripe client via lib/stripe-config.
 
-async function findPaymentMethod(customerId) {
+async function findPaymentMethod(stripe, customerId) {
   const customer = await stripe.customers.retrieve(customerId);
   let pm = customer.invoice_settings?.default_payment_method || customer.default_source;
   if (!pm) {
@@ -314,7 +314,17 @@ export default async function handler(req, res) {
         if (!member.stripe_customer_id) {
           return res.status(400).json({ error: "No payment method on file. Please add a card in the Billing tab." });
         }
-        const paymentMethod = await findPaymentMethod(member.stripe_customer_id);
+        let stripe;
+        try {
+          stripe = await getStripeClient(tenantId);
+        } catch (err) {
+          console.error("member-shop getStripeClient failed:", err?.message || err);
+          return res.status(503).json({
+            error: "stripe_not_configured",
+            detail: "Stripe is not set up for this tenant yet.",
+          });
+        }
+        const paymentMethod = await findPaymentMethod(stripe, member.stripe_customer_id);
         if (!paymentMethod) {
           return res.status(400).json({ error: "No payment method found. Please update your card in the Billing tab." });
         }

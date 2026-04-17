@@ -1,7 +1,7 @@
-import Stripe from "stripe";
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
+import { getStripeClient } from "../../lib/stripe-config";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Phase 7B-2b: per-tenant Stripe client via lib/stripe-config.
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -35,6 +35,17 @@ export default async function handler(req, res) {
     if (!members.length) return res.status(401).json({ error: "Session expired" });
 
     const member = members[0];
+
+    let stripe;
+    try {
+      stripe = await getStripeClient(tenantId);
+    } catch (err) {
+      console.error("member-setup-payment getStripeClient failed:", err?.message || err);
+      return res.status(503).json({
+        error: "stripe_not_configured",
+        detail: "Stripe is not set up for this tenant yet.",
+      });
+    }
 
     // Ensure Stripe customer exists
     let stripeCustomerId = member.stripe_customer_id;
