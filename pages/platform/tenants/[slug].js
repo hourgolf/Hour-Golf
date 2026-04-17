@@ -5,7 +5,7 @@ import Head from "next/head";
 import { usePlatformAuth } from "../../../hooks/usePlatformAuth";
 import TenantBranding from "../../../components/settings/TenantBranding";
 
-const TABS = ["Overview", "Branding", "Stripe", "Features"];
+const TABS = ["Overview", "Branding", "Stripe", "Seam", "Features"];
 
 const FEATURE_KEYS = [
   { key: "bookings", label: "Bookings", hint: "Bay reservations, Skedda sync" },
@@ -117,6 +117,7 @@ export default function PlatformTenantDetail() {
               {tab === "Overview" && <OverviewTab detail={detail} apiKey={apiKey} onSaved={reload} />}
               {tab === "Branding" && <BrandingTab detail={detail} apiKey={apiKey} />}
               {tab === "Stripe" && <StripeTab detail={detail} apiKey={apiKey} onSaved={reload} />}
+              {tab === "Seam" && <SeamTab detail={detail} apiKey={apiKey} />}
               {tab === "Features" && <FeaturesTab detail={detail} apiKey={apiKey} onSaved={reload} />}
             </div>
           </>
@@ -400,6 +401,131 @@ function StripeTab({ detail, apiKey, onSaved }) {
       {s && (
         <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
           Last updated {s.updated_at ? new Date(s.updated_at).toLocaleString() : "—"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SeamTab({ detail, apiKey }) {
+  const tenantId = detail.tenant.id;
+  const [cfg, setCfg] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [enabled, setEnabled] = useState(false);
+  const [apiInput, setApiInput] = useState("");
+  const [deviceInput, setDeviceInput] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await fetch(`/api/platform-tenant-seam?tenant_id=${encodeURIComponent(tenantId)}`, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        const d = r.ok ? await r.json() : null;
+        if (!cancelled) {
+          setCfg(d);
+          setEnabled(d?.enabled ?? false);
+          setDeviceInput(d?.device_id || "");
+        }
+      } catch (e) {
+        if (!cancelled) setErr(e.message);
+      }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [tenantId, apiKey]);
+
+  async function save() {
+    setSaving(true);
+    setErr("");
+    setStatus("");
+    const payload = { tenant_id: tenantId, enabled };
+    if (apiInput.trim()) payload.api_key = apiInput.trim();
+    if (deviceInput.trim() && deviceInput.trim() !== (cfg?.device_id || "")) {
+      payload.device_id = deviceInput.trim();
+    }
+    try {
+      const r = await fetch("/api/platform-tenant-seam", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || "Save failed");
+      setCfg(d);
+      setApiInput("");
+      setStatus("Saved. Cache invalidated — next access-code job picks up new values.");
+    } catch (e) {
+      setErr(e.message);
+    }
+    setSaving(false);
+  }
+
+  if (loading) return <p className="muted">Loading Seam config…</p>;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 600 }}>
+      <div style={{ background: "#f6f7f4", padding: 14, borderRadius: 8, fontSize: 12, color: "var(--text-muted)" }}>
+        Seam (smart-lock) credentials used by the <code>process-access-codes</code>
+        edge function to generate per-booking door codes. Only relevant when the
+        Access Codes feature is enabled. Secrets are write-only — existing values
+        are masked (prefix + last 4). Leave the api_key field blank to keep the
+        current key.
+      </div>
+
+      <div className="mf">
+        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+          <span>Enabled (kill-switch — off pauses code generation without deleting keys)</span>
+        </label>
+      </div>
+
+      <KeyRow
+        label="Seam API key"
+        existing={cfg?.api_key}
+        placeholder="seam_..."
+        value={apiInput}
+        onChange={setApiInput}
+      />
+
+      <div className="mf">
+        <label>Seam Device ID</label>
+        <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>
+          {cfg?.device_id
+            ? <>Current: <code>{cfg.device_id}</code></>
+            : <>Not configured</>
+          }
+        </div>
+        <input
+          type="text"
+          value={deviceInput}
+          onChange={(e) => setDeviceInput(e.target.value)}
+          placeholder="uuid of the physical smart lock in Seam"
+          style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 12 }}
+        />
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button
+          className="btn primary"
+          onClick={save}
+          disabled={saving || (!cfg && (!apiInput.trim() || !deviceInput.trim()))}
+          style={{ padding: "10px 24px", fontSize: 13 }}
+        >
+          {saving ? "Saving…" : "Save Seam config."}
+        </button>
+        {status && <span style={{ color: "var(--primary)", fontSize: 12 }}>{status}</span>}
+        {err && <span style={{ color: "var(--red)", fontSize: 12 }}>{err}</span>}
+      </div>
+
+      {cfg && (
+        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+          Last updated {cfg.updated_at ? new Date(cfg.updated_at).toLocaleString() : "—"}
         </div>
       )}
     </div>

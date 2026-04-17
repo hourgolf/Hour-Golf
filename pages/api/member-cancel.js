@@ -1,5 +1,6 @@
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { sendCancellationEmail } from "../../lib/email";
+import { loadSeamConfig } from "../../lib/seam-config";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -96,20 +97,22 @@ export default async function handler(req, res) {
               }
             );
           } else if (job.status === "sent" && job.seam_access_code_id) {
-            // Access code already created — delete it from Seam
-            const SEAM_API_KEY = process.env.SEAM_API_KEY;
-            if (SEAM_API_KEY) {
-              try {
+            // Access code already created — delete it from Seam using
+            // this tenant's own API key (previously process.env which
+            // would have used HG's key for another tenant's cancel).
+            try {
+              const seamCfg = await loadSeamConfig(tenantId);
+              if (seamCfg && seamCfg.enabled && seamCfg.api_key) {
                 await fetch("https://connect.getseam.com/access_codes/delete", {
                   method: "POST",
                   headers: {
-                    Authorization: `Bearer ${SEAM_API_KEY}`,
+                    Authorization: `Bearer ${seamCfg.api_key}`,
                     "Content-Type": "application/json",
                   },
                   body: JSON.stringify({ access_code_id: job.seam_access_code_id }),
                 });
-              } catch (_) { /* best effort */ }
-            }
+              }
+            } catch (_) { /* best effort */ }
             await fetch(
               `${SUPABASE_URL}/rest/v1/access_code_jobs?id=eq.${job.id}&tenant_id=eq.${tenantId}`,
               {

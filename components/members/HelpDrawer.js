@@ -176,6 +176,7 @@ export default function HelpDrawer({ open, onClose }) {
   const supportEmail = branding?.support_email || null;
   const supportPhone = branding?.support_phone || null;
   const supportTelHref = telHref(supportPhone);
+  const backupCode = accessCodesEnabled ? (branding?.backup_access_code || null) : null;
 
   const [view, setView] = useState("categories");
   const [activeCat, setActiveCat] = useState(null);
@@ -302,15 +303,17 @@ export default function HelpDrawer({ open, onClose }) {
             // otherwise hide the sentence entirely (rather than show
             // HG-specific numbers).
             if (detail === "__ESCALATE_TO_CONTACT__") {
-              if (supportPhone && supportEmail) {
-                detail = `Call or text us at ${supportPhone}, or email ${supportEmail}.`;
-              } else if (supportPhone) {
-                detail = `Call or text us at ${supportPhone}.`;
-              } else if (supportEmail) {
-                detail = `Email us at ${supportEmail}.`;
-              } else {
-                detail = "";
-              }
+              const contactLine =
+                supportPhone && supportEmail
+                  ? `Call or text us at ${supportPhone}, or email ${supportEmail}.`
+                  : supportPhone
+                  ? `Call or text us at ${supportPhone}.`
+                  : supportEmail
+                  ? `Email us at ${supportEmail}.`
+                  : "";
+              detail = backupCode
+                ? `Try backup code ${backupCode} first — it works on the keypad when your generated code fails.${contactLine ? " If that doesn't work: " + contactLine : ""}`
+                : contactLine;
             }
             return (
             <div className="help-trouble">

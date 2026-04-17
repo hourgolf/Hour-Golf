@@ -303,6 +303,7 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
       payload.support_email = branding.support_email || null;
       payload.support_phone = branding.support_phone || null;
       payload.facility_hours = branding.facility_hours || null;
+      payload.backup_access_code = branding.backup_access_code || null;
 
       // Platform-mode PATCH requires the target tenant_id in the body
       // (tenant-admin mode resolves from subdomain, no extra field).
@@ -591,6 +592,20 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
             rows={2}
             style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)", fontFamily: "inherit" }}
           />
+        </div>
+        <div className="mf" style={{ marginTop: 14, maxWidth: 280 }}>
+          <label>Backup Access Code</label>
+          <input
+            type="text"
+            value={branding.backup_access_code || ""}
+            onChange={(e) => update("backup_access_code", e.target.value)}
+            placeholder="e.g. 2138"
+            maxLength={20}
+            style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontFamily: "var(--font-mono)", fontSize: 13, background: "var(--surface)", color: "var(--text)" }}
+          />
+          <div className="muted" style={{ marginTop: 4 }}>
+            Only relevant when Access Codes is enabled. Shown to members as a fallback in the troubleshooting flow if their Seam code fails. Leave blank if you don&rsquo;t have one.
+          </div>
         </div>
       </div>
 

@@ -39,6 +39,7 @@ const EDITABLE_COLUMNS = [
   "support_email",
   "support_phone",
   "facility_hours",
+  "backup_access_code",
   "background_image_url",
   "font_display_name",
   "font_display_url",
@@ -125,11 +126,14 @@ export default async function handler(req, res) {
           if (typeof value === "string" && value.length > 200) {
             return res.status(400).json({ error: `${col} too long (max 200 chars)` });
           }
-        } else if (["support_email", "support_phone", "facility_hours"].includes(col)) {
+        } else if (["support_email", "support_phone", "facility_hours", "backup_access_code"].includes(col)) {
           if (value !== null && typeof value !== "string") {
             return res.status(400).json({ error: `Invalid string for ${col}` });
           }
-          const max = col === "facility_hours" ? 500 : 120;
+          const max =
+            col === "facility_hours" ? 500
+            : col === "backup_access_code" ? 20
+            : 120;
           if (typeof value === "string" && value.length > max) {
             return res.status(400).json({ error: `${col} too long (max ${max} chars)` });
           }
