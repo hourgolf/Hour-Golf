@@ -51,9 +51,13 @@ export default async function handler(req, res) {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Generate session token
+    // Generate session token. New signups get the same 90-day "sticky"
+    // session as a Remember-me login — a user who just went through the
+    // effort of creating an account shouldn't be greeted with a relog
+    // a week later.
     const sessionToken = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+    const expiresAt = new Date(Date.now() + NINETY_DAYS_MS).toISOString();
 
     // Create member record
     const memberData = {
@@ -117,14 +121,14 @@ export default async function handler(req, res) {
       }
     } catch (_) {}
 
-    // Set httpOnly cookie
+    // Set httpOnly cookie — Max-Age matches the 90-day DB expiry above.
     const isSecure = process.env.NODE_ENV === "production";
     const cookie = [
       `hg-member-token=${sessionToken}`,
       "Path=/",
       "HttpOnly",
       "SameSite=Lax",
-      `Max-Age=${24 * 60 * 60}`,
+      `Max-Age=${Math.floor(NINETY_DAYS_MS / 1000)}`,
     ];
     if (isSecure) cookie.push("Secure");
     res.setHeader("Set-Cookie", cookie.join("; "));

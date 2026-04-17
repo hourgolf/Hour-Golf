@@ -40,9 +40,17 @@ export default async function handler(req, res) {
     }
     // If no password_hash, allow login (legacy member — will be prompted to set password)
 
-    // 3) Generate session token — 30 days if rememberMe, else 24 hours
+    // 3) Generate session token.
+    // Tuned up from 24h / 30d on 2026-04-17 after members complained about
+    // frequent relogs. 7 days is the "didn't check Remember me" floor (still
+    // long enough that weekly-active members don't relog); 90 days is the
+    // explicit-opt-in ceiling (matches Gmail/Slack-style sticky sessions).
+    // Single-token-per-member remains a known limitation — cross-device login
+    // still invalidates the other device. Tracked as Tier 2 follow-up.
     const sessionToken = crypto.randomBytes(32).toString("hex");
-    const sessionDuration = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+    const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+    const sessionDuration = rememberMe ? NINETY_DAYS_MS : SEVEN_DAYS_MS;
     const expiresAt = new Date(Date.now() + sessionDuration).toISOString();
 
     // 4) Store token in members table
@@ -79,9 +87,10 @@ export default async function handler(req, res) {
       } catch (_) { /* ignore */ }
     }
 
-    // 6) Set httpOnly cookie
+    // 6) Set httpOnly cookie (Max-Age mirrors sessionDuration above so the
+    // cookie and DB row expire in lockstep)
     const isSecure = process.env.NODE_ENV === "production";
-    const cookieMaxAge = rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60;
+    const cookieMaxAge = Math.floor(sessionDuration / 1000);
     const cookie = [
       `hg-member-token=${sessionToken}`,
       "Path=/",

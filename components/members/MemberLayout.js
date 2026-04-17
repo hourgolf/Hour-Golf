@@ -32,7 +32,10 @@ export default function MemberLayout({ activeTab, children }) {
   // Login fields
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
+  // Default to checked — the no-rememberMe session was 24h and members
+  // felt like deploys were logging them out (really it was daily TTL
+  // expiry). 90-day session when checked, 7-day floor when unchecked.
+  const [rememberMe, setRememberMe] = useState(true);
 
   // Signup fields
   const [signupName, setSignupName] = useState("");
