@@ -7,6 +7,7 @@ import {
   buildDisplayFontFace,
   buildBackgroundImageRule,
 } from "../lib/branding";
+import { loadFeatures } from "../lib/tenant-features";
 
 // Escape helper: keep user-supplied branding values from breaking out of
 // <style> or HTML attribute contexts. Tenant names and font names are the
@@ -25,17 +26,22 @@ class MyDocument extends Document {
     const initialProps = await Document.getInitialProps(ctx);
     const tenantId = tenantIdFromReq(ctx.req);
     let branding = FALLBACK_BRANDING;
-    try {
-      branding = await loadBranding(tenantId);
-    } catch {
-      // Never fail the page render because of a branding fetch error.
-      branding = FALLBACK_BRANDING;
-    }
-    return { ...initialProps, branding, tenantId };
+    let features = null;
+    // Load branding + features in parallel — both are short network
+    // calls and neither should block the other. Each has its own
+    // try/catch so one failing doesn't take the other down.
+    const [brandingResult, featuresResult] = await Promise.allSettled([
+      loadBranding(tenantId),
+      loadFeatures(tenantId),
+    ]);
+    if (brandingResult.status === "fulfilled") branding = brandingResult.value;
+    if (featuresResult.status === "fulfilled") features = featuresResult.value;
+    return { ...initialProps, branding, features, tenantId };
   }
 
   render() {
     const branding = this.props.branding || FALLBACK_BRANDING;
+    const features = this.props.features || null;
     const tenantId = this.props.tenantId || "";
     const cssVars = buildRootCssVars(branding);
     const fontFace = buildDisplayFontFace(branding);
@@ -103,7 +109,7 @@ class MyDocument extends Document {
           */}
           <script
             dangerouslySetInnerHTML={{
-              __html: `window.__TENANT_BRANDING__ = ${JSON.stringify(branding).replace(/</g, "\\u003c")};window.__TENANT_ID__ = ${JSON.stringify(tenantId)};`,
+              __html: `window.__TENANT_BRANDING__ = ${JSON.stringify(branding).replace(/</g, "\\u003c")};window.__TENANT_ID__ = ${JSON.stringify(tenantId)};window.__TENANT_FEATURES__ = ${JSON.stringify(features).replace(/</g, "\\u003c")};`,
             }}
           />
         </Head>
