@@ -72,9 +72,17 @@ export default function PlatformHome() {
           </div>
         </div>
 
-        <h2 className="section-head" style={{ marginTop: 32 }}>
-          Tenants {tenants.length > 0 && <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>({tenants.length})</span>}
-        </h2>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 16, marginTop: 32 }}>
+          <h2 className="section-head" style={{ margin: 0 }}>
+            Tenants {tenants.length > 0 && <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>({tenants.length})</span>}
+          </h2>
+          <Link
+            href="/platform/tenants/new"
+            style={{ fontSize: 12, padding: "4px 12px", background: "var(--primary)", color: "var(--bg, #fff)", borderRadius: 999, textDecoration: "none" }}
+          >
+            + New tenant
+          </Link>
+        </div>
 
         {err && <p className="err">{err}</p>}
         {loading && <p style={{ color: "var(--text-muted)" }}>Loading tenants…</p>}

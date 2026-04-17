@@ -113,7 +113,7 @@ export default function PlatformTenantDetail() {
             </div>
 
             <div style={{ padding: "24px 0" }}>
-              {tab === "Overview" && <OverviewTab detail={detail} />}
+              {tab === "Overview" && <OverviewTab detail={detail} apiKey={apiKey} onSaved={reload} />}
               {tab === "Branding" && <BrandingTab detail={detail} apiKey={apiKey} />}
               {tab === "Stripe" && <StripeTab detail={detail} apiKey={apiKey} onSaved={reload} />}
               {tab === "Features" && <FeaturesTab detail={detail} apiKey={apiKey} onSaved={reload} />}
@@ -125,9 +125,37 @@ export default function PlatformTenantDetail() {
   );
 }
 
-function OverviewTab({ detail }) {
+function OverviewTab({ detail, apiKey, onSaved }) {
   const { tenant, stats, stripe, features, admins } = detail;
   const enabledFeatures = (features || []).filter((f) => f.enabled).length;
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [statusErr, setStatusErr] = useState("");
+
+  async function toggleStatus() {
+    const next = tenant.status === "active" ? "suspended" : "active";
+    const label = next === "suspended" ? "SUSPEND" : "REACTIVATE";
+    const msg =
+      next === "suspended"
+        ? `Suspend ${tenant.name}? Subdomain will 404 for users but all data is preserved. You can reactivate at any time.`
+        : `Reactivate ${tenant.name}? Subdomain becomes accessible again.`;
+    if (!window.confirm(msg)) return;
+    setStatusSaving(true);
+    setStatusErr("");
+    try {
+      const r = await fetch("/api/platform-tenant-status", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ tenant_id: tenant.id, status: next }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || "Status change failed");
+      onSaved?.();
+    } catch (e) {
+      setStatusErr(e.message);
+    }
+    setStatusSaving(false);
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <div className="summary">
@@ -172,6 +200,34 @@ function OverviewTab({ detail }) {
             <span className="tab-num">{count}</span>
           </div>
         ))}
+      </div>
+
+      <div>
+        <h3 className="section-head">Status</h3>
+        <p className="muted" style={{ fontSize: 12, marginBottom: 10, maxWidth: 520 }}>
+          Suspended tenants return 404 on their subdomain when MULTI_TENANT_STRICT=true.
+          All data (bookings, members, orders, payments) is preserved — no hard delete.
+        </p>
+        <button
+          onClick={toggleStatus}
+          disabled={statusSaving}
+          style={{
+            padding: "8px 16px",
+            fontSize: 12,
+            background: tenant.status === "active" ? "var(--red)" : "var(--primary)",
+            color: "#EDF3E3",
+            border: 0,
+            borderRadius: 999,
+            cursor: statusSaving ? "wait" : "pointer",
+          }}
+        >
+          {statusSaving
+            ? "Saving…"
+            : tenant.status === "active"
+            ? "Suspend tenant"
+            : "Reactivate tenant"}
+        </button>
+        {statusErr && <p className="err" style={{ marginTop: 8 }}>{statusErr}</p>}
       </div>
 
       <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
