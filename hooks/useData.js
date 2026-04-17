@@ -32,10 +32,8 @@ export function useData(apiKey, connected) {
     // every tenant's rows — a real cross-tenant leak that surfaced once
     // Parts Dept rows appeared alongside Hour Golf's in the admin list.
     //
-    // monthly_usage is intentionally NOT filtered here: it's a view that
-    // does not expose tenant_id as a column, so PostgREST can't filter on
-    // it. Fixing requires a view recreate and is tracked as tech debt
-    // alongside the broader RLS hardening (admin_all policy scoping).
+    // monthly_usage was rebuilt in migration 20260417170000 to expose
+    // tenant_id + scope its internal joins by tenant; now also filtered.
     const tid =
       (typeof window !== "undefined" && window.__TENANT_ID__) || "";
     const tenantQ = tid ? `tenant_id=eq.${encodeURIComponent(tid)}&` : "";
@@ -44,7 +42,7 @@ export function useData(apiKey, connected) {
         supa(key, "members", `?${tenantQ}order=name`),
         supa(key, "bookings", `?${tenantQ}order=booking_start.desc&limit=5000`),
         supa(key, "tier_config", `?${tenantQ}order=display_order`),
-        supa(key, "monthly_usage", "?order=billing_month.desc,overage_charge.desc"),
+        supa(key, "monthly_usage", `?${tenantQ}order=billing_month.desc,overage_charge.desc`),
         supa(key, "payments", `?${tenantQ}order=created_at.desc`).catch(() => []),
       ]);
       setAll({ members, bookings, tierCfg, usage, payments });

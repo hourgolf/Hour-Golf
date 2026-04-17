@@ -389,7 +389,7 @@ export default function MemberLayout({ activeTab, children }) {
     return (
       <div className="mem-layout">
         <div className="mem-login">
-          <div className="mem-brand">HOUR GOLF</div>
+          <div className="mem-brand">{branding?.app_name || ""}</div>
           <div className="mem-brand-sub">Complete Your Account</div>
           <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 24, lineHeight: 1.5 }}>
             Welcome back, <strong>{member.name || member.email}</strong>! Please set a password and agree to our policies to continue.
