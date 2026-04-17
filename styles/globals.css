@@ -295,7 +295,8 @@ html { overflow-y: scroll; }
 /* =============================================
    CUSTOMER PORTAL — legacy (portal-*) classes
    ============================================= */
-.portal { font-family: var(--font-body); background-color: var(--bg); color: var(--text); min-height: 100vh; }
+/* Transparent wrapper so body background (color or image) shows through. */
+.portal { font-family: var(--font-body); background: transparent; color: var(--text); min-height: 100vh; }
 .portal-login { max-width: 380px; margin: 0 auto; padding: 100px 24px; text-align: center; }
 .portal-login input { width: 100%; padding: 14px 16px; border: 1.5px solid var(--border); border-radius: var(--radius); font-size: 15px; font-family: var(--font-body); letter-spacing: 0.03em; margin-bottom: 16px; background: var(--surface); }
 .portal-login input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--border); }
@@ -423,7 +424,8 @@ html { overflow-y: scroll; }
    MEMBER PORTAL (multi-page /members/*)
    ============================================= */
 
-.mem-layout { font-family: var(--font-body); background: var(--bg); color: var(--text); min-height: 100vh; letter-spacing: 0.03em; }
+/* Transparent so body's background-color (or tenant background image) shows through. */
+.mem-layout { font-family: var(--font-body); background: transparent; color: var(--text); min-height: 100vh; letter-spacing: 0.03em; }
 .mem-loading { padding: 60px 24px; text-align: center; color: var(--text-muted); font-size: 14px; }
 
 .mem-login { max-width: 380px; margin: 0 auto; padding: 100px 24px; text-align: center; }
