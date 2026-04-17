@@ -39,7 +39,7 @@ class MyDocument extends Document {
     const cssVars = buildRootCssVars(branding);
     const fontFace = buildDisplayFontFace(branding);
     const bgRule = buildBackgroundImageRule(branding);
-    const appName = branding.app_name || "Hour Golf";
+    const appName = branding.app_name || "Ourlee";
     const themeColor = branding.pwa_theme_color || branding.primary_color;
 
     return (

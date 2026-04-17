@@ -7,7 +7,7 @@ export default function Header({
 }) {
   const branding = useBranding();
   const tenantLogoUrl = branding?.logo_url;
-  const tenantName = branding?.app_name || "Hour Golf";
+  const tenantName = branding?.app_name || "Ourlee";
 
   const logoVisible = showLogo !== false && !!logoUrl;
   const titleVisible = showTitle !== false && !!tenantLogoUrl;

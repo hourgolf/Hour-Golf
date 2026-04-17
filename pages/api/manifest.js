@@ -13,7 +13,7 @@ import { loadBranding, tenantIdFromReq } from "../../lib/branding";
 export default async function handler(req, res) {
   const tenantId = tenantIdFromReq(req);
   const branding = await loadBranding(tenantId);
-  const name = branding.app_name || "Hour Golf";
+  const name = branding.app_name || "Ourlee";
 
   // Manifest is cacheable for 5 minutes to reduce per-request work, but
   // short enough that branding edits propagate quickly.
