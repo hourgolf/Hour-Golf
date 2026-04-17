@@ -4,7 +4,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
-const FALLBACK_EMAIL_FROM = Deno.env.get("EMAIL_FROM") || "Ourlee <onboarding@resend.dev>";
+// Falls back to the platform's verified ourlee.co domain — never the
+// resend.dev sandbox, which silently 403s for any recipient who isn't
+// the Resend account owner.
+const FALLBACK_EMAIL_FROM = Deno.env.get("EMAIL_FROM") || "Ourlee <no-reply@ourlee.co>";
 
 function toPacific(dt: Date): { date: string; time: string } {
   const tz = "America/Los_Angeles";
