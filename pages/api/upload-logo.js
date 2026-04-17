@@ -13,7 +13,7 @@ export const config = {
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
-  const { user, reason } = await verifyAdmin(req);
+  const { user, tenantId, reason } = await verifyAdmin(req);
   if (!user) {
     console.error("upload-logo verifyAdmin failed:", reason);
     return res.status(401).json({ error: "Unauthorized", detail: reason });
@@ -26,6 +26,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing or invalid filename" });
   }
 
+  // Tenant-prefix the storage path so tenant #2's uploads can't collide
+  // with Hour Golf's (and vice versa). Old URLs remain valid because the
+  // existing files aren't moved — only new uploads land under the prefix.
+  const storagePath = `${tenantId}/${safe}`;
+
   const contentType = req.headers["content-type"] || "application/octet-stream";
 
   try {
@@ -37,7 +42,7 @@ export default async function handler(req, res) {
     if (!body.length) return res.status(400).json({ error: "Empty body" });
 
     const key = getServiceKey();
-    const resp = await fetch(`${SUPABASE_URL}/storage/v1/object/logos/${safe}`, {
+    const resp = await fetch(`${SUPABASE_URL}/storage/v1/object/logos/${storagePath}`, {
       method: "POST",
       headers: {
         apikey: key,
@@ -53,7 +58,7 @@ export default async function handler(req, res) {
       return res.status(resp.status).json({ error: "Upload failed", detail: text });
     }
 
-    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/logos/${safe}`;
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/logos/${storagePath}`;
     return res.status(200).json({ url: publicUrl });
   } catch (e) {
     console.error("Logo upload error:", e);

@@ -7,6 +7,26 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 // Disable Next.js body parsing — Stripe signature verification needs the raw body
 export const config = { api: { bodyParser: false } };
 
+// Multi-tenant note (Phase 2B-3):
+// This endpoint does NOT pass through middleware.js — Stripe calls it directly,
+// so there's no subdomain to resolve a tenant from. We rely on two properties
+// that make today's logic tenant-safe without explicit scoping:
+//
+//   1. Stripe IDs (customer, subscription, payment_intent) are globally unique,
+//      so a PATCH like `members?stripe_customer_id=eq.X` can only ever match
+//      one row regardless of tenant.
+//
+//   2. When we INSERT a `payments` row, we first look up the member (to resolve
+//      email/name). We carry the member's `tenant_id` into that insert so the
+//      new row is properly scoped. See invoice.paid handler below.
+//
+// When Phase 7 introduces Stripe Connect, each tenant will have their own
+// Stripe account — meaning this webhook URL only ever receives events for one
+// tenant. At that point, tenant resolution becomes either:
+//   - webhook URL path: /api/stripe-webhook/[tenantSlug]
+//   - reverse-lookup from the Stripe account ID in event.account
+// Don't overhaul this file until Phase 7 brings that decision.
+
 async function getRawBody(req) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
@@ -195,12 +215,14 @@ export default async function handler(req, res) {
 
         if (!stripeCustomerId || amountPaid <= 0) break;
 
-        // Find member by stripe_customer_id
+        // Find member by stripe_customer_id — tenant_id comes with the row so
+        // the subsequent payments INSERT is correctly scoped.
         let memberEmail = null;
         let memberName = null;
+        let memberTenantId = null;
         try {
           const mResp = await fetch(
-            `${SUPABASE_URL}/rest/v1/members?stripe_customer_id=eq.${encodeURIComponent(stripeCustomerId)}&select=email,name`,
+            `${SUPABASE_URL}/rest/v1/members?stripe_customer_id=eq.${encodeURIComponent(stripeCustomerId)}&select=email,name,tenant_id`,
             { headers: { apikey: key, Authorization: `Bearer ${key}` } }
           );
           if (mResp.ok) {
@@ -208,6 +230,7 @@ export default async function handler(req, res) {
             if (rows.length) {
               memberEmail = rows[0].email;
               memberName = rows[0].name;
+              memberTenantId = rows[0].tenant_id;
             }
           }
         } catch (_) {}
@@ -235,22 +258,26 @@ export default async function handler(req, res) {
           } catch (_) {}
         }
 
-        // Record payment
+        // Record payment — scoped to the member's tenant.
         const billingMonth = new Date(invoice.period_start * 1000).toISOString();
+        const paymentInsert = {
+          member_email: memberEmail,
+          billing_month: billingMonth,
+          amount_cents: amountPaid,
+          stripe_payment_intent_id: paymentIntentId || `inv_${invoice.id}`,
+          status: "succeeded",
+          description,
+        };
+        // Only include tenant_id when we resolved one; the DB DEFAULT will
+        // otherwise supply Hour Golf's UUID for any stragglers.
+        if (memberTenantId) paymentInsert.tenant_id = memberTenantId;
         await fetch(`${SUPABASE_URL}/rest/v1/payments`, {
           method: "POST",
           headers: {
             apikey: key, Authorization: `Bearer ${key}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            member_email: memberEmail,
-            billing_month: billingMonth,
-            amount_cents: amountPaid,
-            stripe_payment_intent_id: paymentIntentId || `inv_${invoice.id}`,
-            status: "succeeded",
-            description,
-          }),
+          body: JSON.stringify(paymentInsert),
         });
 
         // Send receipt email

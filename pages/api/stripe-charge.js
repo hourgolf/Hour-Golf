@@ -6,7 +6,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
-  const { user, reason } = await verifyAdmin(req);
+  const { user, tenantId, reason } = await verifyAdmin(req);
   if (!user) {
     console.error("stripe-charge verifyAdmin failed:", reason);
     return res.status(401).json({ error: "Unauthorized", detail: reason });
@@ -69,6 +69,7 @@ export default async function handler(req, res) {
       metadata: {
         member_email: member_email || "",
         billing_month: billing_month || "",
+        tenant_id: tenantId,
         source: "hour-golf-dashboard",
       },
     });

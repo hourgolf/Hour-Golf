@@ -10,7 +10,7 @@ export const config = {
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
-  const { user, reason } = await verifyAdmin(req);
+  const { user, tenantId, reason } = await verifyAdmin(req);
   if (!user) return res.status(401).json({ error: "Unauthorized", detail: reason });
 
   const raw = String(req.query.filename || "");
@@ -18,6 +18,10 @@ export default async function handler(req, res) {
   if (!safe || safe === "." || safe === "..") {
     return res.status(400).json({ error: "Missing or invalid filename" });
   }
+
+  // Tenant-prefix the storage path so tenant uploads can't collide across
+  // tenants. Old URLs remain valid because existing files aren't moved.
+  const storagePath = `${tenantId}/${safe}`;
 
   const contentType = req.headers["content-type"] || "application/octet-stream";
 
@@ -28,7 +32,7 @@ export default async function handler(req, res) {
     if (!body.length) return res.status(400).json({ error: "Empty body" });
 
     const key = getServiceKey();
-    const resp = await fetch(`${SUPABASE_URL}/storage/v1/object/shop/${safe}`, {
+    const resp = await fetch(`${SUPABASE_URL}/storage/v1/object/shop/${storagePath}`, {
       method: "POST",
       headers: {
         apikey: key,
@@ -44,7 +48,7 @@ export default async function handler(req, res) {
       return res.status(resp.status).json({ error: "Upload failed", detail: text });
     }
 
-    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/shop/${safe}`;
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/shop/${storagePath}`;
     return res.status(200).json({ url: publicUrl });
   } catch (e) {
     console.error("Shop image upload error:", e);

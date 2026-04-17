@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
@@ -10,17 +10,18 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
+  const tenantId = getTenantId(req);
   const { template_key, to_email, variables, subject_override } = req.body || {};
   if (!template_key || !to_email) {
     return res.status(400).json({ error: "template_key and to_email required" });
   }
 
   try {
-    // 1) Check member preferences (opt-out check)
+    // 1) Check member preferences (opt-out check) within this tenant
     if (template_key === "booking_confirmation") {
       try {
         const prefResp = await fetch(
-          `${SUPABASE_URL}/rest/v1/member_preferences?email=eq.${encodeURIComponent(to_email)}`,
+          `${SUPABASE_URL}/rest/v1/member_preferences?email=eq.${encodeURIComponent(to_email)}&tenant_id=eq.${tenantId}`,
           { headers: { apikey: key, Authorization: `Bearer ${key}` } }
         );
         if (prefResp.ok) {
@@ -32,9 +33,9 @@ export default async function handler(req, res) {
       } catch (_) { /* proceed if preferences lookup fails */ }
     }
 
-    // 2) Lookup email config to get Resend template ID
+    // 2) Lookup email config to get Resend template ID within this tenant
     const configResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/email_config?template_key=eq.${encodeURIComponent(template_key)}&is_active=eq.true`,
+      `${SUPABASE_URL}/rest/v1/email_config?template_key=eq.${encodeURIComponent(template_key)}&tenant_id=eq.${tenantId}&is_active=eq.true`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (!configResp.ok) throw new Error("Email config lookup failed");
@@ -98,6 +99,7 @@ export default async function handler(req, res) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          tenant_id: tenantId,
           template_key,
           to_email,
           subject: subjectUsed,
