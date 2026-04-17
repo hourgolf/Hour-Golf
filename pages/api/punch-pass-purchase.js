@@ -1,7 +1,7 @@
-import Stripe from "stripe";
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
+import { getStripeClient } from "../../lib/stripe-config";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Phase 7B-2c: per-tenant Stripe client via lib/stripe-config.
 
 const PASS_OPTIONS = {
   1: { hours: 1, discount: 0, label: "1 Hour Pass" },
@@ -61,6 +61,17 @@ export default async function handler(req, res) {
     const fullPrice = pass.hours * rate;
     const discountedPrice = fullPrice * (1 - pass.discount);
     const amountCents = Math.round(discountedPrice * 100);
+
+    let stripe;
+    try {
+      stripe = await getStripeClient(tenantId);
+    } catch (err) {
+      console.error("punch-pass-purchase getStripeClient failed:", err?.message || err);
+      return res.status(503).json({
+        error: "stripe_not_configured",
+        detail: "Stripe is not set up for this tenant yet.",
+      });
+    }
 
     // Ensure Stripe customer exists
     let stripeCustomerId = member.stripe_customer_id;
