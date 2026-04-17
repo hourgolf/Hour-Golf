@@ -170,8 +170,9 @@ export default function MemberLayout({ activeTab, children }) {
   if (!member) {
     return (
       <div className="mem-layout" style={{ position: "relative", overflow: "hidden" }}>
-        {/* Background — same azalea as main dash */}
-        <img src="/blobs/azalea_bg.png" alt="" style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.50, pointerEvents: "none", zIndex: 0 }} />
+        {/* Tenant background image (if any) is painted on body via SSR
+            injection in _document.js using tenant_branding.background_image_url.
+            No additional <img> needed here. */}
 
         <div style={{ position: "relative", zIndex: 1, maxWidth: 400, width: "calc(100% - 40px)", margin: "40px auto 0" }}>
           <InstallPrompt variant="login" />
@@ -390,8 +391,9 @@ export default function MemberLayout({ activeTab, children }) {
 
   return (
     <div className="mem-layout" style={{ position: "relative" }}>
-      {/* Main dashboard background — swap image, adjust opacity here */}
-      <img src="/blobs/azalea_bg.png" alt="" style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.50, pointerEvents: "none", zIndex: 0 }} />
+      {/* Tenant background image (if any) is painted on body via SSR
+          injection in _document.js using tenant_branding.background_image_url.
+          No additional <img> needed here. */}
 
       {/* Header */}
       <header className="mem-header" style={{ position: "relative", zIndex: 1 }}>

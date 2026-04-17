@@ -46,7 +46,7 @@ export default function ResetPassword() {
 
   return (
     <div className="mem-layout" style={{ position: "relative", overflow: "hidden" }}>
-      <img src="/blobs/azalea_bg.png" alt="" style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.50, pointerEvents: "none", zIndex: 0 }} />
+      {/* Tenant background image (if any) is painted on body via SSR injection. */}
 
       <div className="mem-login" style={{
         position: "relative", zIndex: 1,
