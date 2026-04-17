@@ -126,14 +126,17 @@ export default function PlatformTenantDetail() {
 }
 
 function OverviewTab({ detail, apiKey, onSaved }) {
+  const router = useRouter();
   const { tenant, stats, stripe, features, admins } = detail;
   const enabledFeatures = (features || []).filter((f) => f.enabled).length;
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusErr, setStatusErr] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteErr, setDeleteErr] = useState("");
+  const [deleteBlockedCounts, setDeleteBlockedCounts] = useState(null);
 
   async function toggleStatus() {
     const next = tenant.status === "active" ? "suspended" : "active";
-    const label = next === "suspended" ? "SUSPEND" : "REACTIVATE";
     const msg =
       next === "suspended"
         ? `Suspend ${tenant.name}? Subdomain will 404 for users but all data is preserved. You can reactivate at any time.`
@@ -154,6 +157,37 @@ function OverviewTab({ detail, apiKey, onSaved }) {
       setStatusErr(e.message);
     }
     setStatusSaving(false);
+  }
+
+  async function deleteTenant() {
+    const confirmText = `DELETE ${tenant.slug}`;
+    const typed = window.prompt(
+      `Permanently delete ${tenant.name}? This CANNOT be undone.\n\nBranding, features, and Stripe config will cascade. Delete fails if any member / booking / payment / shop / event / loyalty row exists for this tenant.\n\nType "${confirmText}" to confirm:`
+    );
+    if (typed !== confirmText) return;
+
+    setDeleting(true);
+    setDeleteErr("");
+    setDeleteBlockedCounts(null);
+    try {
+      const r = await fetch(
+        `/api/platform-tenant-delete?tenant_id=${encodeURIComponent(tenant.id)}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${apiKey}` },
+        }
+      );
+      const d = await r.json();
+      if (!r.ok) {
+        if (d.counts) setDeleteBlockedCounts(d.counts);
+        throw new Error(d.detail || d.error || "Delete failed");
+      }
+      // Success — bounce back to the tenant list.
+      router.replace("/platform");
+    } catch (e) {
+      setDeleteErr(e.message);
+      setDeleting(false);
+    }
   }
 
   return (
@@ -206,7 +240,7 @@ function OverviewTab({ detail, apiKey, onSaved }) {
         <h3 className="section-head">Status</h3>
         <p className="muted" style={{ fontSize: 12, marginBottom: 10, maxWidth: 520 }}>
           Suspended tenants return 404 on their subdomain when MULTI_TENANT_STRICT=true.
-          All data (bookings, members, orders, payments) is preserved — no hard delete.
+          All data (bookings, members, orders, payments) is preserved.
         </p>
         <button
           onClick={toggleStatus}
@@ -229,6 +263,46 @@ function OverviewTab({ detail, apiKey, onSaved }) {
         </button>
         {statusErr && <p className="err" style={{ marginTop: 8 }}>{statusErr}</p>}
       </div>
+
+      {tenant.status === "suspended" && (
+        <div>
+          <h3 className="section-head" style={{ color: "var(--red)" }}>Danger zone</h3>
+          <p className="muted" style={{ fontSize: 12, marginBottom: 10, maxWidth: 520 }}>
+            Hard-delete is only allowed on suspended tenants with zero data rows.
+            Branding, features, and Stripe config cascade. Bookings, members,
+            payments, shop orders, events, loyalty — any of these blocking will
+            abort the delete and show you which table(s) still hold rows.
+          </p>
+          <button
+            onClick={deleteTenant}
+            disabled={deleting}
+            style={{
+              padding: "8px 16px",
+              fontSize: 12,
+              background: "transparent",
+              color: "var(--red)",
+              border: "1.5px solid var(--red)",
+              borderRadius: 999,
+              cursor: deleting ? "wait" : "pointer",
+            }}
+          >
+            {deleting ? "Deleting…" : "Delete tenant permanently"}
+          </button>
+          {deleteErr && <p className="err" style={{ marginTop: 8 }}>{deleteErr}</p>}
+          {deleteBlockedCounts && (
+            <div style={{ marginTop: 8, fontSize: 11, color: "var(--text-muted)" }}>
+              <div style={{ marginBottom: 4, fontWeight: 600 }}>Blocking rows:</div>
+              {Object.entries(deleteBlockedCounts)
+                .filter(([, v]) => typeof v === "number" && v > 0)
+                .map(([tbl, n]) => (
+                  <div key={tbl}>
+                    <code>{tbl}</code>: {n}
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
         Created {new Date(tenant.created_at).toLocaleString()}

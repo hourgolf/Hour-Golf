@@ -233,7 +233,13 @@ export default function MemberLayout({ activeTab, children }) {
               {branding?.app_name || ""}
             </div>
           )}
-          <div className="mem-brand-sub">{mode === "login" ? "Hello Friend." : mode === "forgot" ? "Reset Password." : "Join the Club."}</div>
+          <div className="mem-brand-sub">{
+            mode === "login"
+              ? (branding?.welcome_message || "Welcome.")
+              : mode === "forgot"
+              ? "Reset Password."
+              : "Join the Club."
+          }</div>
 
           {mode === "forgot" ? (
             <>

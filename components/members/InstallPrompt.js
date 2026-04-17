@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useBranding } from "../../hooks/useBranding";
 
 function isStandalone() {
   if (typeof window === "undefined") return false;
@@ -17,6 +18,8 @@ export default function InstallPrompt({ variant = "banner" }) {
   const [show, setShow] = useState(false);
   const [os, setOS] = useState("unknown");
   const [dismissed, setDismissed] = useState(false);
+  const branding = useBranding();
+  const appName = branding?.app_name || "app";
 
   useEffect(() => {
     // Don't show if already installed as app
@@ -50,7 +53,7 @@ export default function InstallPrompt({ variant = "banner" }) {
           color: "rgba(237,243,227,0.6)", fontSize: 16, cursor: "pointer", lineHeight: 1,
         }}>&times;</button>
         <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
-          Get the Hour Golf App
+          Get the {appName} App
         </div>
         {os === "ios" ? (
           <span>
@@ -84,7 +87,7 @@ export default function InstallPrompt({ variant = "banner" }) {
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text, #35443B)", marginBottom: 2 }}>
-          Add Hour Golf to your Home Screen
+          Add {appName} to your Home Screen
         </div>
         <div style={{ fontSize: 12, color: "var(--text-muted, #8BB5A0)", lineHeight: 1.4 }}>
           {os === "ios" ? (

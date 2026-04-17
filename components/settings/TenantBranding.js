@@ -195,6 +195,7 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
       payload.font_display_name = branding.font_display_name || null;
       payload.font_display_url = branding.font_display_url || null;
       payload.font_body_family = branding.font_body_family || null;
+      payload.welcome_message = branding.welcome_message || null;
 
       // Platform-mode PATCH requires the target tenant_id in the body
       // (tenant-admin mode resolves from subdomain, no extra field).
@@ -355,6 +356,27 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
             <div className="muted" style={{ marginTop: 4 }}>
               Google Fonts in the curated list — all pre-loaded by the app.
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Copy */}
+      <div>
+        <h4 style={{ fontFamily: "var(--font-display)", fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, color: "var(--text-muted)", marginBottom: 10 }}>
+          Copy
+        </h4>
+        <div className="mf">
+          <label>Login Welcome Message</label>
+          <input
+            type="text"
+            value={branding.welcome_message || ""}
+            onChange={(e) => update("welcome_message", e.target.value)}
+            placeholder="Hello Friend."
+            maxLength={200}
+            style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)" }}
+          />
+          <div className="muted" style={{ marginTop: 4 }}>
+            Shown under the logo on the member portal login screen. Leave blank to use a neutral default.
           </div>
         </div>
       </div>

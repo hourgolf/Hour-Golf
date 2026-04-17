@@ -27,6 +27,7 @@ const EDITABLE_COLUMNS = [
   "font_display_name",
   "font_display_url",
   "font_body_family",
+  "welcome_message",
 ];
 
 function isUuid(value) {
@@ -92,6 +93,13 @@ export default async function handler(req, res) {
           }
           if (typeof value === "string" && value.length > 100) {
             return res.status(400).json({ error: `${col} too long` });
+          }
+        } else if (col === "welcome_message") {
+          if (value !== null && typeof value !== "string") {
+            return res.status(400).json({ error: `Invalid string for ${col}` });
+          }
+          if (typeof value === "string" && value.length > 200) {
+            return res.status(400).json({ error: `${col} too long (max 200 chars)` });
           }
         }
 
