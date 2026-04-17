@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import useMemberAuth from "../../hooks/useMemberAuth";
 import { useBranding } from "../../hooks/useBranding";
 import { useTenantFeatures } from "../../hooks/useTenantFeatures";
+import { getLogoMaxDims } from "../../lib/branding";
 import { TIER_COLORS } from "../../lib/constants";
 import HelpDrawer from "./HelpDrawer";
 import EventPopup from "./EventPopup";
@@ -203,13 +204,14 @@ export default function MemberLayout({ activeTab, children }) {
             const welcomeLogoUrl = branding?.welcome_logo_url || branding?.logo_url;
             const showLogo = branding?.show_welcome_logo !== false && !!welcomeLogoUrl;
             const showTitle = branding?.show_welcome_title !== false && !!(branding?.app_name);
+            const welcomeDims = getLogoMaxDims("welcome", branding?.welcome_logo_size);
             return (
               <>
                 {showLogo && (
                   <img
                     src={welcomeLogoUrl}
                     alt={branding.app_name || ""}
-                    style={{ width: "100%", maxWidth: 350, marginBottom: showTitle ? 8 : 30 }}
+                    style={{ width: "100%", maxWidth: welcomeDims.w, maxHeight: welcomeDims.h, marginBottom: showTitle ? 8 : 30, objectFit: "contain" }}
                   />
                 )}
                 {showTitle && (
@@ -451,22 +453,31 @@ export default function MemberLayout({ activeTab, children }) {
               mark (which would need its own branding column), we drop it and
               keep the header clean for every tenant. */}
           <div aria-hidden="true" style={{ justifySelf: "start" }}>
-            {branding?.show_icon && branding?.icon_url && (
-              <img
-                src={branding.icon_url}
-                alt=""
-                style={{ height: 28, width: "auto", opacity: 0.9 }}
-              />
-            )}
+            {branding?.show_icon && branding?.icon_url && (() => {
+              const iconDims = getLogoMaxDims("icon", branding?.icon_size);
+              return (
+                <img
+                  src={branding.icon_url}
+                  alt=""
+                  style={{ height: iconDims.h, width: iconDims.w, objectFit: "contain", opacity: 0.9 }}
+                />
+              );
+            })()}
           </div>
           <div style={{ textAlign: "center" }}>
             {(() => {
               const headerLogoUrl = branding?.header_logo_url || branding?.logo_url;
               const showLogo = branding?.show_header_logo !== false && !!headerLogoUrl;
               const showTitle = branding?.show_header_title === true && !!(branding?.app_name);
+              const headerDims = getLogoMaxDims("header", branding?.header_logo_size);
               if (showLogo) {
                 return (
-                  <img src={headerLogoUrl} alt={branding.app_name || ""} className="hdr-title-logo" />
+                  <img
+                    src={headerLogoUrl}
+                    alt={branding.app_name || ""}
+                    className="hdr-title-logo"
+                    style={{ maxHeight: headerDims.h, maxWidth: headerDims.w, objectFit: "contain" }}
+                  />
                 );
               }
               if (showTitle || !headerLogoUrl) {

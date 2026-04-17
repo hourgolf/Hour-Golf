@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useBranding } from "../../hooks/useBranding";
+import { getLogoMaxDims } from "../../lib/branding";
 
 export default function LoginForm({ onLogin, loading, error }) {
   const [email, setEmail] = useState("");
@@ -15,13 +16,14 @@ export default function LoginForm({ onLogin, loading, error }) {
   const welcomeLogoUrl = branding?.welcome_logo_url || branding?.logo_url;
   const showLogo = branding?.show_welcome_logo !== false && !!welcomeLogoUrl;
   const showTitle = branding?.show_welcome_title !== false && !!appName;
+  const welcomeDims = getLogoMaxDims("welcome", branding?.welcome_logo_size);
   return (
     <div className="setup">
       {showLogo && (
         <img
           src={welcomeLogoUrl}
           alt={appName}
-          style={{ maxWidth: 260, maxHeight: 80, marginBottom: showTitle ? 6 : 12 }}
+          style={{ maxWidth: welcomeDims.w, maxHeight: welcomeDims.h, marginBottom: showTitle ? 6 : 12 }}
         />
       )}
       {showTitle && (

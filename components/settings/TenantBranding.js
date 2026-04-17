@@ -58,11 +58,14 @@ const COLOR_FIELDS = [
   { key: "text_color", label: "Text", hint: "Primary body text color" },
 ];
 
-// Compact logo slot with preview, upload, URL input, and on/off toggle.
-// Rendered three times in the Logos section — welcome, header, icon.
-function LogoSlot({ label, hint, urlKey, toggleKey, uploadHandler, uploading, branding, update }) {
+// Compact logo slot with preview, upload, URL input, on/off toggle,
+// and S/M/L size selector. Rendered three times in the Logos section
+// — welcome, header, icon. Actual pixel sizing is enforced by the
+// render sites via getLogoMaxDims; this UI only picks the bucket.
+function LogoSlot({ label, hint, urlKey, toggleKey, sizeKey, uploadHandler, uploading, branding, update }) {
   const url = branding[urlKey];
   const enabled = branding[toggleKey] !== false;
+  const size = branding[sizeKey] || "m";
   return (
     <div className="mf">
       <label>{label}</label>
@@ -97,14 +100,38 @@ function LogoSlot({ label, hint, urlKey, toggleKey, uploadHandler, uploading, br
         placeholder="https://..."
         style={{ width: "100%", padding: "4px 8px", border: "1px solid var(--border)", borderRadius: 4, fontFamily: "var(--font-mono)", fontSize: 10, background: "var(--surface)", color: "var(--text)" }}
       />
-      <label style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12 }}>
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) => update(toggleKey, e.target.checked)}
-        />
-        <span>Show</span>
-      </label>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, fontSize: 12 }}>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => update(toggleKey, e.target.checked)}
+          />
+          <span>Show</span>
+        </label>
+        <div style={{ display: "inline-flex", gap: 2 }}>
+          {["s", "m", "l"].map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => update(sizeKey, opt)}
+              style={{
+                padding: "2px 8px",
+                fontSize: 11,
+                background: size === opt ? "var(--primary)" : "var(--surface)",
+                color: size === opt ? "var(--bg)" : "var(--text)",
+                border: "1px solid var(--border)",
+                borderRadius: 4,
+                cursor: "pointer",
+                textTransform: "uppercase",
+                letterSpacing: 1,
+              }}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      </div>
       {uploading && <div className="muted" style={{ marginTop: 4 }}>Uploading…</div>}
     </div>
   );
@@ -263,6 +290,9 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
       payload.show_header_logo = branding.show_header_logo !== false;
       payload.show_header_title = branding.show_header_title === true;
       payload.show_icon = branding.show_icon === true;
+      payload.welcome_logo_size = ["s", "m", "l"].includes(branding.welcome_logo_size) ? branding.welcome_logo_size : "m";
+      payload.header_logo_size = ["s", "m", "l"].includes(branding.header_logo_size) ? branding.header_logo_size : "m";
+      payload.icon_size = ["s", "m", "l"].includes(branding.icon_size) ? branding.icon_size : "m";
       payload.background_image_url = branding.background_image_url || null;
       payload.font_display_name = branding.font_display_name || null;
       payload.font_display_url = branding.font_display_url || null;
@@ -342,6 +372,7 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
             hint="Big hero on login pages"
             urlKey="welcome_logo_url"
             toggleKey="show_welcome_logo"
+            sizeKey="welcome_logo_size"
             uploadHandler={handleWelcomeLogoUpload}
             uploading={uploadingWelcome}
             branding={branding}
@@ -352,6 +383,7 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
             hint="Compact, shown in persistent nav"
             urlKey="header_logo_url"
             toggleKey="show_header_logo"
+            sizeKey="header_logo_size"
             uploadHandler={handleHeaderLogoUpload}
             uploading={uploadingHeader}
             branding={branding}
@@ -362,6 +394,7 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
             hint="Decorative mark (secondary)"
             urlKey="icon_url"
             toggleKey="show_icon"
+            sizeKey="icon_size"
             uploadHandler={handleIconUpload}
             uploading={uploadingIcon}
             branding={branding}

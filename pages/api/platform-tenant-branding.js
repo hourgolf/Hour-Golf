@@ -31,6 +31,9 @@ const EDITABLE_COLUMNS = [
   "show_header_logo",
   "show_header_title",
   "show_icon",
+  "welcome_logo_size",
+  "header_logo_size",
+  "icon_size",
   "background_image_url",
   "font_display_name",
   "font_display_url",
@@ -98,6 +101,10 @@ export default async function handler(req, res) {
         } else if (col.startsWith("show_")) {
           if (value !== null && typeof value !== "boolean") {
             return res.status(400).json({ error: `${col} must be boolean` });
+          }
+        } else if (col.endsWith("_size")) {
+          if (value !== null && !["s", "m", "l"].includes(value)) {
+            return res.status(400).json({ error: `${col} must be 's', 'm', or 'l'` });
           }
         } else if (col.startsWith("font_")) {
           if (value !== null && typeof value !== "string") {

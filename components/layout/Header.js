@@ -1,4 +1,5 @@
 import { useBranding } from "../../hooks/useBranding";
+import { getLogoMaxDims } from "../../lib/branding";
 
 export default function Header({
   todayCount, todayHours, memberCount,
@@ -42,9 +43,17 @@ export default function Header({
           )}
         </button>
         <div style={{ textAlign: "center" }}>
-          {tenantHeaderLogoVisible && (
-            <img src={tenantHeaderLogoUrl} alt={tenantName} className="hdr-title-logo" />
-          )}
+          {tenantHeaderLogoVisible && (() => {
+            const headerDims = getLogoMaxDims("header", branding?.header_logo_size);
+            return (
+              <img
+                src={tenantHeaderLogoUrl}
+                alt={tenantName}
+                className="hdr-title-logo"
+                style={{ maxHeight: headerDims.h, maxWidth: headerDims.w, objectFit: "contain" }}
+              />
+            );
+          })()}
           {tenantHeaderTitleVisible && (
             <div
               className="hdr-title-logo"
