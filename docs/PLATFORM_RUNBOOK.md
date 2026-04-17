@@ -4,7 +4,7 @@ Practical reference for running the platform. Assumes you (Matt) as the
 sole super-admin. Written so you can re-derive how your own system
 works after a gap of weeks.
 
-Last updated: 2026-04-17.
+Last updated: 2026-04-17 (Phase 7C shipped).
 
 Tenant UUID conventions used throughout:
 - Hour Golf: `11111111-1111-4111-8111-111111111111`
@@ -116,12 +116,14 @@ The wildcard `*.ourlee.co` on Vercel already routes to this app. New tenants jus
 **Step 4 — Stripe setup (only if tenant takes payments)**
 
 1. Tenant admin creates a Stripe account (or you can help via Stripe's account creation API — not yet automated)
-2. Get from tenant: `sk_live_...`, `pk_live_...` (optional), `whsec_...` (after they set up the webhook in Stripe dashboard)
-3. In Stripe Dashboard, under Developers → Webhooks → Add endpoint: URL is `https://<slug>.ourlee.co/api/stripe-webhook` (note: this route is still single-tenant-shaped — Phase 7C not fully done for multi-tenant webhook isolation; for now all tenants share the same webhook endpoint. When a second tenant goes live with real Stripe, this needs the per-tenant webhook URL migration first.)
-4. `/platform/tenants/<slug> → Stripe` tab
-5. Paste secret key, publishable key (optional), webhook secret
-6. Set mode (test or live), set enabled=true
-7. Save
+2. Get from tenant: `sk_live_...`, `pk_live_...` (optional)
+3. In Stripe Dashboard, under Developers → Webhooks → Add endpoint: URL is `https://<slug>.ourlee.co/api/stripe-webhook/<slug>` (per-tenant route shipped in Phase 7C). Subscribe to these events: `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted`.
+4. Reveal the endpoint's signing secret in Stripe Dashboard (`whsec_...`)
+5. `/platform/tenants/<slug> → Stripe` tab
+6. Paste secret key, publishable key (optional), webhook secret
+7. Set mode (test or live), set enabled=true
+8. Save
+9. In Stripe Dashboard → Webhooks → your endpoint → "Send test webhook" → pick `invoice.paid`. Confirm it shows 200 OK. If 400 "Invalid signature" — re-copy the signing secret. If 400 "Webhook not configured" — the webhook_secret field didn't save, retry step 6.
 
 Risks to explain to the tenant:
 - **Failed Stripe charges** show up as `status=failed` in `payments` table. Admin dashboard → Customers → Payments History shows these.
@@ -389,11 +391,16 @@ Real bugs or single-points-of-failure. Check these first when something weird ha
 - **Fix**: Known Tier 2 follow-up. Multi-session table design documented but not yet built.
 - **Mitigation**: 7-day default + 90-day Remember-me session TTLs reduce the friction. Recommend to members: "stay on one primary device."
 
-### Risk: Stripe webhook endpoint still single-tenant
-- **What**: `pages/api/stripe-webhook.js` resolves tenant from member lookup by stripe_customer_id, works for today because only HG has live Stripe. When a second real tenant goes live, this approach creates ambiguity.
-- **Symptom**: Won't manifest until tenant #2 processes their first live payment.
-- **Fix**: Phase 7C migration — per-tenant webhook URLs `/api/stripe-webhook/[slug].js` using the tenant's `webhook_secret` from `tenant_stripe_config`. Not yet built.
-- **Trip test**: Before onboarding a real paying second tenant, complete Phase 7C.
+### Risk: Legacy Stripe webhook route still serves HG (observation window)
+- **What**: Phase 7C shipped the per-tenant route `/api/stripe-webhook/[slug]`. Hour Golf's Stripe dashboard needs to be cut over from the legacy `/api/stripe-webhook` endpoint to `https://hourgolf.ourlee.co/api/stripe-webhook/hourgolf`. Until that cutover + ~24h observation, the legacy route is kept live as a safety net.
+- **Symptom**: After cutover, if HG's subscriptions stop syncing, the new endpoint may be misconfigured — check signature secret in `tenant_stripe_config.webhook_secret` matches what Stripe dashboard displays.
+- **Phase 7C-2 cutover steps** (when ready):
+  1. In Stripe Dashboard (HG account) → Webhooks → Add endpoint `https://hourgolf.ourlee.co/api/stripe-webhook/hourgolf` with same event subscriptions as the current endpoint
+  2. Copy new signing secret, paste into `/platform/tenants/hourgolf → Stripe → Webhook secret`, save
+  3. Send Stripe test webhook → confirm 200
+  4. Disable (don't delete) the legacy webhook endpoint in Stripe Dashboard
+  5. Observe `payments` inserts + `members.tier` updates for 24h
+- **Phase 7C-3 cleanup** (after observation): Delete `pages/api/stripe-webhook.js` and the legacy endpoint in Stripe Dashboard.
 
 ### Risk: app_settings per-user keying
 - **What**: Admin personal prefs (accent color, personal logo, font pref) are keyed by `user_id` only, not `(user_id, tenant_id)`. Admins working across tenants see the same prefs everywhere.
