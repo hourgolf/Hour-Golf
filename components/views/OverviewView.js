@@ -107,7 +107,13 @@ export default function OverviewView({
     }, 0);
   }, [nonMem, chargedBookingIds]);
 
-  const totOver = memMonth.reduce((s, r) => s + Number(r.overage_charge || 0), 0);
+  // Sum the *remaining* owed per member (expected minus reconciled
+  // payments), not the gross overage_charge — otherwise the top counter
+  // keeps showing a big red number even after everyone is paid up.
+  const totOver = memMonth.reduce(
+    (s, r) => s + remainingOverageCents(r, payments) / 100,
+    0
+  );
   const totHrs = memMonth.reduce((s, r) => s + Number(r.total_hours || 0), 0);
 
   function isPaid(email, month) {

@@ -3,9 +3,30 @@ import { getStripeClient } from "../../lib/stripe-config";
 
 // Phase 7B-2d: per-tenant Stripe client via lib/stripe-config.
 
+// Stripe's customers.list({ email }) is CASE-SENSITIVE — it misses
+// customers whose email on file differs in case from the booking
+// (e.g. "Jaf3716@gmail.com" vs "jaf3716@gmail.com"). The Search API
+// normalizes email case, so try it first; fall back to list if search
+// is unavailable or rate-limited.
 async function findStripeCustomer(stripe, email) {
-  const customers = await stripe.customers.list({ email, limit: 1 });
-  return customers.data.length > 0 ? customers.data[0].id : null;
+  const safeEmail = String(email || "").replace(/'/g, "");
+  try {
+    const search = await stripe.customers.search({
+      query: `email:'${safeEmail}'`,
+      limit: 1,
+    });
+    if (search.data.length > 0) return search.data[0].id;
+  } catch (err) {
+    console.warn("stripe.customers.search failed, falling back to list:", err?.message || err);
+  }
+  const list = await stripe.customers.list({ email, limit: 1 });
+  if (list.data.length > 0) return list.data[0].id;
+  const lower = String(email || "").toLowerCase();
+  if (lower !== email) {
+    const listLower = await stripe.customers.list({ email: lower, limit: 1 });
+    if (listLower.data.length > 0) return listLower.data[0].id;
+  }
+  return null;
 }
 
 async function findPaymentMethod(stripe, customerId) {

@@ -3,9 +3,27 @@ import { getStripeClient } from "../../lib/stripe-config";
 
 // Phase 7B-2d: per-tenant Stripe client via lib/stripe-config.
 
+// See charge-nonmember.js for why: stripe.customers.list is
+// case-sensitive on email, so try the Search API first.
 async function findStripeCustomer(stripe, email) {
-  const customers = await stripe.customers.list({ email, limit: 1 });
-  return customers.data.length > 0 ? customers.data[0].id : null;
+  const safeEmail = String(email || "").replace(/'/g, "");
+  try {
+    const search = await stripe.customers.search({
+      query: `email:'${safeEmail}'`,
+      limit: 1,
+    });
+    if (search.data.length > 0) return search.data[0].id;
+  } catch (err) {
+    console.warn("stripe.customers.search failed, falling back to list:", err?.message || err);
+  }
+  const list = await stripe.customers.list({ email, limit: 1 });
+  if (list.data.length > 0) return list.data[0].id;
+  const lower = String(email || "").toLowerCase();
+  if (lower !== email) {
+    const listLower = await stripe.customers.list({ email: lower, limit: 1 });
+    if (listLower.data.length > 0) return listLower.data[0].id;
+  }
+  return null;
 }
 
 async function findPaymentMethod(stripe, customerId) {
