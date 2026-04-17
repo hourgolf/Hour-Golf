@@ -1,6 +1,7 @@
 import ThemeCustomizer from "../settings/ThemeCustomizer";
 import FontSelector from "../settings/FontSelector";
 import LogoUpload from "../settings/LogoUpload";
+import TenantBranding from "../settings/TenantBranding";
 
 export default function SettingsView({ settings, updateSetting, apiKey, user, onLogout, onOpenSync }) {
   const checkLabelStyle = {
@@ -63,11 +64,26 @@ export default function SettingsView({ settings, updateSetting, apiKey, user, on
         </div>
       </div>
 
-      {/* Branding */}
+      {/* Tenant Brand (platform-level) */}
       <div className="tbl" style={{ padding: 20, marginBottom: 20 }}>
-        <h3 style={{ fontFamily: "var(--font-display)", fontSize: 14, textTransform: "uppercase", letterSpacing: 2, color: "var(--primary)", marginBottom: 16 }}>
-          Branding
+        <h3 style={{ fontFamily: "var(--font-display)", fontSize: 14, textTransform: "uppercase", letterSpacing: 2, color: "var(--primary)", marginBottom: 6 }}>
+          Tenant Brand
         </h3>
+        <p className="muted" style={{ marginBottom: 16 }}>
+          Platform-level brand controls. Changes here affect every member and admin
+          view for this tenant. (Your personal dashboard preferences live below.)
+        </p>
+        <TenantBranding apiKey={apiKey} />
+      </div>
+
+      {/* Admin Preferences (per-user) */}
+      <div className="tbl" style={{ padding: 20, marginBottom: 20 }}>
+        <h3 style={{ fontFamily: "var(--font-display)", fontSize: 14, textTransform: "uppercase", letterSpacing: 2, color: "var(--primary)", marginBottom: 6 }}>
+          Your Dashboard
+        </h3>
+        <p className="muted" style={{ marginBottom: 16 }}>
+          Personal customization for your admin dashboard only. Does not affect members.
+        </p>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
           <div>
@@ -84,7 +100,7 @@ export default function SettingsView({ settings, updateSetting, apiKey, user, on
                   checked={settings.showLogo !== false}
                   onChange={(e) => updateSetting("showLogo", e.target.checked)}
                 />
-                Show logo image
+                Show personal logo image
               </label>
               <label style={checkLabelStyle}>
                 <input
@@ -93,7 +109,7 @@ export default function SettingsView({ settings, updateSetting, apiKey, user, on
                   checked={settings.showTitle !== false}
                   onChange={(e) => updateSetting("showTitle", e.target.checked)}
                 />
-                Show &ldquo;HOUR GOLF&rdquo; title
+                Show tenant brand logo in title
               </label>
               <label style={checkLabelStyle}>
                 <input

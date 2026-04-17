@@ -1,10 +1,16 @@
+import { useBranding } from "../../hooks/useBranding";
+
 export default function Header({
   todayCount, todayHours, memberCount,
   onHome, logoUrl, logoScale,
   showLogo, showTitle, showSubtitle,
 }) {
+  const branding = useBranding();
+  const tenantLogoUrl = branding?.logo_url;
+  const tenantName = branding?.app_name || "Hour Golf";
+
   const logoVisible = showLogo !== false && !!logoUrl;
-  const titleVisible = showTitle !== false;
+  const titleVisible = showTitle !== false && !!tenantLogoUrl;
 
   return (
     <header className="header">
@@ -28,7 +34,7 @@ export default function Header({
         </button>
         <div style={{ textAlign: "center" }}>
           {titleVisible && (
-            <img src="/blobs/HG-Script-White.svg" alt="Hour Golf" className="hdr-title-logo" />
+            <img src={tenantLogoUrl} alt={tenantName} className="hdr-title-logo" />
           )}
           {showSubtitle !== false && <div className="logo-sub">Admin Dashboard</div>}
         </div>
