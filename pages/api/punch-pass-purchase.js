@@ -1,5 +1,6 @@
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { getStripeClient } from "../../lib/stripe-config";
+import { assertFeature } from "../../lib/feature-guard";
 
 // Phase 7B-2c: per-tenant Stripe client via lib/stripe-config.
 
@@ -29,6 +30,8 @@ export default async function handler(req, res) {
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies["hg-member-token"];
   if (!token) return res.status(401).json({ error: "Not authenticated" });
+
+  if (!(await assertFeature(res, tenantId, "punch_passes"))) return;
 
   try {
     // Get member from session within this tenant

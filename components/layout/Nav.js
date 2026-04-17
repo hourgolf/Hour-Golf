@@ -1,19 +1,26 @@
+import { useTenantFeatures } from "../../hooks/useTenantFeatures";
+
+// Each tab optionally gates on a feature flag. Items with no `feature`
+// field always render (today, week, customers, tiers, reports are core
+// tenant-admin functionality regardless of tenant).
 const TABS = [
   { key: "today", label: "Today", countKey: "todayCount" },
   { key: "week", label: "Calendar" },
   { key: "overview", label: "Usage" },
   { key: "customers", label: "Customers" },
-  { key: "events", label: "Events" },
-  { key: "shop", label: "Shop" },
+  { key: "events", label: "Events", feature: "events" },
+  { key: "shop", label: "Shop", feature: "pro_shop" },
   { key: "tiers", label: "Config" },
   { key: "reports", label: "Reports" },
 ];
 
 export default function Nav({ view, setView, todayCount, detailName, onClearDetail }) {
+  const { isEnabled } = useTenantFeatures();
+  const visibleTabs = TABS.filter((t) => !t.feature || isEnabled(t.feature));
   return (
     <nav className="nav">
       <div className="nav-inner-wrap">
-      {TABS.map(({ key, label, countKey }) => (
+      {visibleTabs.map(({ key, label, countKey }) => (
         <button
           key={key}
           className={`nav-btn ${view === key ? "active" : ""}`}

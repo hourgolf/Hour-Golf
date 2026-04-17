@@ -1,4 +1,5 @@
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
+import { assertFeature } from "../../lib/feature-guard";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -20,6 +21,8 @@ export default async function handler(req, res) {
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies["hg-member-token"];
   if (!token) return res.status(401).json({ error: "Not authenticated" });
+
+  if (!(await assertFeature(res, tenantId, "events"))) return;
 
   try {
     // Verify session within this tenant

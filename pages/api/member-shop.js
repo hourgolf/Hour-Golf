@@ -1,6 +1,7 @@
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { getStripeClient } from "../../lib/stripe-config";
 import { sendShopOrderNotification } from "../../lib/email";
+import { assertFeature } from "../../lib/feature-guard";
 
 // Phase 7B-2b: per-tenant Stripe client via lib/stripe-config.
 
@@ -49,6 +50,15 @@ export default async function handler(req, res) {
   const token = cookies["hg-member-token"];
   if (!token) return res.status(401).json({ error: "Not authenticated" });
 
+  // The `loyalty` sub-action has its own gate below. All other shop
+  // actions require the pro_shop feature.
+  const action = req.query.action || "browse";
+  if (action === "loyalty") {
+    if (!(await assertFeature(res, tenantId, "loyalty"))) return;
+  } else {
+    if (!(await assertFeature(res, tenantId, "pro_shop"))) return;
+  }
+
   try {
     const mResp = await sb(key, `members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=email,name,tier,stripe_customer_id,shop_credit_balance`);
     if (!mResp.ok) throw new Error("Session lookup failed");
@@ -62,8 +72,6 @@ export default async function handler(req, res) {
       const tc = tcResp.ok ? await tcResp.json() : [];
       if (tc.length > 0) discountPct = Number(tc[0].pro_shop_discount || 0);
     }
-
-    const action = req.query.action || "browse";
 
     // ── GET: browse items ──
     if (req.method === "GET" && action === "browse") {

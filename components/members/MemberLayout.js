@@ -2,17 +2,22 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import useMemberAuth from "../../hooks/useMemberAuth";
 import { useBranding } from "../../hooks/useBranding";
+import { useTenantFeatures } from "../../hooks/useTenantFeatures";
 import { TIER_COLORS } from "../../lib/constants";
 import HelpDrawer from "./HelpDrawer";
 import EventPopup from "./EventPopup";
 import InstallPrompt from "./InstallPrompt";
 
+// Each nav item optionally gates on a feature flag. Items with no
+// `feature` field always render. Billing covers subscription
+// management + punch pass purchase + payment method setup, so hide
+// it when stripe_enabled is off (renders a dead-end page otherwise).
 const NAV_ITEMS = [
   { key: "dashboard", label: "Home", href: "/members/dashboard" },
   { key: "book", label: "Book Time", href: "/members/book" },
-  { key: "events", label: "Events", href: "/members/events" },
-  { key: "shop", label: "Pro Shop", href: "/members/shop" },
-  { key: "billing", label: "Billing", href: "/members/billing" },
+  { key: "events", label: "Events", href: "/members/events", feature: "events" },
+  { key: "shop", label: "Pro Shop", href: "/members/shop", feature: "pro_shop" },
+  { key: "billing", label: "Billing", href: "/members/billing", feature: "stripe_enabled" },
   { key: "account", label: "Account", href: "/members/account" },
 ];
 
@@ -20,6 +25,7 @@ export default function MemberLayout({ activeTab, children }) {
   const router = useRouter();
   const { member, tierConfig, loading, error, login, signup, completeAccount, logout, refresh } = useMemberAuth();
   const branding = useBranding();
+  const { isEnabled: isFeatureEnabled } = useTenantFeatures();
   const [mode, setMode] = useState("login");
 
   // Login fields
@@ -458,7 +464,7 @@ export default function MemberLayout({ activeTab, children }) {
       {/* Nav */}
       <nav className="mem-nav" style={{ position: "relative", zIndex: 1 }}>
         <div className="mem-nav-inner">
-          {NAV_ITEMS.map(({ key, label, href }) => (
+          {NAV_ITEMS.filter((item) => !item.feature || isFeatureEnabled(item.feature)).map(({ key, label, href }) => (
             <button key={key} className={`mem-nav-btn ${activeTab === key ? "active" : ""}`} onClick={() => router.push(href)}>
               {label}
             </button>

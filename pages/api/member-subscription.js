@@ -1,5 +1,6 @@
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { getStripeClient } from "../../lib/stripe-config";
+import { assertFeature } from "../../lib/feature-guard";
 
 // Phase 7B-2c: per-tenant Stripe client via lib/stripe-config.
 
@@ -34,6 +35,8 @@ export default async function handler(req, res) {
 
   const member = await getMemberFromToken(key, token, tenantId);
   if (!member) return res.status(401).json({ error: "Session expired" });
+
+  if (!(await assertFeature(res, tenantId, "subscriptions"))) return;
 
   let stripe;
   try {

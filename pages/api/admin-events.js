@@ -1,4 +1,5 @@
 import { verifyAdmin, getServiceKey, SUPABASE_URL } from "../../lib/api-helpers";
+import { assertFeature } from "../../lib/feature-guard";
 
 function sb(key, path, opts = {}) {
   return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -18,6 +19,8 @@ export default async function handler(req, res) {
 
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
+
+  if (!(await assertFeature(res, tenantId, "events"))) return;
 
   try {
     // GET — list all events with interest + registration counts
