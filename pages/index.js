@@ -193,15 +193,17 @@ export default function Dashboard() {
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.detail || d.error);
-      await supaPost(apiKey, "payments", {
-        member_email: chgTgt.email,
-        billing_month: chgTgt.month,
-        amount_cents: Math.round(chgTgt.amount * 100),
-        stripe_payment_intent_id: d.payment_intent_id,
-        status: "succeeded",
-        description: `Overage \u2014 ${mL(chgTgt.month)}`,
-      });
-      showToast(`Charged $${chgTgt.amount.toFixed(2)}`);
+      // Server owns the payments table INSERT now (see stripe-charge.js).
+      // If it somehow failed server-side, surface it so the admin knows the
+      // customer was charged but DB didn't capture it — rare, but possible.
+      if (d.payments_row_recorded === false) {
+        showToast(
+          `Charged $${chgTgt.amount.toFixed(2)} but payments row NOT recorded (${d.payments_row_error || "unknown"}). Ping dev.`,
+          "error"
+        );
+      } else {
+        showToast(`Charged $${chgTgt.amount.toFixed(2)}`);
+      }
       setChgTgt(null);
       await refresh();
     } catch (e) {
