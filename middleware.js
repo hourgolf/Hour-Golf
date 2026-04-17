@@ -102,7 +102,22 @@ export async function middleware(request) {
   headers.set('x-tenant-id', tenantId);
   headers.set('x-tenant-source', source);
 
-  return NextResponse.next({ request: { headers } });
+  const response = NextResponse.next({ request: { headers } });
+
+  // Every page response has tenant-specific HTML (colors, logo, bg URL baked
+  // inline by _document.js). Vercel's Edge CDN MUST NOT cache these across
+  // tenants or across admin brand edits — the default Next.js Cache-Control
+  // (`public, max-age=0, must-revalidate`) turned out to let Vercel HIT for
+  // 15+ minutes after an edit. Setting `private, no-store` in middleware
+  // overrides the downstream default at the Edge layer.
+  //
+  // Skip /api/* so API handlers keep control of their own caching (webhooks,
+  // uploads, JSON endpoints set their own Cache-Control where relevant).
+  if (!request.nextUrl.pathname.startsWith('/api/')) {
+    response.headers.set('Cache-Control', 'private, no-store');
+  }
+
+  return response;
 }
 
 // Match all paths except Next.js internals and static assets. Middleware must

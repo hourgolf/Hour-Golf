@@ -23,16 +23,6 @@ function escapeHtml(s) {
 class MyDocument extends Document {
   static async getInitialProps(ctx) {
     const initialProps = await Document.getInitialProps(ctx);
-    // The HTML body has the tenant's colors, logo URL, and bg URL baked
-    // inline, so the response MUST NOT be cached by Vercel's Edge CDN —
-    // otherwise admin branding edits take 15+ minutes to appear while a
-    // stale SSR snapshot keeps serving. `private, no-store` keeps the page
-    // uncached everywhere; the 60s in-memory cache in lib/branding.js still
-    // prevents the DB from getting hammered within a warm serverless
-    // instance.
-    if (ctx.res && typeof ctx.res.setHeader === "function") {
-      ctx.res.setHeader("Cache-Control", "private, no-store");
-    }
     let branding = FALLBACK_BRANDING;
     try {
       const tenantId = tenantIdFromReq(ctx.req);
