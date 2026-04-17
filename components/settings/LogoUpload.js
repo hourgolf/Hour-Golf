@@ -7,6 +7,11 @@ export default function LogoUpload({ settings, updateSetting, apiKey }) {
 
   async function handleUpload(file) {
     if (!file || !apiKey) return;
+    // Vercel serverless functions cap request bodies at ~4.5MB.
+    if (file.size > 4 * 1024 * 1024) {
+      setError("Image too large. Please use a file under 4MB.");
+      return;
+    }
     setUploading(true);
     setError("");
     try {
@@ -26,6 +31,9 @@ export default function LogoUpload({ settings, updateSetting, apiKey }) {
 
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) {
+        if (resp.status === 413) {
+          throw new Error("Image too large for the server. Please use a file under 4MB.");
+        }
         throw new Error(data.detail || data.error || `Upload failed (${resp.status})`);
       }
 

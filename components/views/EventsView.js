@@ -36,7 +36,8 @@ function EventFormModal({ open, onClose, event, onSave, apiKey }) {
   async function handleImage(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert("Max 5MB"); return; }
+    // Vercel serverless functions cap request bodies at ~4.5MB.
+    if (file.size > 4 * 1024 * 1024) { alert("Image too large. Please use a file under 4MB."); return; }
     setUploading(true);
     try {
       const ext = file.name.split(".").pop();
@@ -46,8 +47,12 @@ function EventFormModal({ open, onClose, event, onSave, apiKey }) {
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": file.type },
         body: file,
       });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.detail || d.error);
+      // Parse JSON gracefully; platform errors (e.g. 413) are plain text.
+      const d = await r.json().catch(async () => ({ detail: (await r.text().catch(() => "")) }));
+      if (!r.ok) {
+        if (r.status === 413) throw new Error("Image too large for the server. Please use a file under 4MB.");
+        throw new Error(d.detail || d.error || `Upload failed (${r.status})`);
+      }
       update("image_url", d.url);
     } catch (err) {
       alert("Upload failed: " + err.message);

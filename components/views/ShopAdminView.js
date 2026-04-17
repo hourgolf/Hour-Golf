@@ -58,7 +58,9 @@ function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
   async function handleImageUpload(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert("Max 5MB"); return; }
+    // Vercel serverless functions cap request bodies at ~4.5MB, so reject
+    // anything above 4MB client-side with a clear message.
+    if (file.size > 4 * 1024 * 1024) { alert("Image too large. Please use a file under 4MB."); return; }
     if (form.image_urls.length >= 5) { alert("Maximum 5 images"); return; }
     setUploading(true);
     try {
@@ -69,8 +71,14 @@ function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": file.type },
         body: file,
       });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.detail || d.error);
+      // Parse JSON if possible; fall back to raw text so platform errors
+      // (e.g. Vercel's plain-text "Request Entity Too Large") don't show up
+      // as cryptic "Unexpected token" JSON errors.
+      const d = await r.json().catch(async () => ({ detail: (await r.text().catch(() => "")) }));
+      if (!r.ok) {
+        if (r.status === 413) throw new Error("Image too large for the server. Please use a file under 4MB.");
+        throw new Error(d.detail || d.error || `Upload failed (${r.status})`);
+      }
       update("image_urls", [...form.image_urls, d.url]);
     } catch (err) {
       alert("Upload failed: " + err.message);
