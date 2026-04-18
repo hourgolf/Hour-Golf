@@ -113,7 +113,20 @@ The wildcard `*.ourlee.co` on Vercel already routes to this app. New tenants jus
 6. Support & Legal section — fill in support email, phone, legal URL, terms URL, facility hours
 7. Save
 
-**Step 4 — Stripe setup (only if tenant takes payments)**
+**Step 4 — Email domain (optional — defaults to shared ourlee.co)**
+
+By default, a new tenant sends every member-facing email (booking confirmation, welcome, access code, cancellation, receipt) from `<Tenant Name> <no-reply@ourlee.co>`. Works fine functionally, but the sender domain is ourlee.co instead of the tenant's brand. If the tenant wants their own domain:
+
+1. Tenant admin picks the sending domain (e.g. `book.swingstudio.com` or `swingstudio.com`)
+2. Add the domain in Resend Dashboard → Domains → Add Domain. Resend displays the required DNS records (typically 3 — SPF, DKIM, and a Resend-verification TXT).
+3. Tenant adds those DNS records with their registrar. Propagation usually 5-15 min, can take up to 24h.
+4. In Resend Dashboard, click "Verify DNS" once the records resolve. Status should flip to `Verified`.
+5. Supabase SQL editor: `update public.tenants set email_from = '<Tenant Name> <no-reply@theirdomain.com>' where slug = '<slug>';` (no platform UI yet for this — Phase 8 will surface it in `/platform/tenants/<slug> → Email`).
+6. Send a test email via the platform (create a test booking) and confirm it arrives from the new `from` address and doesn't land in spam.
+
+**Gotcha**: if you update `tenants.email_from` BEFORE the domain is verified in Resend, every outgoing email silently 403s (Resend rejects unverified sender). Symptom: members complain emails stopped; Resend Dashboard → Logs shows 403 with reason "domain not verified". Fix: either verify the domain or revert `email_from` to null (falls back to ourlee.co).
+
+**Step 5 — Stripe setup (only if tenant takes payments)**
 
 1. Tenant admin creates a Stripe account (or you can help via Stripe's account creation API — not yet automated)
 2. Get from tenant: `sk_live_...`, `pk_live_...` (optional)
@@ -129,7 +142,7 @@ Risks to explain to the tenant:
 - **Failed Stripe charges** show up as `status=failed` in `payments` table. Admin dashboard → Customers → Payments History shows these.
 - **Webhook signature failures** mean Stripe events aren't syncing. Symptoms: subscription upgrades don't reflect in members table. Check `webhook_debug_log`.
 
-**Step 5 — Seam setup (only if tenant wants access codes)**
+**Step 6 — Seam setup (only if tenant wants access codes)**
 
 1. Tenant admin sets up their Seam.co account and registers their smart lock(s)
 2. Get from tenant: `seam_...` API key, device_id (UUID of the specific lock)
@@ -143,7 +156,7 @@ That's it — the DB trigger starts creating `access_code_jobs` for new bookings
 
 Also set a backup access code in Branding → Support & Legal → Backup Access Code (physical code the tenant configured on the lock as a fallback).
 
-**Step 6 — Feature flags**
+**Step 7 — Feature flags**
 
 `/platform/tenants/<slug> → Features`. Toggle off anything the tenant isn't paying for / doesn't use:
 - No pro shop? Turn off `pro_shop`.
@@ -154,7 +167,7 @@ Also set a backup access code in Branding → Support & Legal → Backup Access 
 
 Turning off cleanly hides the nav items + returns 404 on feature-specific API routes.
 
-**Step 7 — Initial admin invite**
+**Step 8 — Initial admin invite**
 
 If the admin's email didn't auto-link during Step 1 (they didn't already have a Supabase Auth account), two options:
 
@@ -167,7 +180,7 @@ If the admin's email didn't auto-link during Step 1 (they didn't already have a 
 
 - **Option B:** Use the Supabase Dashboard → Authentication → Users → Invite user. Send them a magic link. Then add them to `admins` as above.
 
-**Step 8 — Smoke test**
+**Step 9 — Smoke test**
 
 As the new tenant admin:
 1. Log into `<slug>.ourlee.co/admin` — should see their dashboard with their branding
