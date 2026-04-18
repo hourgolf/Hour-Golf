@@ -550,8 +550,13 @@ export default function MemberLayout({ activeTab, children }) {
         />
       )}
 
-      {/* Booking FAB */}
-      <button className="book-fab" onClick={() => router.push("/members/book")} title="Book a Bay">+</button>
+      {/* Booking FAB — opens the quick-book sheet directly (MemberBooking
+          listens for ?new=1 on mount and auto-opens with smart defaults). */}
+      <button
+        className="book-fab"
+        onClick={() => router.push("/members/book?new=1")}
+        title="Book a Bay"
+      >+</button>
 
       {/* Help FAB */}
       <button className="help-fab" onClick={() => setHelpOpen(true)} title="Help">?</button>

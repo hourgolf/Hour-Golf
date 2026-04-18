@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/router";
 import { BAYS, TZ } from "../../lib/constants";
 import { fT, fDL } from "../../lib/format";
 import { useBranding } from "../../hooks/useBranding";
@@ -23,6 +24,7 @@ function nowPacific() {
 }
 
 export default function MemberBooking({ member, tierConfig, refresh, showToast }) {
+  const router = useRouter();
   const isNonMember = member.tier === "Non-Member";
   const hasCard = member.hasPaymentMethod;
   const branding = useBranding();
@@ -185,6 +187,14 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
     setSheetOpen(true);
   }
 
+  // Open the sheet with sensible defaults instead of a grid-cell context.
+  // Used by the global "+" Book FAB via ?new=1. Picks Bay 1 + the first
+  // bookable slot (which HOURS already filters to "now" for today).
+  function openSheetFresh() {
+    const firstHour = HOURS.length > 0 ? HOURS[0] : defaultStart;
+    openSheet("Bay 1", firstHour);
+  }
+
   function closeSheet() {
     if (sheetBooking) return;
     setSheetOpen(false);
@@ -242,6 +252,34 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prevOverflow; };
   }, [sheetOpen]);
+
+  // Auto-open the sheet when the "+" Book FAB pushes /members/book?new=1.
+  // Strip the query param afterward so tabbing away and back doesn't
+  // keep re-triggering. Guarded by !sheetOpen so we don't reset a
+  // user-in-progress sheet.
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (router.query.new && !sheetOpen && hasCard) {
+      openSheetFresh();
+      const { new: _drop, ...rest } = router.query;
+      router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+    }
+  }, [router.isReady, router.query.new, hasCard]);
+
+  // If the member changes the date while the sheet is open, the previous
+  // sheetStart / sheetEnd can fall outside the new day's HOURS window
+  // (most obvious when flipping today <-> a future date: today's HOURS
+  // strips past times). Reset to the first bookable slot so the select
+  // dropdowns always render a valid selection.
+  useEffect(() => {
+    if (!sheetOpen) return;
+    if (!HOURS.includes(sheetStart)) {
+      const first = HOURS[0] || defaultStart;
+      setSheetStart(first);
+      const fallbackEnd = HOURS[4] || HOURS[HOURS.length - 1] || defaultEnd;
+      setSheetEnd(fallbackEnd);
+    }
+  }, [bookDate]);
 
   const canSubmitSheet = hasCard
     && !sheetBooking
@@ -403,6 +441,17 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
                   {fT(new Date(`2026-01-01T${sheetStart}:00`))} &ndash; {fT(new Date(`2026-01-01T${sheetEnd}:00`))}
                   <span className="mem-sheet-summary-dur">&nbsp;&middot; {sheetDurationHrs.toFixed(sheetDurationHrs % 1 === 0 ? 0 : 1)} hr</span>
                 </div>
+              </div>
+
+              <div className="mem-sheet-section">
+                <div className="mem-sheet-label">Date</div>
+                <DatePicker
+                  value={bookDate}
+                  onChange={setBookDate}
+                  min={todayStr}
+                  max={maxDateStr}
+                  timezone={TZ}
+                />
               </div>
 
               <div className="mem-sheet-section">
