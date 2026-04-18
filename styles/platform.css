@@ -795,3 +795,213 @@ html[data-surface="platform"] body {
   font-size: 12px;
   word-break: break-all;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   ACCENT VARIANTS
+   Swap just the primary scale. Applied by usePlatformSettings
+   via data-accent on <html>. Default (no attribute) = emerald,
+   defined at the top of this file.
+   ───────────────────────────────────────────────────────────── */
+
+:root[data-surface="platform"][data-accent="blue"] {
+  --p-primary:      #3b82f6;  /* blue-500 */
+  --p-primary-hover:#2563eb;  /* blue-600 */
+  --p-primary-soft: #eff6ff;
+  --p-primary-text: #1d4ed8;
+  --primary:        var(--p-primary);
+  --primary-light:  var(--p-primary-hover);
+  --primary-bg:     var(--p-primary-soft);
+}
+
+:root[data-surface="platform"][data-accent="teal"] {
+  --p-primary:      #14b8a6;  /* teal-500 */
+  --p-primary-hover:#0d9488;  /* teal-600 */
+  --p-primary-soft: #f0fdfa;
+  --p-primary-text: #0f766e;
+  --primary:        var(--p-primary);
+  --primary-light:  var(--p-primary-hover);
+  --primary-bg:     var(--p-primary-soft);
+}
+
+:root[data-surface="platform"][data-accent="amber"] {
+  --p-primary:      #f59e0b;  /* amber-500 */
+  --p-primary-hover:#d97706;  /* amber-600 */
+  --p-primary-soft: #fffbeb;
+  --p-primary-text: #b45309;
+  --primary:        var(--p-primary);
+  --primary-light:  var(--p-primary-hover);
+  --primary-bg:     var(--p-primary-soft);
+}
+
+:root[data-surface="platform"][data-accent="slate"] {
+  --p-primary:      #475569;  /* slate-600 */
+  --p-primary-hover:#334155;  /* slate-700 */
+  --p-primary-soft: #f1f5f9;
+  --p-primary-text: #1e293b;
+  --primary:        var(--p-primary);
+  --primary-light:  var(--p-primary-hover);
+  --primary-bg:     var(--p-primary-soft);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   DENSITY
+   "compact" shrinks vertical padding on the dense interactive
+   surfaces (table rows, buttons, card body, form inputs). Gives
+   Matt a Linear-style tight layout when he's doing ops work vs.
+   the default comfortable spacing for reading.
+   ───────────────────────────────────────────────────────────── */
+
+html[data-surface="platform"][data-density="compact"] .p-table tbody td {
+  padding: 7px 16px;
+}
+html[data-surface="platform"][data-density="compact"] .p-table thead th {
+  padding: 7px 16px;
+}
+html[data-surface="platform"][data-density="compact"] .p-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+}
+html[data-surface="platform"][data-density="compact"] .p-btn--sm {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+html[data-surface="platform"][data-density="compact"] .p-card-body {
+  padding: 14px 16px;
+}
+html[data-surface="platform"][data-density="compact"] .p-card-header {
+  padding: 11px 16px;
+}
+html[data-surface="platform"][data-density="compact"] .p-card-footer {
+  padding: 8px 16px;
+}
+html[data-surface="platform"][data-density="compact"] .p-input,
+html[data-surface="platform"][data-density="compact"] .p-select,
+html[data-surface="platform"][data-density="compact"] .p-textarea {
+  padding: 5px 9px;
+  font-size: 12px;
+}
+html[data-surface="platform"][data-density="compact"] .p-content {
+  padding: 20px 24px;
+}
+html[data-surface="platform"][data-density="compact"] .p-page-header {
+  margin-bottom: 16px;
+}
+html[data-surface="platform"][data-density="compact"] .p-page-title {
+  font-size: 19px;
+}
+html[data-surface="platform"][data-density="compact"] .p-stack {
+  gap: 12px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SIDEBAR COLLAPSE
+   Trades the 240px rail for a 56px icon-only rail. Keeps muscle
+   memory for nav; hides labels + brand text. Click-to-expand via
+   the same toggle in /platform/settings (no hover-to-expand for
+   now — simpler state machine).
+   ───────────────────────────────────────────────────────────── */
+
+html[data-surface="platform"][data-sidebar="collapsed"] .p-shell {
+  grid-template-columns: 56px 1fr;
+}
+html[data-surface="platform"][data-sidebar="collapsed"] .p-sidebar {
+  padding: 16px 8px;
+}
+html[data-surface="platform"][data-sidebar="collapsed"] .p-sidebar-brand-text,
+html[data-surface="platform"][data-sidebar="collapsed"] .p-sidebar-section,
+html[data-surface="platform"][data-sidebar="collapsed"] .p-sidebar-nav-item span,
+html[data-surface="platform"][data-sidebar="collapsed"] .p-sidebar-user span:not(.p-sidebar-user-dot) {
+  display: none;
+}
+html[data-surface="platform"][data-sidebar="collapsed"] .p-sidebar-brand {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+html[data-surface="platform"][data-sidebar="collapsed"] .p-sidebar-nav-item {
+  justify-content: center;
+  padding: 7px;
+}
+html[data-surface="platform"][data-sidebar="collapsed"] .p-sidebar-footer {
+  padding: 12px 0 0;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   ACCENT SWATCHES (used on /platform/settings picker)
+   ───────────────────────────────────────────────────────────── */
+
+.p-swatch-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.p-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px;
+  border: 1.5px solid var(--p-border);
+  border-radius: var(--p-radius-lg);
+  background: var(--p-surface);
+  cursor: pointer;
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+
+.p-swatch:hover {
+  border-color: var(--p-border-strong);
+}
+
+.p-swatch.is-selected {
+  border-color: var(--p-primary);
+  box-shadow: 0 0 0 3px var(--p-primary-soft);
+}
+
+.p-swatch-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.5);
+}
+
+.p-swatch-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--p-text);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RADIO GROUP (density / future binary choices)
+   ───────────────────────────────────────────────────────────── */
+
+.p-radio-group {
+  display: inline-flex;
+  border: 1px solid var(--p-border);
+  border-radius: var(--p-radius);
+  padding: 2px;
+  background: var(--p-surface-alt);
+  gap: 0;
+}
+
+.p-radio-group button {
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--p-radius) - 2px);
+  cursor: pointer;
+  color: var(--p-text-muted);
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.p-radio-group button.is-selected {
+  background: var(--p-surface);
+  color: var(--p-text);
+  box-shadow: var(--p-shadow-sm);
+}
+
+.p-radio-group button:hover:not(.is-selected) {
+  color: var(--p-text);
+}

@@ -16,6 +16,7 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import Head from "next/head";
 import { usePlatformAuth } from "../../hooks/usePlatformAuth";
+import { usePlatformSettings } from "../../hooks/usePlatformSettings";
 
 function SidebarIcon({ d }) {
   return (
@@ -43,6 +44,8 @@ const ICON_SETTINGS =
 const ICON_SIGNOUT =
   "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9";
 const ICON_PLUS = "M12 5v14M5 12h14";
+const ICON_SLIDERS =
+  "M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6";
 
 export default function PlatformShell({
   children,
@@ -53,7 +56,12 @@ export default function PlatformShell({
   activeNav = "tenants",
 }) {
   const router = useRouter();
-  const { connected, authLoading, user, logout } = usePlatformAuth();
+  const { apiKey, connected, authLoading, user, logout } = usePlatformAuth();
+
+  // Load platform admin prefs — the hook also mutates <html> with
+  // data-accent, data-density, data-sidebar so CSS reacts without
+  // needing prop drilling. Returned for the sidebar-collapse toggle.
+  const { settings } = usePlatformSettings({ apiKey, connected });
 
   // Scope CSS cascade. data-surface="platform" selector flips every
   // var override in styles/platform.css. Revert on unmount so member-
@@ -65,6 +73,10 @@ export default function PlatformShell({
     return () => {
       if (prev === null) document.documentElement.removeAttribute("data-surface");
       else document.documentElement.setAttribute("data-surface", prev);
+      // Clean up accent/density/sidebar so member surfaces don't inherit.
+      document.documentElement.removeAttribute("data-accent");
+      document.documentElement.removeAttribute("data-density");
+      document.documentElement.removeAttribute("data-sidebar");
     };
   }, []);
 
@@ -99,9 +111,22 @@ export default function PlatformShell({
               "p-sidebar-nav-item" +
               (activeNav === "tenants" ? " is-active" : "")
             }
+            title="Tenants"
           >
             <SidebarIcon d={ICON_TENANTS} />
             <span>Tenants</span>
+          </Link>
+
+          <Link
+            href="/platform/settings"
+            className={
+              "p-sidebar-nav-item" +
+              (activeNav === "settings" ? " is-active" : "")
+            }
+            title="Settings"
+          >
+            <SidebarIcon d={ICON_SLIDERS} />
+            <span>Settings</span>
           </Link>
 
           <div className="p-sidebar-footer">
