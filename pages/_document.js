@@ -58,12 +58,25 @@ class MyDocument extends Document {
           <meta name="apple-mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
           <meta name="apple-mobile-web-app-title" content={escapeHtml(appName)} />
-          {/* Icons stay static for Phase 3A — per-tenant icon generation is
-              a later phase. Tenant #2 gets Hour Golf's icons until we build
-              an icon upload + resize pipeline. */}
-          <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-          <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png" />
-          <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512x512.png" />
+          {/* Icons: use per-tenant PWA icon when uploaded; otherwise fall
+              back to the bundled HG defaults. Tenants that haven't set
+              pwa_icon_url retain pre-Phase-7 behavior. */}
+          <link
+            rel="apple-touch-icon"
+            href={branding.pwa_icon_url || "/icons/icon-192x192.png"}
+          />
+          <link
+            rel="icon"
+            type="image/png"
+            sizes="192x192"
+            href={branding.pwa_icon_url || "/icons/icon-192x192.png"}
+          />
+          <link
+            rel="icon"
+            type="image/png"
+            sizes="512x512"
+            href={branding.pwa_icon_url || "/icons/icon-512x512.png"}
+          />
 
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

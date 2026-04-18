@@ -26,6 +26,7 @@ const EDITABLE_COLUMNS = [
   "welcome_logo_url",
   "header_logo_url",
   "icon_url",
+  "pwa_icon_url",
   "show_welcome_logo",
   "show_welcome_title",
   "show_header_logo",

@@ -146,6 +146,7 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
   const [uploadingWelcome, setUploadingWelcome] = useState(false);
   const [uploadingHeader, setUploadingHeader] = useState(false);
   const [uploadingIcon, setUploadingIcon] = useState(false);
+  const [uploadingPwaIcon, setUploadingPwaIcon] = useState(false);
   const [uploadingBg, setUploadingBg] = useState(false);
   const [uploadingFont, setUploadingFont] = useState(false);
 
@@ -252,6 +253,11 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
     if (url) update("icon_url", url);
   }
 
+  async function handlePwaIconUpload(e) {
+    const url = await uploadAsset(e.target.files?.[0], "logo", "pwaicon", setUploadingPwaIcon);
+    if (url) update("pwa_icon_url", url);
+  }
+
   async function handleBgUpload(e) {
     const url = await uploadAsset(e.target.files?.[0], "bg", "bg", setUploadingBg);
     if (url) update("background_image_url", url);
@@ -285,6 +291,7 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
       payload.welcome_logo_url = branding.welcome_logo_url || null;
       payload.header_logo_url = branding.header_logo_url || null;
       payload.icon_url = branding.icon_url || null;
+      payload.pwa_icon_url = branding.pwa_icon_url || null;
       payload.show_welcome_logo = branding.show_welcome_logo !== false;
       payload.show_welcome_title = branding.show_welcome_title !== false;
       payload.show_header_logo = branding.show_header_logo !== false;
@@ -426,6 +433,37 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
             />
             <span>In persistent header</span>
           </label>
+        </div>
+      </div>
+
+      {/* PWA Icon (phone home-screen / browser tab) */}
+      <div>
+        <h4 style={{ fontFamily: "var(--font-display)", fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, color: "var(--text-muted)", marginBottom: 10 }}>
+          PWA &amp; Browser Icon
+        </h4>
+        <div className="mf" style={{ maxWidth: 360 }}>
+          <label>Home-screen / favicon (PNG, square, ≥512×512)</label>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>
+            Shown when a member installs this portal as an app, and as the
+            browser tab icon. 1024×1024 recommended for crisp iOS rendering.
+            Leave empty to use the default Ourlee icon.
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+            {branding.pwa_icon_url && (
+              <div style={{ width: 64, height: 64, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "var(--bg)" }}>
+                <img src={branding.pwa_icon_url} alt="PWA icon" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </div>
+            )}
+            <input type="file" accept="image/png" onChange={handlePwaIconUpload} disabled={uploadingPwaIcon} />
+          </div>
+          <input
+            type="text"
+            value={branding.pwa_icon_url || ""}
+            onChange={(e) => update("pwa_icon_url", e.target.value)}
+            placeholder="https://... or leave empty"
+            style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontFamily: "var(--font-mono)", fontSize: 11, background: "var(--surface)", color: "var(--text)" }}
+          />
+          {uploadingPwaIcon && <div className="muted" style={{ marginTop: 4 }}>Uploading…</div>}
         </div>
       </div>
 
