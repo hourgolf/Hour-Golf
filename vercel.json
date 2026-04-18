@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron-birthday-bonus",
+      "schedule": "0 16 * * *"
+    }
+  ]
+}

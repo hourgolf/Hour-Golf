@@ -378,6 +378,183 @@ function LoyaltySection({ jwt }) {
   );
 }
 
+function BirthdayBonusSection({ jwt }) {
+  const [cfg, setCfg] = useState(null);
+  const [ledger, setLedger] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [processResult, setProcessResult] = useState(null);
+
+  const [enabled, setEnabled] = useState(false);
+  const [creditAmount, setCreditAmount] = useState("");
+  const [bonusHours, setBonusHours] = useState("");
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    try {
+      const r = await fetch("/api/admin-birthday-bonus", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      if (r.ok) {
+        const data = await r.json();
+        setCfg(data.config || null);
+        setLedger(data.ledger || []);
+        setEnabled(!!data.config?.enabled);
+        setCreditAmount(
+          data.config?.credit_amount == null ? "" : String(data.config.credit_amount)
+        );
+        setBonusHours(
+          data.config?.bonus_hours == null ? "" : String(data.config.bonus_hours)
+        );
+      }
+    } catch {}
+    setLoading(false);
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      const payload = {
+        enabled,
+        credit_amount: creditAmount === "" ? null : Number(creditAmount),
+        bonus_hours: bonusHours === "" ? null : Number(bonusHours),
+      };
+      const r = await fetch("/api/admin-birthday-bonus", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify(payload),
+      });
+      if (r.ok) await load();
+    } catch {}
+    setSaving(false);
+  }
+
+  async function runToday() {
+    setProcessing(true);
+    setProcessResult(null);
+    try {
+      const r = await fetch("/api/admin-birthday-bonus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({}),
+      });
+      const data = await r.json();
+      setProcessResult(data);
+      await load();
+    } catch (e) {
+      setProcessResult({ error: e.message });
+    }
+    setProcessing(false);
+  }
+
+  if (loading) {
+    return <div style={{ padding: 12, color: "var(--text-muted)" }}>Loading birthday bonus config...</div>;
+  }
+
+  return (
+    <>
+      <div style={{ padding: 12, border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)", marginBottom: 12, maxWidth: 640 }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(e) => setEnabled(e.target.checked)}
+              style={{ accentColor: "var(--primary)" }}
+            />
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Enabled</span>
+          </label>
+          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+            Runs daily at ~8am Pacific. Each member receives their bonus once per year.
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>Shop credit ($)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="e.g. 10"
+              value={creditAmount}
+              onChange={(e) => setCreditAmount(e.target.value)}
+              style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13 }}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>Free bay hours</label>
+            <input
+              type="number"
+              min="0"
+              step="0.25"
+              placeholder="e.g. 1"
+              value={bonusHours}
+              onChange={(e) => setBonusHours(e.target.value)}
+              style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13 }}
+            />
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
+          Leave blank to skip that reward type. Both blank + enabled is a no-op.
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <button className="btn primary" onClick={save} disabled={saving} style={{ fontSize: 11 }}>
+            {saving ? "Saving..." : "Save"}
+          </button>
+          <button
+            className="btn"
+            onClick={runToday}
+            disabled={processing || !cfg?.enabled}
+            title={!cfg?.enabled ? "Enable + save first" : "Run the daily processor for today"}
+            style={{ fontSize: 11 }}
+          >
+            {processing ? "Running..." : "Run today's bonuses now"}
+          </button>
+        </div>
+        {processResult && (
+          <pre style={{ marginTop: 10, fontSize: 11, background: "var(--primary-bg)", padding: 10, borderRadius: 6, overflowX: "auto" }}>
+            {JSON.stringify(processResult, null, 2)}
+          </pre>
+        )}
+      </div>
+
+      {ledger.length > 0 && (
+        <>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>
+            Recent issuances
+          </div>
+          <div className="tbl" style={{ fontSize: 12 }}>
+            <div className="th">
+              <span style={{ flex: 2 }}>Member</span>
+              <span style={{ flex: 1 }} className="text-r">Year</span>
+              <span style={{ flex: 1 }} className="text-r tab-num">Credit</span>
+              <span style={{ flex: 1 }} className="text-r tab-num">Hours</span>
+              <span style={{ flex: 1 }} className="text-r">Issued</span>
+            </div>
+            {ledger.map((l) => (
+              <div className="tr" key={l.id}>
+                <span style={{ flex: 2 }} className="email-sm">{l.member_email}</span>
+                <span style={{ flex: 1 }} className="text-r">{l.bonus_year}</span>
+                <span style={{ flex: 1 }} className="text-r tab-num">
+                  {l.credit_issued != null ? `$${Number(l.credit_issued).toFixed(0)}` : "\u2014"}
+                </span>
+                <span style={{ flex: 1 }} className="text-r tab-num">
+                  {l.hours_issued != null ? `${Number(l.hours_issued).toFixed(1)}h` : "\u2014"}
+                </span>
+                <span style={{ flex: 1 }} className="text-r email-sm">
+                  {new Date(l.issued_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStripe, onSaveTier, onSelectMember, jwt }) {
   const [linking, setLinking] = useState(null);
   const [editTier, setEditTier] = useState(null);
@@ -428,6 +605,9 @@ export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStrip
 
       <h2 className="section-head" style={{ marginTop: 24 }}>Loyalty Rewards</h2>
       <LoyaltySection jwt={jwt} />
+
+      <h2 className="section-head" style={{ marginTop: 24 }}>Birthday Bonus</h2>
+      <BirthdayBonusSection jwt={jwt} />
 
       <h2 className="section-head" style={{ marginTop: 24 }}>Members ({members.length})</h2>
       {/* Desktop table */}
