@@ -29,7 +29,20 @@ import {
   createCustomer,
   updateCustomerReferenceId,
   splitName,
+  sleep,
 } from "../../lib/square-api";
+
+// Pace inter-member API calls so we stay under Square's SearchCustomers
+// rate limit. Roughly 3 req/sec keeps a 66-member backfill well below
+// Square's observed burst ceiling while still finishing inside Vercel's
+// serverless timeout window (~300ms x 66 = 20s + API latency).
+const INTER_MEMBER_DELAY_MS = 300;
+
+// 60s matches Vercel Pro's default ceiling. Pacing is 300ms between
+// members plus ~300ms per API call; worst case ~40s for HG's ~66
+// paying members. Set explicitly so a plan-tier change or a future
+// larger tenant doesn't silently truncate the run.
+export const config = { maxDuration: 60 };
 
 function isUuid(value) {
   return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -93,7 +106,10 @@ export default async function handler(req, res) {
     dryRun,
   };
 
-  for (const m of members) {
+  for (let i = 0; i < members.length; i++) {
+    const m = members[i];
+    if (i > 0) await sleep(INTER_MEMBER_DELAY_MS);
+
     if (m.square_customer_id) {
       summary.alreadyLinked += 1;
       report.push({ memberId: m.id, email: m.email, action: "already_linked", squareCustomerId: m.square_customer_id });
