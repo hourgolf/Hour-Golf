@@ -53,6 +53,13 @@ function saveLocal(s) {
   }
 }
 
+// Read the current tenant id from the SSR-injected global. Client-only;
+// returns null on the server or before _document.js has run.
+function getTenantId() {
+  if (typeof window === "undefined") return null;
+  return window.__TENANT_ID__ || null;
+}
+
 export function useSettings({ user, apiKey, connected } = {}) {
   const [settings, setSettings] = useState(DEFAULTS);
   const [hydrated, setHydrated] = useState(false);
@@ -66,16 +73,20 @@ export function useSettings({ user, apiKey, connected } = {}) {
   }, []);
 
   // 2) Cloud fetch once auth is ready. Cloud overrides local if a row exists.
+  //    Scoped to (user_id, tenant_id) — the same user on another tenant
+  //    gets their prefs for THAT tenant, not this one's leftovers.
   useEffect(() => {
     if (!connected || !apiKey || !user?.id) return;
     if (cloudFetchedRef.current) return;
+    const tenantId = getTenantId();
+    if (!tenantId) return;
     cloudFetchedRef.current = true;
     (async () => {
       try {
         const rows = await supa(
           apiKey,
           "app_settings",
-          `?user_id=eq.${user.id}&select=settings`
+          `?user_id=eq.${user.id}&tenant_id=eq.${tenantId}&select=settings`
         );
         if (Array.isArray(rows) && rows.length > 0 && rows[0]?.settings) {
           const merged = normalize(rows[0].settings);
@@ -154,9 +165,12 @@ export function useSettings({ user, apiKey, connected } = {}) {
 
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
+      const tenantId = getTenantId();
+      if (!tenantId) return;
       try {
         await supaPost(apiKey, "app_settings", {
           user_id: user.id,
+          tenant_id: tenantId,
           settings,
           updated_at: new Date().toISOString(),
         });
