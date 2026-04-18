@@ -215,7 +215,7 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
           <img
             src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qrPayload(member))}&color=35443B&bgcolor=FFFFFF`}
             alt="Member QR Code"
-            style={{ width: 240, height: 240, borderRadius: 8, border: "1px solid var(--border)" }}
+            style={{ width: 240, height: 240, borderRadius: 8 }}
           />
           <div style={{ marginTop: 12, fontSize: 13, color: "var(--text-muted)" }}>
             {member.tier} &mdash; {tierConfig?.pro_shop_discount || 0}% discount
