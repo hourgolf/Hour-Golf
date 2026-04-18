@@ -644,6 +644,9 @@ function SquareTab({ detail, apiKey }) {
   const [syncingTiers, setSyncingTiers] = useState(false);
   const [tierSyncResult, setTierSyncResult] = useState(null);
   const [tierSyncDryRun, setTierSyncDryRun] = useState(true);
+  const [syncingGiftCards, setSyncingGiftCards] = useState(false);
+  const [giftCardSyncResult, setGiftCardSyncResult] = useState(null);
+  const [giftCardSyncDryRun, setGiftCardSyncDryRun] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -736,6 +739,25 @@ function SquareTab({ detail, apiKey }) {
       setErr(e.message);
     }
     setSyncingTiers(false);
+  }
+
+  async function runGiftCardSync() {
+    setSyncingGiftCards(true);
+    setGiftCardSyncResult(null);
+    setErr("");
+    try {
+      const r = await fetch("/api/admin-square-sync-gift-cards", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ tenant_id: tenantId, dryRun: giftCardSyncDryRun }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || "Gift card sync failed");
+      setGiftCardSyncResult(d);
+    } catch (e) {
+      setErr(e.message);
+    }
+    setSyncingGiftCards(false);
   }
 
   if (loading) return <div className="p-muted">Loading Square config…</div>;
@@ -935,6 +957,57 @@ function SquareTab({ detail, apiKey }) {
                     </summary>
                     <pre className="p-mono" style={{ background: "var(--p-surface, #fff)", padding: 10, borderRadius: 6, border: "1px solid var(--p-border, #e2eddb)", fontSize: 11, margin: "8px 0 0 0", maxHeight: 320, overflow: "auto" }}>
                       {JSON.stringify(tierSyncResult.report, null, 2)}
+                    </pre>
+                  </details>
+                </div>
+              )}
+            </div>
+          )}
+
+          {cfg?.enabled && cfg?.location_id && (
+            <div className="p-field" style={{ marginTop: 16, padding: 14, background: "var(--p-surface-sunken, #f6f7f5)", borderRadius: 8, border: "1px solid var(--p-border, #e2eddb)" }}>
+              <label className="p-field-label">Gift-card balance sync</label>
+              <div className="p-field-hint" style={{ marginBottom: 10 }}>
+                Mirrors each member's <code className="p-mono">shop_credit_balance</code> onto a
+                Square digital gift card linked to their customer
+                record. Square Register then auto-applies the balance
+                at checkout without staff action. First run creates +
+                activates cards for members with non-zero balance;
+                subsequent runs adjust each card up or down to match.
+                Zero-balance members without cards are skipped.
+              </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 13 }}>
+                <input
+                  className="p-checkbox"
+                  type="checkbox"
+                  checked={giftCardSyncDryRun}
+                  onChange={(e) => setGiftCardSyncDryRun(e.target.checked)}
+                />
+                <span>Dry run (no writes to Square)</span>
+              </label>
+              <div style={{ marginTop: 10 }}>
+                <button
+                  className="p-btn"
+                  onClick={runGiftCardSync}
+                  disabled={syncingGiftCards}
+                >
+                  {syncingGiftCards ? "Syncing\u2026" : giftCardSyncDryRun ? "Preview gift-card sync" : "Run gift-card sync"}
+                </button>
+              </div>
+              {giftCardSyncResult && (
+                <div style={{ marginTop: 12, fontSize: 12 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                    {giftCardSyncResult.summary.dryRun ? "Dry-run summary" : "Gift-card sync summary"}
+                  </div>
+                  <pre className="p-mono" style={{ background: "var(--p-surface, #fff)", padding: 10, borderRadius: 6, border: "1px solid var(--p-border, #e2eddb)", fontSize: 11, margin: 0, overflowX: "auto" }}>
+                    {JSON.stringify(giftCardSyncResult.summary, null, 2)}
+                  </pre>
+                  <details style={{ marginTop: 8 }}>
+                    <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--p-text-muted, #6a7a6c)" }}>
+                      Per-member report ({giftCardSyncResult.report.length} rows)
+                    </summary>
+                    <pre className="p-mono" style={{ background: "var(--p-surface, #fff)", padding: 10, borderRadius: 6, border: "1px solid var(--p-border, #e2eddb)", fontSize: 11, margin: "8px 0 0 0", maxHeight: 320, overflow: "auto" }}>
+                      {JSON.stringify(giftCardSyncResult.report, null, 2)}
                     </pre>
                   </details>
                 </div>
