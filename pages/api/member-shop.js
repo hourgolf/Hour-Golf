@@ -352,6 +352,11 @@ export default async function handler(req, res) {
               credits_used: creditsUsed.toFixed(2),
               source: "hour-golf-pro-shop",
             },
+            // Expand the latest_charge so we get the public receipt_url and
+            // card brand / last-4 back in the same round-trip. Saves a
+            // second paymentIntents.retrieve() call before we write the
+            // shop_orders rows below.
+            expand: ["latest_charge"],
           });
         } catch (stripeErr) {
           console.error("Stripe checkout failed:", stripeErr);
@@ -381,6 +386,18 @@ export default async function handler(req, res) {
         });
       }
 
+      // Extract receipt / card detail from the expanded latest_charge
+      // so every shop_orders row in this checkout shares the same
+      // receipt_url. All rows with the same stripe_payment_intent_id
+      // represent one purchase on the Orders tab.
+      const charge = pi?.latest_charge && typeof pi.latest_charge === "object" ? pi.latest_charge : null;
+      const card = charge?.payment_method_details?.card || null;
+      const receiptUrl = charge?.receipt_url || null;
+      const receiptNumber = charge?.receipt_number || null;
+      const paymentMethodKind = charge?.payment_method_details?.type || (pi ? "card" : null);
+      const cardLast4 = card?.last4 || null;
+      const cardBrand = card?.brand ? String(card.brand).toUpperCase() : null;
+
       // 7. Create orders for each line item
       for (const li of lineItems) {
         await sb(key, "shop_orders", {
@@ -398,6 +415,11 @@ export default async function handler(req, res) {
             status: "confirmed",
             stripe_payment_intent_id: pi?.id || null,
             notes: "Pick up at next visit",
+            receipt_url: receiptUrl,
+            receipt_number: receiptNumber,
+            payment_method: paymentMethodKind,
+            card_last_4: cardLast4,
+            card_brand: cardBrand,
           }),
         });
         // Increment quantity_claimed

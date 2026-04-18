@@ -39,11 +39,28 @@ function formatCardBrand(b) {
     VISA: "Visa",
     MASTERCARD: "Mastercard",
     AMERICAN_EXPRESS: "Amex",
+    AMEX: "Amex",
     DISCOVER: "Discover",
     JCB: "JCB",
+    DINERS: "Diners",
     DISCOVER_DINERS: "Diners",
+    UNIONPAY: "UnionPay",
   };
   return map[up] || "Card";
+}
+
+// Summarize an in-app purchase's line items for a single-line display.
+// One item: just the title (with qty prefix if >1). Multiple items:
+// the first item's title + "(+N more)".
+function inAppPurchaseLabel(p) {
+  const items = p.items || [];
+  if (items.length === 0) return "Pro-shop purchase";
+  const first = items[0];
+  const label = first.quantity > 1 ? `${first.quantity}\u00d7 ${first.item_title}` : first.item_title;
+  if (items.length === 1) return label;
+  const moreCount = items.reduce((s, it) => s + (Number(it.quantity) || 1), 0) - (first.quantity || 1);
+  if (moreCount > 0) return `${label} (+${moreCount} more)`;
+  return label;
 }
 
 export default function MemberDashboard({ member, tierConfig, refresh, showToast }) {
@@ -53,7 +70,7 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
   const [loyalty, setLoyalty] = useState(null);
   const [upcoming, setUpcoming] = useState([]);
   const [monthBookings, setMonthBookings] = useState([]);
-  const [inStorePurchases, setInStorePurchases] = useState([]);
+  const [recentPurchases, setRecentPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cancelConfirm, setCancelConfirm] = useState(null); // booking_id being confirmed
   const [cancelling, setCancelling] = useState(false);
@@ -85,11 +102,12 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
         .then((lr) => lr.ok ? lr.json() : null)
         .then((ld) => { if (ld) setLoyalty(ld); })
         .catch(() => {});
-      // Load recent in-store purchases (Square POS). Empty array if the
-      // tenant isn't Square-enabled or the member hasn't bought anything.
-      fetch("/api/member-in-store-purchases?limit=5", { credentials: "include" })
+      // Unified recent purchases — in-app shop orders + in-store Square
+      // POS, merged and sorted by date. Empty array until the member
+      // buys anything; card is hidden below when empty.
+      fetch("/api/member-purchases?limit=5", { credentials: "include" })
         .then((ir) => ir.ok ? ir.json() : null)
-        .then((id) => { if (id?.purchases) setInStorePurchases(id.purchases); })
+        .then((id) => { if (id?.purchases) setRecentPurchases(id.purchases); })
         .catch(() => {});
     } catch (e) {
       showToast("Failed to load dashboard data", "error");
@@ -323,26 +341,31 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
         )}
       </div>
 
-      {/* Recent in-store purchases (Square POS). Hidden when empty so
-          the section doesn't dominate the dashboard for members who
-          haven't bought anything at the counter yet. */}
-      {inStorePurchases.length > 0 && (
+      {/* Recent Purchases — in-app shop + in-store Square POS, merged.
+          Hidden when the member has no purchases yet so the dashboard
+          stays uncluttered. Full history lives on /members/shop > Orders. */}
+      {recentPurchases.length > 0 && (
         <div className="mem-section">
-          <div className="mem-section-head">Recent In-Store Purchases</div>
+          <div className="mem-section-head">Recent Purchases</div>
           <div className="mem-list">
-            {inStorePurchases.map((p) => {
-              const when = new Date(p.occurred_at);
+            {recentPurchases.map((p) => {
+              const when = new Date(p.created_at);
               const paymentLine = formatPaymentMethod(p);
+              const label = p.kind === "in_store"
+                ? (p.description || "In-store purchase")
+                : inAppPurchaseLabel(p);
+              const tag = p.kind === "in_store" ? "In-store" : "In-app";
               return (
                 <div key={p.id} className="mem-list-item" style={{ flexDirection: "column", alignItems: "stretch", gap: 4 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
                     <div style={{ minWidth: 0 }}>
-                      <span>{fD(when)}</span>
+                      <span className="mem-purchase-tag">{tag}</span>
+                      <span style={{ marginLeft: 8 }}>{fD(when)}</span>
                       <span className="mem-list-sub" style={{ marginLeft: 8 }}>
-                        {p.description || "In-store purchase"}
+                        {label}
                       </span>
                     </div>
-                    <div className="mem-dur">${(Number(p.amount_cents) / 100).toFixed(2)}</div>
+                    <div className="mem-dur">${(Number(p.total_cents) / 100).toFixed(2)}</div>
                   </div>
                   {(paymentLine || p.receipt_url) && (
                     <div className="mem-list-sub" style={{ fontSize: 11, display: "flex", gap: 10, alignItems: "center" }}>
@@ -362,6 +385,11 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
                 </div>
               );
             })}
+          </div>
+          <div style={{ marginTop: 10, fontSize: 12, textAlign: "right" }}>
+            <a href="/members/shop" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+              See all orders &rarr;
+            </a>
           </div>
         </div>
       )}

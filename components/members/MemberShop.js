@@ -9,6 +9,32 @@ const STATUS_COLORS = {
   cancelled: "#C92F1F",
 };
 
+const CARD_BRAND_MAP = {
+  VISA: "Visa",
+  MASTERCARD: "Mastercard",
+  AMERICAN_EXPRESS: "Amex",
+  AMEX: "Amex",
+  DISCOVER: "Discover",
+  JCB: "JCB",
+  DINERS: "Diners",
+  DISCOVER_DINERS: "Diners",
+  UNIONPAY: "UnionPay",
+};
+
+// Human-readable "Visa •••• 4242" / "Cash" / "External" for the Orders
+// tab footer. Empty string means no line should render at all.
+function formatPaymentMethodLine(p) {
+  const method = (p.payment_method || "").toLowerCase();
+  if (method === "card") {
+    const brandKey = String(p.card_brand || "").toUpperCase();
+    const brand = CARD_BRAND_MAP[brandKey] || "Card";
+    if (p.card_last_4) return `${brand} \u2022\u2022\u2022\u2022 ${p.card_last_4}`;
+    return brand;
+  }
+  if (!method) return "";
+  return method.charAt(0).toUpperCase() + method.slice(1);
+}
+
 export default function MemberShop({ member, tierConfig, showToast }) {
   const [items, setItems] = useState([]);
   const [myOrders, setMyOrders] = useState([]);
@@ -57,8 +83,11 @@ export default function MemberShop({ member, tierConfig, showToast }) {
 
   const loadOrders = useCallback(async () => {
     try {
-      const r = await fetch("/api/member-shop?action=my-orders", { credentials: "include" });
-      if (r.ok) setMyOrders(await r.json());
+      const r = await fetch("/api/member-purchases?limit=100", { credentials: "include" });
+      if (r.ok) {
+        const d = await r.json();
+        setMyOrders(d.purchases || []);
+      }
     } catch {}
   }, []);
 
@@ -306,35 +335,99 @@ export default function MemberShop({ member, tierConfig, showToast }) {
         </>
       )}
 
-      {/* ── MY ORDERS ── */}
+      {/* ── MY ORDERS ──
+          Unified: in-app shop checkouts (one card per checkout, grouped
+          by stripe_payment_intent_id, all line items listed) + in-store
+          Square POS purchases (one card each with receipt link). */}
       {tab === "orders" && (
         <>
           {myOrders.length === 0 && (
             <div className="mem-section" style={{ textAlign: "center", padding: 40, color: "var(--text-muted)" }}>No orders yet.</div>
           )}
-          {myOrders.map((o) => (
-            <div key={o.id} className="mem-section" style={{ marginBottom: 12, padding: "14px 16px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div>
-                  <strong>{o.item_title}</strong>
-                  {o.size && <span style={{ color: "var(--text-muted)", marginLeft: 8 }}>Size: {o.size}</span>}
-                  {o.quantity > 1 && <span style={{ color: "var(--text-muted)", marginLeft: 8 }}>x{o.quantity}</span>}
+          {myOrders.map((o) => {
+            const paymentLine = formatPaymentMethodLine(o);
+            const dateStr = o.created_at
+              ? new Date(o.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+              : "";
+            if (o.kind === "in_store") {
+              return (
+                <div key={o.id} className="mem-section" style={{ marginBottom: 12, padding: "14px 16px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                    <div>
+                      <span className="mem-purchase-tag">In-store</span>
+                      <strong style={{ marginLeft: 8 }}>{o.description || "In-store purchase"}</strong>
+                    </div>
+                    <span className="badge" style={{ background: "var(--primary)", color: "#EDF3E3", fontSize: 9 }}>
+                      {(o.status || "COMPLETED").toUpperCase()}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, gap: 8 }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>
+                      ${(Number(o.total_cents) / 100).toFixed(2)}
+                    </span>
+                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{dateStr}</span>
+                  </div>
+                  {(paymentLine || o.receipt_url) && (
+                    <div style={{ marginTop: 6, fontSize: 11, color: "var(--text-muted)", display: "flex", gap: 10, alignItems: "center" }}>
+                      {paymentLine && <span>{paymentLine}</span>}
+                      {o.receipt_url && (
+                        <a href={o.receipt_url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+                          View receipt &rarr;
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <span className="badge" style={{ background: STATUS_COLORS[o.status] || "var(--text-muted)", color: "#EDF3E3", fontSize: 9 }}>
-                  {o.status === "picked_up" ? "PICKED UP" : o.status.toUpperCase()}
-                </span>
+              );
+            }
+            // kind === "in_app"
+            const items = o.items || [];
+            const discountPct = items.find((it) => Number(it.discount_pct || 0) > 0)?.discount_pct || 0;
+            const statusLabel = (items[0]?.status || "confirmed").toUpperCase().replace("_", " ");
+            return (
+              <div key={o.id} className="mem-section" style={{ marginBottom: 12, padding: "14px 16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                  <div>
+                    <span className="mem-purchase-tag">In-app</span>
+                  </div>
+                  <span className="badge" style={{ background: STATUS_COLORS[items[0]?.status] || "var(--text-muted)", color: "#EDF3E3", fontSize: 9 }}>
+                    {statusLabel}
+                  </span>
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  {items.map((it, idx) => (
+                    <div key={it.order_id || idx} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "4px 0", fontSize: 14 }}>
+                      <div style={{ minWidth: 0 }}>
+                        {it.quantity > 1 && <span style={{ color: "var(--text-muted)", marginRight: 6 }}>{it.quantity}\u00d7</span>}
+                        <strong>{it.item_title}</strong>
+                        {it.size && <span style={{ color: "var(--text-muted)", marginLeft: 8, fontSize: 12 }}>Size {it.size}</span>}
+                      </div>
+                      <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                        ${((Number(it.unit_price_cents) / 100) * (Number(it.quantity) || 1)).toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>
+                    ${(Number(o.total_cents) / 100).toFixed(2)}
+                    {discountPct > 0 && <span style={{ fontSize: 11, color: "var(--primary)", marginLeft: 6 }}>({discountPct}% off)</span>}
+                  </span>
+                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{dateStr}</span>
+                </div>
+                {(paymentLine || o.receipt_url) && (
+                  <div style={{ marginTop: 6, fontSize: 11, color: "var(--text-muted)", display: "flex", gap: 10, alignItems: "center" }}>
+                    {paymentLine && <span>{paymentLine}</span>}
+                    {o.receipt_url && (
+                      <a href={o.receipt_url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+                        View receipt &rarr;
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-                <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>
-                  ${Number(o.total).toFixed(2)}
-                  {o.discount_pct > 0 && <span style={{ fontSize: 11, color: "var(--primary)", marginLeft: 6 }}>({o.discount_pct}% off)</span>}
-                </span>
-                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                  {new Date(o.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </>
       )}
 
