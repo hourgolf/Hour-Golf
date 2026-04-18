@@ -541,7 +541,7 @@ html { overflow-y: scroll; }
 .mem-credit-hrs { font-family: var(--font-display); font-size: 24px; font-weight: 700; color: var(--primary); }
 .mem-credit-price { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); margin-top: 4px; }
 
-.mem-book-form { max-width: 480px; overflow: hidden; }
+.mem-book-form { max-width: 480px; }
 .mem-book-btn { width: 100%; padding: 14px; background: var(--primary); color: var(--bg); border: none; border-radius: var(--radius); font-family: var(--font-display); font-size: 14px; font-weight: 700; cursor: pointer; text-transform: uppercase; margin-top: 12px; transition: transform 0.12s; }
 .mem-book-btn:hover { transform: scale(0.97); }
 .mem-book-btn:disabled { opacity: 0.5; cursor: default; }
