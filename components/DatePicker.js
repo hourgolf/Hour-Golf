@@ -52,7 +52,15 @@ export default function DatePicker({
   placeholder = "Pick a date",
 }) {
   const today = todayInTZ(timezone);
-  const initial = value || today;
+  // Clamp the initial view into [min, max] so wide-range pickers (e.g.
+  // birthday: max = today - 18y) don't open showing a fully-disabled
+  // month with the user wondering what to click.
+  function clampToRange(iso) {
+    if (min && iso < min) return min;
+    if (max && iso > max) return max;
+    return iso;
+  }
+  const initial = clampToRange(value || today);
   const { y: initY, m: initM } = parseISODate(initial);
 
   const [open, setOpen] = useState(false);
@@ -102,7 +110,7 @@ export default function DatePicker({
   }, [open, focusedISO]);
 
   function openPicker() {
-    const start = value || today;
+    const start = clampToRange(value || today);
     const { y, m } = parseISODate(start);
     setView({ y, m });
     setFocusedISO(start);
@@ -125,6 +133,10 @@ export default function DatePicker({
   function changeMonth(delta) {
     const next = new Date(view.y, view.m + delta, 1);
     setView({ y: next.getFullYear(), m: next.getMonth() });
+  }
+
+  function changeYear(delta) {
+    setView({ y: view.y + delta, m: view.m });
   }
 
   function moveFocus(days) {
@@ -181,6 +193,16 @@ export default function DatePicker({
   const lastOfView  = toISODate(view.y, view.m, daysInMonth(view.y, view.m));
   const canPrev = !min || firstOfView > min;
   const canNext = !max || lastOfView < max;
+  // Year nav: at least one day of the target year must be in [min, max].
+  // For booking's 7-day window, both will usually be false (good — keeps
+  // the buttons inert there). For wider ranges (birthday, reports) they
+  // light up.
+  const firstOfPrevYear = toISODate(view.y - 1, 0, 1);
+  const lastOfPrevYear  = toISODate(view.y - 1, 11, 31);
+  const firstOfNextYear = toISODate(view.y + 1, 0, 1);
+  const lastOfNextYear  = toISODate(view.y + 1, 11, 31);
+  const canPrevYear = (!max || firstOfPrevYear <= max) && (!min || lastOfPrevYear >= min);
+  const canNextYear = (!max || firstOfNextYear <= max) && (!min || lastOfNextYear >= min);
 
   return (
     <div className="hg-datepicker">
@@ -206,25 +228,51 @@ export default function DatePicker({
       {open && (
         <div className="hg-dp-popover" ref={popoverRef} role="dialog" aria-label="Choose a date">
           <div className="hg-dp-head">
-            <button
-              type="button"
-              className="hg-dp-nav"
-              onClick={() => changeMonth(-1)}
-              disabled={!canPrev}
-              aria-label="Previous month"
-            >
-              &lsaquo;
-            </button>
+            <div className="hg-dp-nav-group">
+              <button
+                type="button"
+                className="hg-dp-nav"
+                onClick={() => changeYear(-1)}
+                disabled={!canPrevYear}
+                aria-label="Previous year"
+                title="Previous year"
+              >
+                &laquo;
+              </button>
+              <button
+                type="button"
+                className="hg-dp-nav"
+                onClick={() => changeMonth(-1)}
+                disabled={!canPrev}
+                aria-label="Previous month"
+                title="Previous month"
+              >
+                &lsaquo;
+              </button>
+            </div>
             <div className="hg-dp-month">{MONTHS[view.m]} {view.y}</div>
-            <button
-              type="button"
-              className="hg-dp-nav"
-              onClick={() => changeMonth(1)}
-              disabled={!canNext}
-              aria-label="Next month"
-            >
-              &rsaquo;
-            </button>
+            <div className="hg-dp-nav-group">
+              <button
+                type="button"
+                className="hg-dp-nav"
+                onClick={() => changeMonth(1)}
+                disabled={!canNext}
+                aria-label="Next month"
+                title="Next month"
+              >
+                &rsaquo;
+              </button>
+              <button
+                type="button"
+                className="hg-dp-nav"
+                onClick={() => changeYear(1)}
+                disabled={!canNextYear}
+                aria-label="Next year"
+                title="Next year"
+              >
+                &raquo;
+              </button>
+            </div>
           </div>
 
           <div className="hg-dp-weekdays">

@@ -1,4 +1,18 @@
 import { useState, useEffect } from "react";
+import DatePicker from "../DatePicker";
+
+// Birthday picker bounds: anyone older than 1900 is unrealistic; max is
+// "today" minus 18 years (signup enforces 18+, and edits should stay
+// consistent). Computed lazily inside the component so the values are
+// fresh on every render rather than baked at module load.
+function birthdayMinIso() {
+  return "1900-01-01";
+}
+function birthdayMaxIso() {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 18);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function MemberAccount({ member, tierConfig, refresh, showToast, onLogout }) {
   const [name, setName] = useState(member.name || "");
@@ -176,10 +190,12 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast, 
           </div>
           <div className="mem-form-row">
             <label>Birthday</label>
-            <input
-              type="date"
+            <DatePicker
               value={birthday}
-              onChange={(e) => setBirthday(e.target.value)}
+              onChange={setBirthday}
+              min={birthdayMinIso()}
+              max={birthdayMaxIso()}
+              placeholder="Pick your birthday"
             />
             <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
               So we can celebrate — a birthday bonus may be coming your way.
