@@ -82,8 +82,22 @@ async function resolveTenantBySlug(slug) {
 export async function middleware(request) {
   const strict = process.env.MULTI_TENANT_STRICT === 'true';
   const host = request.headers.get('host') || '';
+  const hostname = host.split(':')[0].toLowerCase();
   const slug = parseSlugFromHost(host);
   const pathname = request.nextUrl.pathname;
+
+  // Apex domain (ourlee.co / www.ourlee.co) is the platform landing.
+  // Sending it to `/` fell back to the Hour Golf tenant content, which
+  // was wrong — the apex should advertise the platform, not be a
+  // stealth HG dashboard. Redirect apex-root to the platform sign-in.
+  // /platform/* paths on apex still serve normally.
+  const isApex =
+    hostname === 'ourlee.co' || hostname === 'www.ourlee.co';
+  if (isApex && pathname === '/') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/platform/login';
+    return NextResponse.redirect(url);
+  }
 
   let tenantId = HOURGOLF_TENANT_ID;
   let source = 'fallback';

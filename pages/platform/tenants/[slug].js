@@ -4,7 +4,7 @@ import { usePlatformAuth } from "../../../hooks/usePlatformAuth";
 import PlatformShell from "../../../components/platform/PlatformShell";
 import TenantBranding from "../../../components/settings/TenantBranding";
 
-const TABS = ["Overview", "Branding", "Stripe", "Seam", "Features"];
+const TABS = ["Overview", "Branding", "Stripe", "Seam", "Features", "Billing"];
 
 const FEATURE_KEYS = [
   { key: "bookings", label: "Bookings", hint: "Bay reservations, Skedda sync" },
@@ -98,6 +98,7 @@ export default function PlatformTenantDetail() {
           {tab === "Stripe" && <StripeTab detail={detail} apiKey={apiKey} onSaved={reload} />}
           {tab === "Seam" && <SeamTab detail={detail} apiKey={apiKey} />}
           {tab === "Features" && <FeaturesTab detail={detail} apiKey={apiKey} onSaved={reload} />}
+          {tab === "Billing" && <BillingTab detail={detail} apiKey={apiKey} />}
         </>
       )}
     </PlatformShell>
@@ -630,6 +631,32 @@ function FeaturesTab({ detail, apiKey, onSaved }) {
 
   const [pending, setPending] = useState({});
   const [err, setErr] = useState("");
+  const [pricing, setPricing] = useState([]);
+
+  // Pull pricing so each feature row can show its upcharge. If the
+  // fetch fails (e.g. /api/platform-pricing isn't deployed yet), the
+  // tab still renders — just without dollars.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/platform-pricing", {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (!cancelled) setPricing(d.pricing || []);
+      } catch {
+        /* silent */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [apiKey]);
+
+  const priceByKey = new Map();
+  for (const row of pricing) {
+    if (row.is_active) priceByKey.set(row.unit_key, row.monthly_price_cents || 0);
+  }
 
   async function toggle(key, nextEnabled) {
     setPending((p) => ({ ...p, [key]: "saving" }));
@@ -651,6 +678,12 @@ function FeaturesTab({ detail, apiKey, onSaved }) {
   }
 
   const onCount = Object.values(current).filter(Boolean).length;
+  const baseCents = priceByKey.get("base") || 0;
+  const enabledCents = Object.entries(current)
+    .filter(([, on]) => on)
+    .reduce((sum, [k]) => sum + (priceByKey.get(k) || 0), 0);
+  const monthlyTotal = baseCents + enabledCents;
+  const hasPricing = priceByKey.size > 0;
 
   return (
     <div className="p-card" style={{ maxWidth: 900 }}>
@@ -658,26 +691,35 @@ function FeaturesTab({ detail, apiKey, onSaved }) {
         <div>
           <div className="p-card-title">Feature flags</div>
           <div className="p-card-subtitle">
-            Each toggle writes one row in <code className="p-mono">tenant_features</code>.
-            Server-side <code className="p-mono">assertFeature</code> and the client
-            <code className="p-mono"> useTenantFeatures</code> hook honor these.
+            Each toggle writes a row in <code className="p-mono">tenant_features</code>. The
+            dollars column shows what each flag contributes to this tenant&rsquo;s monthly
+            bill, per <a href="/platform/pricing" style={{ color: "var(--p-info-text)" }}>Pricing</a>.
           </div>
         </div>
-        <span className="p-pill p-pill--green">{onCount} on</span>
+        <div className="p-row" style={{ gap: 6 }}>
+          <span className="p-pill p-pill--green">{onCount} on</span>
+          {hasPricing && (
+            <span className="p-pill p-pill--blue">
+              ${(monthlyTotal / 100).toFixed(2)}/mo
+            </span>
+          )}
+        </div>
       </div>
       <div className="p-card-body p-card-body--flush">
         <table className="p-table">
           <thead>
             <tr>
-              <th style={{ width: "26%" }}>Feature</th>
+              <th style={{ width: "22%" }}>Feature</th>
               <th>Description</th>
-              <th style={{ width: 120, textAlign: "right" }}>Enabled</th>
+              <th style={{ width: 110 }} className="p-table-num">Monthly</th>
+              <th style={{ width: 100, textAlign: "right" }}>Enabled</th>
             </tr>
           </thead>
           <tbody>
             {FEATURE_KEYS.map(({ key, label, hint }) => {
               const isOn = !!current[key];
               const state = pending[key];
+              const cents = priceByKey.get(key);
               return (
                 <tr key={key}>
                   <td>
@@ -685,6 +727,17 @@ function FeaturesTab({ detail, apiKey, onSaved }) {
                     <div className="p-mono p-muted" style={{ marginTop: 2 }}>{key}</div>
                   </td>
                   <td className="p-muted">{hint}</td>
+                  <td className="p-table-num p-muted">
+                    {cents === undefined ? (
+                      <span className="p-subtle">—</span>
+                    ) : cents === 0 ? (
+                      <span className="p-subtle">Free</span>
+                    ) : (
+                      <span style={{ color: isOn ? "var(--p-text)" : "var(--p-text-muted)" }}>
+                        ${(cents / 100).toFixed(2)}
+                      </span>
+                    )}
+                  </td>
                   <td style={{ textAlign: "right" }}>
                     <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                       {state === "saving" && <span className="p-subtle" style={{ fontSize: 11 }}>saving…</span>}
@@ -703,6 +756,19 @@ function FeaturesTab({ detail, apiKey, onSaved }) {
               );
             })}
           </tbody>
+          {hasPricing && (
+            <tfoot>
+              <tr>
+                <td colSpan={2} className="p-muted" style={{ fontWeight: 500 }}>
+                  Base {baseCents > 0 && <span className="p-subtle">({`$${(baseCents / 100).toFixed(2)}`})</span>} + enabled features
+                </td>
+                <td className="p-table-num" style={{ fontWeight: 600 }}>
+                  ${(monthlyTotal / 100).toFixed(2)}
+                </td>
+                <td />
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
       {err && <div className="p-card-footer" style={{ justifyContent: "flex-start" }}>
@@ -710,6 +776,264 @@ function FeaturesTab({ detail, apiKey, onSaved }) {
       </div>}
     </div>
   );
+}
+
+// ───────────────────────────────────────────────────────────
+// Billing
+// ───────────────────────────────────────────────────────────
+
+function BillingTab({ detail, apiKey }) {
+  const tenantId = detail.tenant.id;
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState("");
+  const [notes, setNotes] = useState("");
+  const [savedMsg, setSavedMsg] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setErr("");
+    try {
+      const r = await fetch(`/api/platform-billing?tenant_id=${encodeURIComponent(tenantId)}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || "Load failed");
+      setData(d);
+      setStatus(d.billing?.status || "not_enrolled");
+      setNotes(d.billing?.notes || "");
+    } catch (e) {
+      setErr(e.message);
+    }
+    setLoading(false);
+  }, [tenantId, apiKey]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function saveBilling() {
+    setSaving(true);
+    setSavedMsg("");
+    setErr("");
+    try {
+      const r = await fetch("/api/platform-billing", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ tenant_id: tenantId, status, notes: notes || null }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || "Save failed");
+      setSavedMsg("Saved.");
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    }
+    setSaving(false);
+  }
+
+  if (loading) return <div className="p-muted">Loading billing…</div>;
+  if (err && !data) return <div className="p-msg p-msg--error">{err}</div>;
+  if (!data) return null;
+
+  const cents = data.computed_monthly_cents || 0;
+  const { breakdown = [], billing, drift } = data;
+
+  return (
+    <div className="p-stack">
+      <div className="p-msg p-msg--info">
+        <strong>Phase 1 — preview only.</strong> The math below is the monthly total
+        this tenant <em>will</em> be charged once Ourlee&rsquo;s own Stripe account is
+        wired in (Phase 2). No actual charges happen today. Edit prices at
+        <a href="/platform/pricing" style={{ color: "var(--p-info-text)", marginLeft: 4 }}>/platform/pricing</a>.
+      </div>
+
+      {/* Summary */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+        <div className="p-card" style={{ padding: "14px 16px" }}>
+          <div className="p-muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+            Monthly total
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 600, marginTop: 4, fontFamily: "var(--p-font-mono)", color: "var(--p-primary-text)" }}>
+            ${(cents / 100).toFixed(2)}
+          </div>
+          <div className="p-subtle" style={{ fontSize: 11, marginTop: 2 }}>
+            {breakdown.filter((b) => b.applies).length} line items
+          </div>
+        </div>
+        <div className="p-card" style={{ padding: "14px 16px" }}>
+          <div className="p-muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+            Billing status
+          </div>
+          <div style={{ marginTop: 4 }}>
+            <BillingStatusPill status={billing?.status} />
+          </div>
+          <div className="p-subtle" style={{ fontSize: 11, marginTop: 8 }}>
+            {billing?.stripe_customer_id ? (
+              <>Stripe customer <code className="p-mono">{billing.stripe_customer_id}</code></>
+            ) : (
+              "Not yet enrolled in Stripe"
+            )}
+          </div>
+        </div>
+        <div className="p-card" style={{ padding: "14px 16px" }}>
+          <div className="p-muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+            Cached snapshot
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 600, marginTop: 4, fontFamily: "var(--p-font-mono)" }}>
+            ${((data.cached_monthly_cents || 0) / 100).toFixed(2)}
+          </div>
+          <div className="p-subtle" style={{ fontSize: 11, marginTop: 2 }}>
+            {billing?.cost_snapshot_at ? new Date(billing.cost_snapshot_at).toLocaleString() : "Never"}
+            {drift && <span style={{ color: "var(--p-warning-text)", marginLeft: 6 }}>· drift</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Breakdown */}
+      <div className="p-card">
+        <div className="p-card-header">
+          <div>
+            <div className="p-card-title">Line items</div>
+            <div className="p-card-subtitle">
+              Each active pricing row shown; items marked Applied are counted in this tenant&rsquo;s total.
+            </div>
+          </div>
+        </div>
+        <div className="p-card-body p-card-body--flush">
+          <table className="p-table">
+            <thead>
+              <tr>
+                <th style={{ width: "26%" }}>Item</th>
+                <th>Kind</th>
+                <th className="p-table-num" style={{ width: 140 }}>Monthly</th>
+                <th style={{ width: 100, textAlign: "right" }}>Applied</th>
+              </tr>
+            </thead>
+            <tbody>
+              {breakdown.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="p-muted" style={{ textAlign: "center", padding: 24 }}>
+                    No active pricing rows yet. Visit
+                    <a href="/platform/pricing" style={{ color: "var(--p-info-text)", marginLeft: 4 }}>/platform/pricing</a> to
+                    set up prices.
+                  </td>
+                </tr>
+              )}
+              {breakdown.map((b) => (
+                <tr key={b.unit_key} style={{ opacity: b.applies ? 1 : 0.5 }}>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{b.label}</div>
+                    <div className="p-mono p-muted" style={{ marginTop: 2 }}>{b.unit_key}</div>
+                  </td>
+                  <td>
+                    <span className={`p-pill ${b.kind === "base" ? "p-pill--blue" : "p-pill--gray"}`}>
+                      {b.kind}
+                    </span>
+                  </td>
+                  <td className="p-table-num">${(b.monthly_price_cents / 100).toFixed(2)}</td>
+                  <td style={{ textAlign: "right" }}>
+                    {b.applies ? (
+                      <span className="p-pill p-pill--green">Applied</span>
+                    ) : (
+                      <span className="p-subtle" style={{ fontSize: 11 }}>—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={2} style={{ fontWeight: 500 }}>Monthly total</td>
+                <td className="p-table-num" style={{ fontWeight: 600 }}>
+                  ${(cents / 100).toFixed(2)}
+                </td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {/* Billing state editor */}
+      <div className="p-card" style={{ maxWidth: 720 }}>
+        <div className="p-card-header">
+          <div>
+            <div className="p-card-title">Billing state</div>
+            <div className="p-card-subtitle">
+              Manually set the tenant&rsquo;s billing status and internal notes. When
+              Phase 2 wires Stripe webhooks in, status will be updated automatically —
+              manual edits are a stopgap for the interim.
+            </div>
+          </div>
+        </div>
+        <div className="p-card-body">
+          <div className="p-stack">
+            <div className="p-form-grid">
+              <div className="p-field">
+                <label className="p-field-label" htmlFor="billing-status">Status</label>
+                <select
+                  id="billing-status"
+                  className="p-select"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  <option value="not_enrolled">Not enrolled</option>
+                  <option value="trialing">Trialing</option>
+                  <option value="active">Active</option>
+                  <option value="past_due">Past due</option>
+                  <option value="suspended">Suspended</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div className="p-field">
+                <label className="p-field-label">Stripe IDs</label>
+                <div className="p-field-hint" style={{ lineHeight: 1.6 }}>
+                  Customer: <code className="p-mono">{billing?.stripe_customer_id || "—"}</code><br />
+                  Subscription: <code className="p-mono">{billing?.stripe_subscription_id || "—"}</code>
+                </div>
+              </div>
+            </div>
+            <div className="p-field">
+              <label className="p-field-label" htmlFor="billing-notes">Notes</label>
+              <textarea
+                id="billing-notes"
+                className="p-textarea"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="e.g. grandfathered at $0 through 2026-07, pilot program"
+                rows={3}
+              />
+            </div>
+            {savedMsg && <div className="p-msg p-msg--ok">{savedMsg}</div>}
+            {err && <div className="p-msg p-msg--error">{err}</div>}
+          </div>
+        </div>
+        <div className="p-card-footer">
+          <button className="p-btn p-btn--primary" onClick={saveBilling} disabled={saving}>
+            {saving ? "Saving…" : "Save billing state"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BillingStatusPill({ status }) {
+  switch (status) {
+    case "active":
+      return <span className="p-pill p-pill--green"><span className="p-pill-dot" />Active</span>;
+    case "trialing":
+      return <span className="p-pill p-pill--blue">Trialing</span>;
+    case "past_due":
+      return <span className="p-pill p-pill--red">Past due</span>;
+    case "suspended":
+      return <span className="p-pill p-pill--amber">Suspended</span>;
+    case "cancelled":
+      return <span className="p-pill p-pill--gray">Cancelled</span>;
+    default:
+      return <span className="p-pill p-pill--gray">Not enrolled</span>;
+  }
 }
 
 // ───────────────────────────────────────────────────────────

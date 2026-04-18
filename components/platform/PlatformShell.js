@@ -46,6 +46,8 @@ const ICON_SIGNOUT =
 const ICON_PLUS = "M12 5v14M5 12h14";
 const ICON_SLIDERS =
   "M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6";
+const ICON_PRICE =
+  "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6";
 
 export default function PlatformShell({
   children,
@@ -115,6 +117,18 @@ export default function PlatformShell({
           >
             <SidebarIcon d={ICON_TENANTS} />
             <span>Tenants</span>
+          </Link>
+
+          <Link
+            href="/platform/pricing"
+            className={
+              "p-sidebar-nav-item" +
+              (activeNav === "pricing" ? " is-active" : "")
+            }
+            title="Pricing"
+          >
+            <SidebarIcon d={ICON_PRICE} />
+            <span>Pricing</span>
           </Link>
 
           <Link

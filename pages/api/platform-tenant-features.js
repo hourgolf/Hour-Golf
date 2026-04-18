@@ -15,6 +15,7 @@
 import { verifyPlatformAdmin } from "../../lib/platform-auth";
 import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
 import { invalidateFeatures } from "../../lib/tenant-features";
+import { handleFeatureToggleRecompute } from "./platform-billing";
 
 // Only keys already seeded for Hour Golf in the Phase 1 migration. Adding
 // a new key later means inserting a row for every tenant first, so we
@@ -86,6 +87,11 @@ export default async function handler(req, res) {
     // or API request reads the fresh value instead of the stale cached
     // one (up to 60s otherwise).
     invalidateFeatures(tenantId);
+
+    // Recompute the tenant's monthly cost snapshot so the Billing tab
+    // reflects the new enabled-feature set immediately. Best-effort —
+    // failure here doesn't fail the toggle itself.
+    handleFeatureToggleRecompute(tenantId).catch(() => {});
 
     return res.status(200).json(rows[0] || { tenant_id: tenantId, feature_key: featureKey, enabled });
   } catch (e) {
