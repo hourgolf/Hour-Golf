@@ -1,5 +1,6 @@
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { getStripeClient } from "../../lib/stripe-config";
+import { getSessionWithMember } from "../../lib/member-session";
 
 // Phase 7B-2b: per-tenant Stripe client via lib/stripe-config.
 
@@ -26,15 +27,10 @@ export default async function handler(req, res) {
 
   try {
     // Get member from session within this tenant
-    const memberResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=email,name,stripe_customer_id`,
-      { headers: { apikey: key, Authorization: `Bearer ${key}` } }
-    );
-    if (!memberResp.ok) throw new Error("Session lookup failed");
-    const members = await memberResp.json();
-    if (!members.length) return res.status(401).json({ error: "Session expired" });
+    const sess = await getSessionWithMember({ token, tenantId, touch: true });
+    if (!sess) return res.status(401).json({ error: "Session expired" });
 
-    const member = members[0];
+    const member = sess.member;
 
     let stripe;
     try {

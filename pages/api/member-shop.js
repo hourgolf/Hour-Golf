@@ -2,6 +2,7 @@ import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers"
 import { getStripeClient } from "../../lib/stripe-config";
 import { sendShopOrderNotification } from "../../lib/email";
 import { assertFeature } from "../../lib/feature-guard";
+import { getSessionWithMember } from "../../lib/member-session";
 
 // Phase 7B-2b: per-tenant Stripe client via lib/stripe-config.
 
@@ -60,11 +61,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const mResp = await sb(key, `members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=email,name,tier,stripe_customer_id,shop_credit_balance`);
-    if (!mResp.ok) throw new Error("Session lookup failed");
-    const members = await mResp.json();
-    if (!members.length) return res.status(401).json({ error: "Session expired" });
-    const member = members[0];
+    const sess = await getSessionWithMember({ token, tenantId, touch: true });
+    if (!sess) return res.status(401).json({ error: "Session expired" });
+    const member = sess.member;
 
     let discountPct = 0;
     if (member.tier) {

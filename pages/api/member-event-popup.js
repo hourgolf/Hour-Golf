@@ -1,4 +1,5 @@
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
+import { getSessionWithMember } from "../../lib/member-session";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -20,13 +21,9 @@ export default async function handler(req, res) {
   if (!token) return res.status(401).json({ error: "Not authenticated" });
 
   // Verify session within this tenant
-  const mResp = await fetch(
-    `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=email`,
-    { headers: { apikey: key, Authorization: `Bearer ${key}` } }
-  );
-  const members = mResp.ok ? await mResp.json() : [];
-  if (!members.length) return res.status(401).json({ error: "Session expired" });
-  const memberEmail = members[0].email;
+  const session = await getSessionWithMember({ token, tenantId, touch: true });
+  if (!session) return res.status(401).json({ error: "Session expired" });
+  const memberEmail = session.member.email;
 
   try {
     // GET — return undismissed popup events

@@ -1,6 +1,7 @@
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { getStripeClient } from "../../lib/stripe-config";
 import { assertFeature } from "../../lib/feature-guard";
+import { getSessionWithMember } from "../../lib/member-session";
 
 // Phase 7B-2c: per-tenant Stripe client via lib/stripe-config.
 
@@ -35,15 +36,10 @@ export default async function handler(req, res) {
 
   try {
     // Get member from session within this tenant
-    const memberResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=*`,
-      { headers: { apikey: key, Authorization: `Bearer ${key}` } }
-    );
-    if (!memberResp.ok) throw new Error("Session lookup failed");
-    const members = await memberResp.json();
-    if (!members.length) return res.status(401).json({ error: "Session expired" });
+    const sess = await getSessionWithMember({ token, tenantId, touch: true });
+    if (!sess) return res.status(401).json({ error: "Session expired" });
 
-    const member = members[0];
+    const member = sess.member;
     const { hours } = req.body || {};
     const pass = PASS_OPTIONS[hours];
     if (!pass) return res.status(400).json({ error: "Invalid pass option. Choose 1, 5, or 10 hours." });

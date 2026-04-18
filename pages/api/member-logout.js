@@ -1,4 +1,5 @@
 import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { deleteMemberSession } from "../../lib/member-session";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -17,8 +18,17 @@ export default async function handler(req, res) {
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies["hg-member-token"];
 
-  // Clear the token in the database if we have one
+  // Clear the token in the database if we have one.
+  // 1) Delete the specific row in member_sessions.
+  // 2) Also null the scalar members.session_token — the WHERE match by
+  //    token value means this only hits the row if the scalar still holds
+  //    THIS device's token (logging out on device A after device B logged
+  //    in leaves the scalar pointing at B, which is correct to preserve).
+  //    Once the scalar columns are dropped, this second call goes away.
   if (token && key) {
+    try {
+      await deleteMemberSession(token);
+    } catch (_) { /* best effort */ }
     try {
       await fetch(
         `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}`,

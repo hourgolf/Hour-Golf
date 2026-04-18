@@ -1,4 +1,5 @@
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
+import { getSessionWithMember } from "../../lib/member-session";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -24,15 +25,9 @@ export default async function handler(req, res) {
 
   try {
     // Lookup member by session token within this tenant
-    const memberResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=*`,
-      { headers: { apikey: key, Authorization: `Bearer ${key}` } }
-    );
-    if (!memberResp.ok) throw new Error("Session lookup failed");
-    const members = await memberResp.json();
-    if (!members.length) return res.status(401).json({ error: "Session expired" });
-
-    const member = members[0];
+    const session = await getSessionWithMember({ token, tenantId, touch: true });
+    if (!session) return res.status(401).json({ error: "Session expired" });
+    const member = session.member;
     const cleanEmail = member.email;
 
     // Load tier config

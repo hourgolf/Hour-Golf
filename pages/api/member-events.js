@@ -1,5 +1,6 @@
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { assertFeature } from "../../lib/feature-guard";
+import { getSessionWithMember } from "../../lib/member-session";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -26,14 +27,9 @@ export default async function handler(req, res) {
 
   try {
     // Verify session within this tenant
-    const mResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=email`,
-      { headers: { apikey: key, Authorization: `Bearer ${key}` } }
-    );
-    if (!mResp.ok) throw new Error("Session lookup failed");
-    const members = await mResp.json();
-    if (!members.length) return res.status(401).json({ error: "Session expired" });
-    const memberEmail = members[0].email;
+    const session = await getSessionWithMember({ token, tenantId, touch: true });
+    if (!session) return res.status(401).json({ error: "Session expired" });
+    const memberEmail = session.member.email;
 
     // Get published events within this tenant
     const evResp = await fetch(

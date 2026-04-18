@@ -1,4 +1,5 @@
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
+import { getSessionWithMember } from "../../lib/member-session";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -11,13 +12,8 @@ function parseCookies(cookieHeader) {
 }
 
 async function getMemberFromToken(key, token, tenantId) {
-  const resp = await fetch(
-    `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=email,name,phone`,
-    { headers: { apikey: key, Authorization: `Bearer ${key}` } }
-  );
-  if (!resp.ok) return null;
-  const rows = await resp.json();
-  return rows[0] || null;
+  const session = await getSessionWithMember({ token, tenantId, touch: true });
+  return session?.member || null;
 }
 
 export default async function handler(req, res) {

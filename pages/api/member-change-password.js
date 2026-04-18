@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
+import { getSessionWithMember } from "../../lib/member-session";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -32,15 +33,10 @@ export default async function handler(req, res) {
 
   try {
     // 1) Look up member by session token within this tenant
-    const resp = await fetch(
-      `${SUPABASE_URL}/rest/v1/members?session_token=eq.${encodeURIComponent(token)}&tenant_id=eq.${tenantId}&session_expires_at=gt.${new Date().toISOString()}&select=email,password_hash`,
-      { headers: { apikey: key, Authorization: `Bearer ${key}` } }
-    );
-    if (!resp.ok) throw new Error("Session lookup failed");
-    const members = await resp.json();
-    if (!members.length) return res.status(401).json({ error: "Session expired" });
+    const session = await getSessionWithMember({ token, tenantId, touch: true });
+    if (!session) return res.status(401).json({ error: "Session expired" });
 
-    const member = members[0];
+    const member = session.member;
 
     // 2) Verify current password
     if (!member.password_hash) {
