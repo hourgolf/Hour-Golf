@@ -3,6 +3,9 @@ import { useState, useEffect } from "react";
 export default function MemberAccount({ member, tierConfig, refresh, showToast, onLogout }) {
   const [name, setName] = useState(member.name || "");
   const [phone, setPhone] = useState(member.phone || "");
+  const [birthday, setBirthday] = useState("");
+  const [address, setAddress] = useState("");
+  const [emergencyContact, setEmergencyContact] = useState("");
   const [prefs, setPrefs] = useState({
     email_booking_confirmations: true,
     email_cancellations: true,
@@ -37,6 +40,9 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast, 
         const d = await r.json();
         setName(d.profile.name || "");
         setPhone(d.profile.phone || "");
+        setBirthday(d.profile.birthday || "");
+        setAddress(d.profile.address || "");
+        setEmergencyContact(d.profile.emergency_contact || "");
         setPrefs(d.preferences);
       }
     } catch (_) { /* use defaults */ }
@@ -53,6 +59,9 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast, 
         body: JSON.stringify({
           name,
           phone,
+          birthday,
+          address,
+          emergency_contact: emergencyContact,
           preferences: {
             email_booking_confirmations: prefs.email_booking_confirmations,
             email_cancellations: prefs.email_cancellations,
@@ -163,6 +172,35 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast, 
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="(555) 123-4567"
+            />
+          </div>
+          <div className="mem-form-row">
+            <label>Birthday</label>
+            <input
+              type="date"
+              value={birthday}
+              onChange={(e) => setBirthday(e.target.value)}
+            />
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+              So we can celebrate — a birthday bonus may be coming your way.
+            </div>
+          </div>
+          <div className="mem-form-row">
+            <label>Address</label>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="123 Main St, Portland, OR 97201"
+            />
+          </div>
+          <div className="mem-form-row">
+            <label>Emergency contact</label>
+            <input
+              type="text"
+              value={emergencyContact}
+              onChange={(e) => setEmergencyContact(e.target.value)}
+              placeholder="Name &amp; phone number"
             />
           </div>
         </div>

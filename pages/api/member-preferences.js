@@ -45,7 +45,14 @@ export default async function handler(req, res) {
     } catch (_) { /* ignore */ }
 
     return res.status(200).json({
-      profile: { name: member.name, phone: member.phone || "", email },
+      profile: {
+        name: member.name,
+        phone: member.phone || "",
+        email,
+        birthday: member.birthday || "",
+        address: member.address || "",
+        emergency_contact: member.emergency_contact || "",
+      },
       preferences: prefs || {
         email_booking_confirmations: true,
         email_reminders: true,
@@ -55,14 +62,43 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "PATCH") {
-    const { name, phone, preferences } = req.body || {};
+    const { name, phone, birthday, address, emergency_contact, preferences } = req.body || {};
+
+    // Lightweight validation so bad input doesn't reach the DB. All
+    // fields are optional — member may set or clear.
+    if (birthday !== undefined && birthday !== null && birthday !== "") {
+      if (typeof birthday !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) {
+        return res.status(400).json({ error: "birthday must be YYYY-MM-DD" });
+      }
+      const d = new Date(birthday);
+      if (isNaN(d.getTime())) {
+        return res.status(400).json({ error: "birthday is not a valid date" });
+      }
+    }
+    if (address !== undefined && address !== null && typeof address !== "string") {
+      return res.status(400).json({ error: "address must be a string" });
+    }
+    if (emergency_contact !== undefined && emergency_contact !== null && typeof emergency_contact !== "string") {
+      return res.status(400).json({ error: "emergency_contact must be a string" });
+    }
 
     try {
-      // Update member profile if name or phone changed
-      if (name !== undefined || phone !== undefined) {
+      // Update member profile if any editable field changed
+      if (
+        name !== undefined ||
+        phone !== undefined ||
+        birthday !== undefined ||
+        address !== undefined ||
+        emergency_contact !== undefined
+      ) {
         const updates = {};
         if (name !== undefined) updates.name = name;
         if (phone !== undefined) updates.phone = phone;
+        if (birthday !== undefined) updates.birthday = birthday === "" ? null : birthday;
+        if (address !== undefined) updates.address = address === "" ? null : address;
+        if (emergency_contact !== undefined) {
+          updates.emergency_contact = emergency_contact === "" ? null : emergency_contact;
+        }
         updates.updated_at = new Date().toISOString();
 
         await fetch(
