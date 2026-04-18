@@ -1,5 +1,7 @@
 import { verifyAdmin, getServiceKey, SUPABASE_URL } from "../../lib/api-helpers";
 import { assertFeature } from "../../lib/feature-guard";
+import { getSquareCredentials } from "../../lib/square-config";
+import { adjustGiftCard } from "../../lib/square-api";
 
 function sb(key, path, opts = {}) {
   return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -70,8 +72,10 @@ export default async function handler(req, res) {
       const rules = rulesResp.ok ? await rulesResp.json() : [];
       if (!rules.length) return res.status(200).json({ processed: 0, message: "No enabled rules" });
 
-      // Fetch active members within this tenant
-      const memResp = await sb(key, `members?tenant_id=eq.${tenantId}&tier=neq.Non-Member&select=email,name,shop_credit_balance`);
+      // Fetch active members within this tenant. Include
+      // square_gift_card_id so we can mirror loyalty rewards onto the
+      // linked gift card below.
+      const memResp = await sb(key, `members?tenant_id=eq.${tenantId}&tier=neq.Non-Member&select=email,name,shop_credit_balance,square_gift_card_id`);
       const members = memResp.ok ? await memResp.json() : [];
       if (!members.length) return res.status(200).json({ processed: 0, message: "No members" });
 
@@ -106,9 +110,13 @@ export default async function handler(req, res) {
       // arriving AFTER this run don't claw back issued credit — the
       // ledger dedup further down prevents re-processing — but they
       // reduce future runs for that month if an admin re-triggers.
-      const sqResp = await sb(key, `payments?tenant_id=eq.${tenantId}&source=eq.square_pos&status=eq.succeeded&billing_month=gte.${monthStart}&billing_month=lt.${monthEnd}&select=member_email,amount_cents,refunded_cents`);
+      const sqResp = await sb(key, `payments?tenant_id=eq.${tenantId}&source=eq.square_pos&status=eq.succeeded&billing_month=gte.${monthStart}&billing_month=lt.${monthEnd}&select=member_email,amount_cents,refunded_cents,payment_method`);
       const squareRows = sqResp.ok ? await sqResp.json() : [];
       squareRows.forEach((r) => {
+        // Exclude gift-card tenders: the member is "spending" credit
+        // they already earned, so counting it toward shop_spend again
+        // would double-reward. Card / cash / external tenders all count.
+        if (r.payment_method === "gift_card") return;
         const net = Math.max(
           0,
           Number(r.amount_cents || 0) - Number(r.refunded_cents || 0)
@@ -117,6 +125,14 @@ export default async function handler(req, res) {
           memberSpend[r.member_email] = (memberSpend[r.member_email] || 0) + net / 100;
         }
       });
+
+      // Lazy-load Square credentials once for gift-card mirroring
+      // below. If Square isn't configured for this tenant, skip
+      // silently — loyalty credit still lands in shop_credit_balance.
+      let squareCreds = null;
+      try {
+        squareCreds = await getSquareCredentials(tenantId);
+      } catch (_) { /* Square not set up — skip gift-card mirroring */ }
 
       // Process each member against each rule
       let totalIssued = 0;
@@ -172,6 +188,28 @@ export default async function handler(req, res) {
                 reason: `Loyalty reward — ${rule.rule_type === "hours" ? `${progress.toFixed(1)}h booked` : rule.rule_type === "bookings" ? `${progress} bookings` : `$${progress.toFixed(0)} spent`} in ${period}`,
               }),
             });
+
+            // Mirror the reward onto the member's Square gift card so
+            // Register sees the new balance on their next scan. Skip
+            // cleanly if: Square not configured, or member has no gift
+            // card yet (next admin-square-sync-gift-cards run handles
+            // the creation + initial activate).
+            if (squareCreds && member.square_gift_card_id) {
+              try {
+                await adjustGiftCard({
+                  apiBase: squareCreds.apiBase,
+                  accessToken: squareCreds.accessToken,
+                  locationId: squareCreds.locationId,
+                  giftCardId: member.square_gift_card_id,
+                  deltaCents: Math.round(rewardAmt * 100),
+                  direction: "INCREMENT",
+                  reason: "OTHER",
+                  idempotencyKey: `gc-loyalty-${member.email}-${period}-${rule.rule_type}`,
+                });
+              } catch (e) {
+                console.error(`admin-loyalty: gift card increment failed for ${member.email}:`, e.message);
+              }
+            }
 
             totalIssued += rewardAmt;
             membersAffected.add(member.email);

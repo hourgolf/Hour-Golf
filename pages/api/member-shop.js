@@ -1,5 +1,7 @@
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { getStripeClient } from "../../lib/stripe-config";
+import { getSquareCredentials } from "../../lib/square-config";
+import { adjustGiftCard } from "../../lib/square-api";
 import { sendShopOrderNotification } from "../../lib/email";
 import { assertFeature } from "../../lib/feature-guard";
 import { getSessionWithMember } from "../../lib/member-session";
@@ -384,6 +386,28 @@ export default async function handler(req, res) {
             reason: `Pro Shop purchase — ${lineItems.length} item${lineItems.length > 1 ? "s" : ""}`,
           }),
         });
+
+        // Keep the Square gift card in lockstep if the member has one
+        // linked so Register doesn't keep showing stale credit. Any
+        // Square API failure here is logged but never blocks the
+        // in-app purchase — next sync-gift-cards run will reconcile.
+        if (member.square_gift_card_id) {
+          try {
+            const square = await getSquareCredentials(tenantId);
+            await adjustGiftCard({
+              apiBase: square.apiBase,
+              accessToken: square.accessToken,
+              locationId: square.locationId,
+              giftCardId: member.square_gift_card_id,
+              deltaCents: Math.round(creditsUsed * 100),
+              direction: "DECREMENT",
+              reason: "OTHER",
+              idempotencyKey: `gc-shop-dec-${member.email}-${Date.now()}`,
+            });
+          } catch (e) {
+            console.error(`shop checkout: gift card decrement failed for ${member.email}:`, e.message);
+          }
+        }
       }
 
       // Extract receipt / card detail from the expanded latest_charge
