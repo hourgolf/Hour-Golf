@@ -26,7 +26,10 @@ alter table public.payments
 create table if not exists public.refunds (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
-  payment_id uuid references public.payments(id) on delete set null,
+  -- payments.id is bigint (pre-existing schema), so the FK column must
+  -- match. Nullable + on delete set null so walk-in refunds (no linked
+  -- payment row) still leave an audit record.
+  payment_id bigint references public.payments(id) on delete set null,
   source text,
   external_refund_id text not null,
   amount_cents integer not null,
