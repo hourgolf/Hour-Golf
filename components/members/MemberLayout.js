@@ -79,7 +79,7 @@ export default function MemberLayout({ activeTab, children }) {
   const [toast, setToast] = useState(null);
   function showToast(msg, type = "success") {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 4000);
+    setTimeout(() => setToast(null), 5000);
   }
 
   // Login handler

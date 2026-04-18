@@ -119,9 +119,25 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || d.detail || "Booking failed");
-      showToast("Booking confirmed!");
-      setBookStartTime(HOURS.length > 0 ? HOURS[0] : defaultStart);
-      setBookEndTime(HOURS.length > 4 ? HOURS[4] : HOURS[HOURS.length - 1] || defaultEnd);
+      showToast("\u2713 Booking confirmed! Check your email.");
+      // Advance to the slot right after what was just booked so the form
+      // doesn't immediately show a red conflict against the new booking.
+      const justBookedDurationSlots = Math.max(
+        1,
+        HOURS.indexOf(bookEndTime) - HOURS.indexOf(bookStartTime)
+      );
+      const advancedStartIdx = HOURS.indexOf(bookEndTime);
+      if (advancedStartIdx >= 0 && advancedStartIdx + 1 < HOURS.length) {
+        setBookStartTime(HOURS[advancedStartIdx]);
+        const advancedEndIdx = Math.min(
+          advancedStartIdx + justBookedDurationSlots,
+          HOURS.length - 1
+        );
+        setBookEndTime(HOURS[advancedEndIdx]);
+      } else {
+        setBookStartTime(HOURS.length > 0 ? HOURS[0] : defaultStart);
+        setBookEndTime(HOURS.length > 4 ? HOURS[4] : HOURS[HOURS.length - 1] || defaultEnd);
+      }
       setBookBay("Bay 1");
       setTermsAccepted(false);
       fetch(`/api/customer-availability?date=${bookDate}`, { credentials: "include" })
@@ -134,11 +150,11 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
     setBooking(false);
   }
 
-  // Clamp date when user selects via calendar
+  // Accept the user's raw selection so out-of-range dates surface the
+  // existing error message instead of silently snapping to day 7.
   function handleDateChange(e) {
-    let val = e.target.value;
-    if (val < todayStr) val = todayStr;
-    if (val > maxDateStr) val = maxDateStr;
+    const val = e.target.value;
+    if (!val) return;
     setBookDate(val);
   }
 
@@ -171,10 +187,13 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
               max={maxDateStr}
               onChange={handleDateChange}
             />
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+              Book up to 7 days in advance.
+            </div>
           </div>
           {(dateInPast || dateTooFar) && (
             <div className="mem-err" style={{ marginTop: 4, fontSize: 12 }}>
-              {dateInPast ? "Cannot book in the past." : "Bookings limited to 7 days out."}
+              {dateInPast ? "Cannot book in the past." : "Bookings are limited to 7 days in advance. Please pick an earlier date."}
             </div>
           )}
           <div className="mem-form-row">
