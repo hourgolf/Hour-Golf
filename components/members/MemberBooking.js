@@ -234,12 +234,16 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
     setSheetBooking(false);
   }
 
-  // Lock body scroll while sheet is open.
+  // Lock body scroll and hide floating FABs while sheet is open.
   useEffect(() => {
     if (!sheetOpen) return;
-    const prev = document.body.style.overflow;
+    const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    document.body.classList.add("mem-sheet-open");
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.classList.remove("mem-sheet-open");
+    };
   }, [sheetOpen]);
 
   const canSubmitSheet = hasCard
@@ -493,21 +497,21 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
               </label>
 
               {sheetMsg && <div className="mem-err" style={{ marginTop: 4 }}>{sheetMsg}</div>}
+            </div>
 
-              <div className="mem-sheet-actions">
-                <button type="button" className="mem-sheet-cancel" onClick={closeSheet} disabled={sheetBooking}>
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="mem-book-btn"
-                  onClick={submitSheet}
-                  disabled={!canSubmitSheet}
-                  style={{ flex: 2, margin: 0 }}
-                >
-                  {sheetBooking ? "Booking\u2026" : "Confirm booking"}
-                </button>
-              </div>
+            <div className="mem-sheet-actions">
+              <button type="button" className="mem-sheet-cancel" onClick={closeSheet} disabled={sheetBooking}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="mem-book-btn"
+                onClick={submitSheet}
+                disabled={!canSubmitSheet}
+                style={{ flex: 2, margin: 0 }}
+              >
+                {sheetBooking ? "Booking\u2026" : "Confirm booking"}
+              </button>
             </div>
           </div>
         </div>
