@@ -42,14 +42,29 @@ function isUuid(value) {
 const INTER_MEMBER_DELAY_MS = 300;
 const GROUP_PREFIX = "HG tier:";
 
+// DB tier names (set in lib/constants.js) haven't been renamed to match
+// HG's current member-facing branding. Remap only at the Square
+// boundary so Square's note + group names reflect what members and
+// staff actually say out loud. A global rename across DB, Stripe, and
+// emails is tracked separately — when that lands, this map becomes
+// redundant and can be deleted.
+const TIER_DISPLAY_MAP = {
+  "Starter": "Player",
+  "Green Jacket": "Jacket",
+};
+
+function displayTierName(tier) {
+  return TIER_DISPLAY_MAP[tier] || tier;
+}
+
 function tierGroupName(tier) {
-  return `${GROUP_PREFIX} ${tier}`;
+  return `${GROUP_PREFIX} ${displayTierName(tier)}`;
 }
 
 function noteFor(tier, discountPct) {
   const pct = Number(discountPct || 0);
   const pctStr = pct > 0 ? `${pct}% pro-shop discount` : "no pro-shop discount";
-  return `HG tier: ${tier} — ${pctStr}`;
+  return `HG tier: ${displayTierName(tier)} — ${pctStr}`;
 }
 
 export default async function handler(req, res) {
