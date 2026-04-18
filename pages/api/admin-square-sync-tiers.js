@@ -23,6 +23,7 @@
 
 import { verifyAdmin, SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
 import { verifyPlatformAdmin } from "../../lib/platform-auth";
+import { TIERS } from "../../lib/constants";
 import { getSquareCredentials } from "../../lib/square-config";
 import {
   listCustomerGroups,
@@ -126,7 +127,15 @@ export default async function handler(req, res) {
   const groupsByName = new Map();
   for (const g of existingGroups) groupsByName.set(g.name, g);
 
-  const tiersNeedingGroups = new Set();
+  // Seed from the full TIERS list (minus Non-Member) rather than only
+  // tiers that currently have members. This way every tier group
+  // exists in Square up front — the merchant can pre-wire the
+  // automatic-discount rule in Square Dashboard before any member
+  // signs up for that tier. Current-member tiers are unioned in for
+  // safety if the DB ever has a tier string not in TIERS.
+  const tiersNeedingGroups = new Set(
+    TIERS.filter((t) => t && t !== "Non-Member")
+  );
   for (const m of members) {
     if (!m.tier || m.tier === "Non-Member") continue;
     tiersNeedingGroups.add(m.tier);
