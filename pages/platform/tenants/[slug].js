@@ -641,6 +641,9 @@ function SquareTab({ detail, apiKey }) {
   const [backfilling, setBackfilling] = useState(false);
   const [backfillResult, setBackfillResult] = useState(null);
   const [backfillDryRun, setBackfillDryRun] = useState(true);
+  const [syncingTiers, setSyncingTiers] = useState(false);
+  const [tierSyncResult, setTierSyncResult] = useState(null);
+  const [tierSyncDryRun, setTierSyncDryRun] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -714,6 +717,25 @@ function SquareTab({ detail, apiKey }) {
       setErr(e.message);
     }
     setBackfilling(false);
+  }
+
+  async function runTierSync() {
+    setSyncingTiers(true);
+    setTierSyncResult(null);
+    setErr("");
+    try {
+      const r = await fetch("/api/admin-square-sync-tiers", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ tenant_id: tenantId, dryRun: tierSyncDryRun }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || "Tier sync failed");
+      setTierSyncResult(d);
+    } catch (e) {
+      setErr(e.message);
+    }
+    setSyncingTiers(false);
   }
 
   if (loading) return <div className="p-muted">Loading Square config…</div>;
@@ -862,6 +884,57 @@ function SquareTab({ detail, apiKey }) {
                     </summary>
                     <pre className="p-mono" style={{ background: "var(--p-surface, #fff)", padding: 10, borderRadius: 6, border: "1px solid var(--p-border, #e2eddb)", fontSize: 11, margin: "8px 0 0 0", maxHeight: 320, overflow: "auto" }}>
                       {JSON.stringify(backfillResult.report, null, 2)}
+                    </pre>
+                  </details>
+                </div>
+              )}
+            </div>
+          )}
+
+          {cfg?.enabled && cfg?.location_id && (
+            <div className="p-field" style={{ marginTop: 16, padding: 14, background: "var(--p-surface-sunken, #f6f7f5)", borderRadius: 8, border: "1px solid var(--p-border, #e2eddb)" }}>
+              <label className="p-field-label">Tier sync (Phase 3)</label>
+              <div className="p-field-hint" style={{ marginBottom: 10 }}>
+                Writes each linked member's HG tier + pro-shop discount to the
+                Square customer's <code className="p-mono">note</code> field, and
+                assigns them to a <code className="p-mono">HG tier: &lt;Tier&gt;</code>
+                customer group (auto-created on first run). Staff see the note in
+                the Square POS customer profile; merchants can also wire the
+                group to an automatic discount rule in Square Dashboard.
+                Re-run whenever tiers change to keep Square in sync.
+              </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 13 }}>
+                <input
+                  className="p-checkbox"
+                  type="checkbox"
+                  checked={tierSyncDryRun}
+                  onChange={(e) => setTierSyncDryRun(e.target.checked)}
+                />
+                <span>Dry run (preview only, no writes)</span>
+              </label>
+              <div style={{ marginTop: 10 }}>
+                <button
+                  className="p-btn"
+                  onClick={runTierSync}
+                  disabled={syncingTiers}
+                >
+                  {syncingTiers ? "Syncing…" : tierSyncDryRun ? "Preview tier sync" : "Run tier sync"}
+                </button>
+              </div>
+              {tierSyncResult && (
+                <div style={{ marginTop: 12, fontSize: 12 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                    {tierSyncResult.summary.dryRun ? "Dry-run summary" : "Tier sync summary"}
+                  </div>
+                  <pre className="p-mono" style={{ background: "var(--p-surface, #fff)", padding: 10, borderRadius: 6, border: "1px solid var(--p-border, #e2eddb)", fontSize: 11, margin: 0, overflowX: "auto" }}>
+                    {JSON.stringify(tierSyncResult.summary, null, 2)}
+                  </pre>
+                  <details style={{ marginTop: 8 }}>
+                    <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--p-text-muted, #6a7a6c)" }}>
+                      Per-member report ({tierSyncResult.report.length} rows)
+                    </summary>
+                    <pre className="p-mono" style={{ background: "var(--p-surface, #fff)", padding: 10, borderRadius: 6, border: "1px solid var(--p-border, #e2eddb)", fontSize: 11, margin: "8px 0 0 0", maxHeight: 320, overflow: "auto" }}>
+                      {JSON.stringify(tierSyncResult.report, null, 2)}
                     </pre>
                   </details>
                 </div>
