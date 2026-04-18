@@ -18,6 +18,34 @@ function qrPayload(member) {
   return `${origin}/verify?token=${member.verify_token}`;
 }
 
+// Pretty payment-method line for the in-store purchase card. Card with
+// last 4 becomes "Visa •••• 4242", card without last 4 is just the brand,
+// non-card payment types (CASH, EXTERNAL, ...) capitalize the first
+// letter. Returns empty string when nothing useful is known.
+function formatPaymentMethod(p) {
+  const method = (p.payment_method || "").toLowerCase();
+  if (method === "card") {
+    const brand = p.card_brand ? formatCardBrand(p.card_brand) : "Card";
+    if (p.card_last_4) return `${brand} \u2022\u2022\u2022\u2022 ${p.card_last_4}`;
+    return brand;
+  }
+  if (!method) return "";
+  return method.charAt(0).toUpperCase() + method.slice(1);
+}
+
+function formatCardBrand(b) {
+  const up = String(b || "").toUpperCase();
+  const map = {
+    VISA: "Visa",
+    MASTERCARD: "Mastercard",
+    AMERICAN_EXPRESS: "Amex",
+    DISCOVER: "Discover",
+    JCB: "JCB",
+    DISCOVER_DINERS: "Diners",
+  };
+  return map[up] || "Card";
+}
+
 export default function MemberDashboard({ member, tierConfig, refresh, showToast }) {
   const router = useRouter();
   const [usage, setUsage] = useState(null);
@@ -304,15 +332,33 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
           <div className="mem-list">
             {inStorePurchases.map((p) => {
               const when = new Date(p.occurred_at);
+              const paymentLine = formatPaymentMethod(p);
               return (
-                <div key={p.id} className="mem-list-item">
-                  <div>
-                    <span>{fD(when)}</span>
-                    <span className="mem-list-sub" style={{ marginLeft: 8 }}>
-                      {p.description || "In-store purchase"}
-                    </span>
+                <div key={p.id} className="mem-list-item" style={{ flexDirection: "column", alignItems: "stretch", gap: 4 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <span>{fD(when)}</span>
+                      <span className="mem-list-sub" style={{ marginLeft: 8 }}>
+                        {p.description || "In-store purchase"}
+                      </span>
+                    </div>
+                    <div className="mem-dur">${(Number(p.amount_cents) / 100).toFixed(2)}</div>
                   </div>
-                  <div className="mem-dur">${(Number(p.amount_cents) / 100).toFixed(2)}</div>
+                  {(paymentLine || p.receipt_url) && (
+                    <div className="mem-list-sub" style={{ fontSize: 11, display: "flex", gap: 10, alignItems: "center" }}>
+                      {paymentLine && <span>{paymentLine}</span>}
+                      {p.receipt_url && (
+                        <a
+                          href={p.receipt_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}
+                        >
+                          View receipt &rarr;
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
