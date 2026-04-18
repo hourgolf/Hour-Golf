@@ -25,6 +25,7 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
   const [loyalty, setLoyalty] = useState(null);
   const [upcoming, setUpcoming] = useState([]);
   const [monthBookings, setMonthBookings] = useState([]);
+  const [inStorePurchases, setInStorePurchases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cancelConfirm, setCancelConfirm] = useState(null); // booking_id being confirmed
   const [cancelling, setCancelling] = useState(false);
@@ -55,6 +56,12 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
       fetch("/api/member-shop?action=loyalty", { credentials: "include" })
         .then((lr) => lr.ok ? lr.json() : null)
         .then((ld) => { if (ld) setLoyalty(ld); })
+        .catch(() => {});
+      // Load recent in-store purchases (Square POS). Empty array if the
+      // tenant isn't Square-enabled or the member hasn't bought anything.
+      fetch("/api/member-in-store-purchases?limit=5", { credentials: "include" })
+        .then((ir) => ir.ok ? ir.json() : null)
+        .then((id) => { if (id?.purchases) setInStorePurchases(id.purchases); })
         .catch(() => {});
     } catch (e) {
       showToast("Failed to load dashboard data", "error");
@@ -287,6 +294,31 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
           </div>
         )}
       </div>
+
+      {/* Recent in-store purchases (Square POS). Hidden when empty so
+          the section doesn't dominate the dashboard for members who
+          haven't bought anything at the counter yet. */}
+      {inStorePurchases.length > 0 && (
+        <div className="mem-section">
+          <div className="mem-section-head">Recent In-Store Purchases</div>
+          <div className="mem-list">
+            {inStorePurchases.map((p) => {
+              const when = new Date(p.occurred_at);
+              return (
+                <div key={p.id} className="mem-list-item">
+                  <div>
+                    <span>{fD(when)}</span>
+                    <span className="mem-list-sub" style={{ marginLeft: 8 }}>
+                      {p.description || "In-store purchase"}
+                    </span>
+                  </div>
+                  <div className="mem-dur">${(Number(p.amount_cents) / 100).toFixed(2)}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* This Month Activity */}
       <div className="mem-section">
