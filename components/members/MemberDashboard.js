@@ -18,51 +18,6 @@ function qrPayload(member) {
   return `${origin}/verify?token=${member.verify_token}`;
 }
 
-// Pretty payment-method line for the in-store purchase card. Card with
-// last 4 becomes "Visa •••• 4242", card without last 4 is just the brand,
-// non-card payment types (CASH, EXTERNAL, ...) capitalize the first
-// letter. Returns empty string when nothing useful is known.
-function formatPaymentMethod(p) {
-  const method = (p.payment_method || "").toLowerCase();
-  if (method === "card") {
-    const brand = p.card_brand ? formatCardBrand(p.card_brand) : "Card";
-    if (p.card_last_4) return `${brand} \u2022\u2022\u2022\u2022 ${p.card_last_4}`;
-    return brand;
-  }
-  if (!method) return "";
-  return method.charAt(0).toUpperCase() + method.slice(1);
-}
-
-function formatCardBrand(b) {
-  const up = String(b || "").toUpperCase();
-  const map = {
-    VISA: "Visa",
-    MASTERCARD: "Mastercard",
-    AMERICAN_EXPRESS: "Amex",
-    AMEX: "Amex",
-    DISCOVER: "Discover",
-    JCB: "JCB",
-    DINERS: "Diners",
-    DISCOVER_DINERS: "Diners",
-    UNIONPAY: "UnionPay",
-  };
-  return map[up] || "Card";
-}
-
-// Summarize an in-app purchase's line items for a single-line display.
-// One item: just the title (with qty prefix if >1). Multiple items:
-// the first item's title + "(+N more)".
-function inAppPurchaseLabel(p) {
-  const items = p.items || [];
-  if (items.length === 0) return "Pro-shop purchase";
-  const first = items[0];
-  const label = first.quantity > 1 ? `${first.quantity}\u00d7 ${first.item_title}` : first.item_title;
-  if (items.length === 1) return label;
-  const moreCount = items.reduce((s, it) => s + (Number(it.quantity) || 1), 0) - (first.quantity || 1);
-  if (moreCount > 0) return `${label} (+${moreCount} more)`;
-  return label;
-}
-
 export default function MemberDashboard({ member, tierConfig, refresh, showToast }) {
   const router = useRouter();
   const [usage, setUsage] = useState(null);
@@ -70,7 +25,7 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
   const [loyalty, setLoyalty] = useState(null);
   const [upcoming, setUpcoming] = useState([]);
   const [monthBookings, setMonthBookings] = useState([]);
-  const [recentPurchases, setRecentPurchases] = useState([]);
+  const [myEvents, setMyEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cancelConfirm, setCancelConfirm] = useState(null); // booking_id being confirmed
   const [cancelling, setCancelling] = useState(false);
@@ -102,12 +57,28 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
         .then((lr) => lr.ok ? lr.json() : null)
         .then((ld) => { if (ld) setLoyalty(ld); })
         .catch(() => {});
-      // Unified recent purchases — in-app shop orders + in-store Square
-      // POS, merged and sorted by date. Empty array until the member
-      // buys anything; card is hidden below when empty.
-      fetch("/api/member-purchases?limit=5", { credentials: "include" })
-        .then((ir) => ir.ok ? ir.json() : null)
-        .then((id) => { if (id?.purchases) setRecentPurchases(id.purchases); })
+      // Upcoming events the member has registered for or expressed
+      // interest in. /api/member-events returns every published event
+      // flagged with is_interested + registration_status; we filter to
+      // those the member cares about and that haven't happened yet.
+      fetch("/api/member-events", { credentials: "include" })
+        .then((er) => er.ok ? er.json() : null)
+        .then((events) => {
+          if (!Array.isArray(events)) return;
+          const now = Date.now();
+          const relevant = events
+            .filter((ev) => {
+              if (!ev.is_interested && !ev.registration_status) return false;
+              const end = ev.end_date ? new Date(ev.end_date).getTime() : null;
+              const start = ev.start_date ? new Date(ev.start_date).getTime() : null;
+              // Hide events that have fully ended. Keep in-progress events.
+              if (end && end < now) return false;
+              if (!end && start && start < now - 24 * 3600 * 1000) return false;
+              return true;
+            })
+            .sort((a, b) => new Date(a.start_date || 0) - new Date(b.start_date || 0));
+          setMyEvents(relevant);
+        })
         .catch(() => {});
     } catch (e) {
       showToast("Failed to load dashboard data", "error");
@@ -341,45 +312,50 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
         )}
       </div>
 
-      {/* Recent Purchases — in-app shop + in-store Square POS, merged.
-          Hidden when the member has no purchases yet so the dashboard
-          stays uncluttered. Full history lives on /members/shop > Orders. */}
-      {recentPurchases.length > 0 && (
+      {/* Your Events — only events the member registered for or
+          flagged interest in, and that haven't already ended. Hidden
+          when empty so the dashboard stays uncluttered for members
+          not engaged with events. Tap a row to jump to the event
+          detail page. */}
+      {myEvents.length > 0 && (
         <div className="mem-section">
-          <div className="mem-section-head">Recent Purchases</div>
+          <div className="mem-section-head">Your Events</div>
           <div className="mem-list">
-            {recentPurchases.map((p) => {
-              const when = new Date(p.created_at);
-              const paymentLine = formatPaymentMethod(p);
-              const label = p.kind === "in_store"
-                ? (p.description || "In-store purchase")
-                : inAppPurchaseLabel(p);
-              const tag = p.kind === "in_store" ? "In-store" : "In-app";
+            {myEvents.map((ev) => {
+              const start = ev.start_date ? new Date(ev.start_date) : null;
+              const status = ev.registration_status; // e.g. 'registered', 'waitlist'
+              let tag = "Interested";
+              let tagStyle = { background: "var(--primary-bg)", color: "var(--primary)" };
+              if (status === "registered") {
+                tag = "Registered";
+                tagStyle = { background: "var(--primary)", color: "var(--bg)" };
+              } else if (status === "waitlist") {
+                tag = "Waitlist";
+                tagStyle = { background: "#ddd480", color: "#35443B" };
+              } else if (status) {
+                tag = status.charAt(0).toUpperCase() + status.slice(1);
+              }
               return (
-                <div key={p.id} className="mem-list-item" style={{ flexDirection: "column", alignItems: "stretch", gap: 4 }}>
+                <div
+                  key={ev.id}
+                  className="mem-list-item"
+                  style={{ flexDirection: "column", alignItems: "stretch", gap: 4, cursor: "pointer" }}
+                  onClick={() => router.push(`/members/events/${ev.id}`)}
+                >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
                     <div style={{ minWidth: 0 }}>
-                      <span className="mem-purchase-tag">{tag}</span>
-                      <span style={{ marginLeft: 8 }}>{fD(when)}</span>
-                      <span className="mem-list-sub" style={{ marginLeft: 8 }}>
-                        {label}
-                      </span>
+                      <span className="mem-purchase-tag" style={tagStyle}>{tag}</span>
+                      <strong style={{ marginLeft: 8 }}>{ev.title}</strong>
                     </div>
-                    <div className="mem-dur">${(Number(p.total_cents) / 100).toFixed(2)}</div>
+                    {start && (
+                      <span className="mem-list-sub" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
+                        {fD(start)} &middot; {fT(start)}
+                      </span>
+                    )}
                   </div>
-                  {(paymentLine || p.receipt_url) && (
-                    <div className="mem-list-sub" style={{ fontSize: 11, display: "flex", gap: 10, alignItems: "center" }}>
-                      {paymentLine && <span>{paymentLine}</span>}
-                      {p.receipt_url && (
-                        <a
-                          href={p.receipt_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}
-                        >
-                          View receipt &rarr;
-                        </a>
-                      )}
+                  {ev.subtitle && (
+                    <div className="mem-list-sub" style={{ fontSize: 12 }}>
+                      {ev.subtitle}
                     </div>
                   )}
                 </div>
@@ -387,8 +363,8 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
             })}
           </div>
           <div style={{ marginTop: 10, fontSize: 12, textAlign: "right" }}>
-            <a href="/members/shop" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
-              See all orders &rarr;
+            <a href="/members/events" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+              Browse all events &rarr;
             </a>
           </div>
         </div>
