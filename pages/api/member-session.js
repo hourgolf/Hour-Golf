@@ -74,6 +74,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       member: {
+        id: member.id,
         email: member.email,
         name: member.name,
         tier: member.tier,
@@ -82,6 +83,7 @@ export default async function handler(req, res) {
         shop_credit_balance: Number(member.shop_credit_balance || 0),
         member_number: member.member_number || null,
         verify_token: generateVerifyToken(member.email),
+        square_customer_id: member.square_customer_id || null,
         needsAccountSetup,
       },
       tierConfig,

@@ -4,7 +4,7 @@ import { usePlatformAuth } from "../../../hooks/usePlatformAuth";
 import PlatformShell from "../../../components/platform/PlatformShell";
 import TenantBranding from "../../../components/settings/TenantBranding";
 
-const TABS = ["Overview", "Branding", "Stripe", "Seam", "Features", "Billing"];
+const TABS = ["Overview", "Branding", "Stripe", "Seam", "Square", "Features", "Billing"];
 
 const FEATURE_KEYS = [
   { key: "bookings", label: "Bookings", hint: "Bay reservations, Skedda sync" },
@@ -97,6 +97,7 @@ export default function PlatformTenantDetail() {
           {tab === "Branding" && <BrandingTab detail={detail} apiKey={apiKey} />}
           {tab === "Stripe" && <StripeTab detail={detail} apiKey={apiKey} onSaved={reload} />}
           {tab === "Seam" && <SeamTab detail={detail} apiKey={apiKey} />}
+          {tab === "Square" && <SquareTab detail={detail} apiKey={apiKey} />}
           {tab === "Features" && <FeaturesTab detail={detail} apiKey={apiKey} onSaved={reload} />}
           {tab === "Billing" && <BillingTab detail={detail} apiKey={apiKey} />}
         </>
@@ -614,6 +615,273 @@ function SeamTab({ detail, apiKey }) {
           disabled={saving || (!cfg && (!apiInput.trim() || !deviceInput.trim()))}
         >
           {saving ? "Saving…" : "Save Seam config"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// Square
+// ───────────────────────────────────────────────────────────
+
+function SquareTab({ detail, apiKey }) {
+  const tenantId = detail.tenant.id;
+  const [cfg, setCfg] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [enabled, setEnabled] = useState(false);
+  const [environment, setEnvironment] = useState("production");
+  const [tokenInput, setTokenInput] = useState("");
+  const [locationInput, setLocationInput] = useState("");
+  const [appIdInput, setAppIdInput] = useState("");
+  const [webhookInput, setWebhookInput] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const [status, setStatus] = useState("");
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillResult, setBackfillResult] = useState(null);
+  const [backfillDryRun, setBackfillDryRun] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await fetch(`/api/platform-tenant-square?tenant_id=${encodeURIComponent(tenantId)}`, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        const d = r.ok ? await r.json() : null;
+        if (!cancelled) {
+          setCfg(d);
+          setEnabled(d?.enabled ?? false);
+          setEnvironment(d?.environment || "production");
+          setLocationInput(d?.location_id || "");
+          setAppIdInput(d?.application_id || "");
+        }
+      } catch (e) {
+        if (!cancelled) setErr(e.message);
+      }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [tenantId, apiKey]);
+
+  async function save() {
+    setSaving(true);
+    setErr("");
+    setStatus("");
+    const payload = { tenant_id: tenantId, enabled, environment };
+    if (tokenInput.trim()) payload.access_token = tokenInput.trim();
+    if (locationInput.trim() && locationInput.trim() !== (cfg?.location_id || "")) {
+      payload.location_id = locationInput.trim();
+    }
+    if (appIdInput.trim() !== (cfg?.application_id || "")) {
+      payload.application_id = appIdInput.trim() || null;
+    }
+    if (webhookInput.trim()) payload.webhook_signature_key = webhookInput.trim();
+    try {
+      const r = await fetch("/api/platform-tenant-square", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || "Save failed");
+      setCfg(d);
+      setTokenInput("");
+      setWebhookInput("");
+      setStatus("Saved. Cache invalidated — next Square call picks up new values.");
+    } catch (e) {
+      setErr(e.message);
+    }
+    setSaving(false);
+  }
+
+  async function runBackfill() {
+    setBackfilling(true);
+    setBackfillResult(null);
+    setErr("");
+    try {
+      const r = await fetch("/api/admin-square-backfill", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ tenant_id: tenantId, dryRun: backfillDryRun }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || "Backfill failed");
+      setBackfillResult(d);
+    } catch (e) {
+      setErr(e.message);
+    }
+    setBackfilling(false);
+  }
+
+  if (loading) return <div className="p-muted">Loading Square config…</div>;
+
+  return (
+    <div className="p-card" style={{ maxWidth: 720 }}>
+      <div className="p-card-header">
+        <div>
+          <div className="p-card-title">Square POS configuration</div>
+          <div className="p-card-subtitle">
+            Credentials used by the member QR backfill and the POS-purchase
+            webhook so in-store Square Register scans round-trip into the
+            app's loyalty and activity surfaces.
+          </div>
+        </div>
+        <span className={`p-pill ${cfg?.enabled ? "p-pill--green" : "p-pill--gray"}`}>
+          {cfg ? (cfg.enabled ? "Enabled" : "Disabled") : "Not configured"}
+        </span>
+      </div>
+      <div className="p-card-body">
+        <div className="p-stack">
+          <div className="p-field">
+            <label className="p-field-label">Environment</label>
+            <div className="p-field-hint">
+              Sandbox uses <code className="p-mono">connect.squareupsandbox.com</code>,
+              production uses <code className="p-mono">connect.squareup.com</code>.
+            </div>
+            <select
+              className="p-input p-input--mono"
+              value={environment}
+              onChange={(e) => setEnvironment(e.target.value)}
+            >
+              <option value="production">production</option>
+              <option value="sandbox">sandbox</option>
+            </select>
+          </div>
+
+          <div className="p-field">
+            <label className="p-field-label">Kill switch</label>
+            <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0" }}>
+              <input
+                className="p-checkbox"
+                type="checkbox"
+                checked={enabled}
+                onChange={(e) => setEnabled(e.target.checked)}
+              />
+              <span style={{ fontSize: 13 }}>
+                Enabled
+                <span className="p-subtle" style={{ fontSize: 11, marginLeft: 6 }}>
+                  — off pauses Square sync without deleting credentials
+                </span>
+              </span>
+            </label>
+          </div>
+
+          <KeyRow
+            label="Square access token"
+            existing={cfg?.access_token}
+            placeholder="EAAA… (production) or EAAAE… (sandbox)"
+            value={tokenInput}
+            onChange={setTokenInput}
+          />
+
+          <div className="p-field">
+            <label className="p-field-label" htmlFor="sq-location">Location ID</label>
+            <div className="p-field-hint">
+              {cfg?.location_id
+                ? <>Current: <code className="p-mono">{cfg.location_id}</code></>
+                : <>Not configured</>
+              }
+            </div>
+            <input
+              id="sq-location"
+              className="p-input p-input--mono"
+              type="text"
+              value={locationInput}
+              onChange={(e) => setLocationInput(e.target.value)}
+              placeholder="LXXXXXXXXXXXX"
+            />
+          </div>
+
+          <div className="p-field">
+            <label className="p-field-label" htmlFor="sq-appid">Application ID (optional)</label>
+            <div className="p-field-hint">
+              Only needed if we ever push Terminal orders. Safe to leave blank for scan-only flow.
+            </div>
+            <input
+              id="sq-appid"
+              className="p-input p-input--mono"
+              type="text"
+              value={appIdInput}
+              onChange={(e) => setAppIdInput(e.target.value)}
+              placeholder="sq0idp-…"
+            />
+          </div>
+
+          <KeyRow
+            label="Webhook signature key"
+            existing={cfg?.webhook_signature_key}
+            placeholder="wh_…"
+            value={webhookInput}
+            onChange={setWebhookInput}
+          />
+
+          {status && <div className="p-msg p-msg--ok">{status}</div>}
+          {err && <div className="p-msg p-msg--error">{err}</div>}
+
+          {cfg?.enabled && cfg?.location_id && (
+            <div className="p-field" style={{ marginTop: 16, padding: 14, background: "var(--p-surface-sunken, #f6f7f5)", borderRadius: 8, border: "1px solid var(--p-border, #e2eddb)" }}>
+              <label className="p-field-label">Member backfill</label>
+              <div className="p-field-hint" style={{ marginBottom: 10 }}>
+                Walks every member in this tenant, searches Square by email, and either
+                links an existing Square customer, backfills a <code className="p-mono">reference_id</code>, or
+                creates a new Square customer. Always start with a dry run — the report
+                shows conflicts, duplicates, and errors before any writes.
+              </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 13 }}>
+                <input
+                  className="p-checkbox"
+                  type="checkbox"
+                  checked={backfillDryRun}
+                  onChange={(e) => setBackfillDryRun(e.target.checked)}
+                />
+                <span>Dry run (no writes to Square or our DB)</span>
+              </label>
+              <div style={{ marginTop: 10 }}>
+                <button
+                  className="p-btn"
+                  onClick={runBackfill}
+                  disabled={backfilling}
+                >
+                  {backfilling ? "Running…" : backfillDryRun ? "Preview backfill" : "Run backfill"}
+                </button>
+              </div>
+              {backfillResult && (
+                <div style={{ marginTop: 12, fontSize: 12 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                    {backfillResult.summary.dryRun ? "Dry-run summary" : "Backfill summary"}
+                  </div>
+                  <pre className="p-mono" style={{ background: "var(--p-surface, #fff)", padding: 10, borderRadius: 6, border: "1px solid var(--p-border, #e2eddb)", fontSize: 11, margin: 0, overflowX: "auto" }}>
+                    {JSON.stringify(backfillResult.summary, null, 2)}
+                  </pre>
+                  <details style={{ marginTop: 8 }}>
+                    <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--p-text-muted, #6a7a6c)" }}>
+                      Per-member report ({backfillResult.report.length} rows)
+                    </summary>
+                    <pre className="p-mono" style={{ background: "var(--p-surface, #fff)", padding: 10, borderRadius: 6, border: "1px solid var(--p-border, #e2eddb)", fontSize: 11, margin: "8px 0 0 0", maxHeight: 320, overflow: "auto" }}>
+                      {JSON.stringify(backfillResult.report, null, 2)}
+                    </pre>
+                  </details>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="p-card-footer">
+        {cfg && (
+          <span className="p-subtle" style={{ fontSize: 11, marginRight: "auto", alignSelf: "center" }}>
+            Last updated {cfg.updated_at ? new Date(cfg.updated_at).toLocaleString() : "—"}
+          </span>
+        )}
+        <button
+          className="p-btn p-btn--primary"
+          onClick={save}
+          disabled={saving || (!cfg && (!tokenInput.trim() || !locationInput.trim()))}
+        >
+          {saving ? "Saving…" : "Save Square config"}
         </button>
       </div>
     </div>

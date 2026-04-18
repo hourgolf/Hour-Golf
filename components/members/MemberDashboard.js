@@ -5,6 +5,19 @@ import Modal from "../ui/Modal";
 import InstallPrompt from "./InstallPrompt";
 import { fT, fD, fDL } from "../../lib/format";
 
+// What the QR encodes:
+//   - If the member has a Square customer record linked, encode the member
+//     UUID. That same UUID is also written to Square's `reference_id`, so
+//     Square Register scans the QR and loads the customer profile natively.
+//   - Otherwise fall back to the legacy /verify?token=... URL so staff
+//     using a plain phone camera still land on the member-lookup page.
+function qrPayload(member) {
+  if (member.square_customer_id && member.id) return member.id;
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "https://hourgolf.vercel.app";
+  return `${origin}/verify?token=${member.verify_token}`;
+}
+
 export default function MemberDashboard({ member, tierConfig, refresh, showToast }) {
   const router = useRouter();
   const [usage, setUsage] = useState(null);
@@ -130,10 +143,7 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
         {member.verify_token && (
           <div className="mem-card" style={{ borderColor: "var(--primary)", cursor: "pointer" }} onClick={() => setShowQR(true)}>
             <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(
-                (typeof window !== "undefined" ? window.location.origin : "https://hourgolf.vercel.app") +
-                "/verify?token=" + member.verify_token
-              )}&color=35443B&bgcolor=FFFFFF`}
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(qrPayload(member))}&color=35443B&bgcolor=FFFFFF`}
               alt="QR"
               style={{ width: 48, height: 48, borderRadius: 4 }}
             />
@@ -150,10 +160,7 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
             Show this code at the register to apply your member discount.
           </p>
           <img
-            src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(
-              (typeof window !== "undefined" ? window.location.origin : "https://hourgolf.vercel.app") +
-              "/verify?token=" + member.verify_token
-            )}&color=35443B&bgcolor=FFFFFF`}
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qrPayload(member))}&color=35443B&bgcolor=FFFFFF`}
             alt="Member QR Code"
             style={{ width: 240, height: 240, borderRadius: 8, border: "1px solid var(--border)" }}
           />
