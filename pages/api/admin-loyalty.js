@@ -100,6 +100,24 @@ export default async function handler(req, res) {
         memberSpend[o.member_email] = (memberSpend[o.member_email] || 0) + Number(o.total || 0);
       });
 
+      // Fold in-store Square POS purchases into shop_spend, net of any
+      // refunds recorded against them. Filtering on billing_month keeps
+      // the window consistent with shop_orders.created_at. Refunds
+      // arriving AFTER this run don't claw back issued credit — the
+      // ledger dedup further down prevents re-processing — but they
+      // reduce future runs for that month if an admin re-triggers.
+      const sqResp = await sb(key, `payments?tenant_id=eq.${tenantId}&source=eq.square_pos&status=eq.succeeded&billing_month=gte.${monthStart}&billing_month=lt.${monthEnd}&select=member_email,amount_cents,refunded_cents`);
+      const squareRows = sqResp.ok ? await sqResp.json() : [];
+      squareRows.forEach((r) => {
+        const net = Math.max(
+          0,
+          Number(r.amount_cents || 0) - Number(r.refunded_cents || 0)
+        );
+        if (net > 0 && r.member_email) {
+          memberSpend[r.member_email] = (memberSpend[r.member_email] || 0) + net / 100;
+        }
+      });
+
       // Process each member against each rule
       let totalIssued = 0;
       let membersAffected = new Set();
