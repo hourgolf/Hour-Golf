@@ -1,22 +1,16 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import Head from "next/head";
 import Link from "next/link";
 import { usePlatformAuth } from "../../hooks/usePlatformAuth";
+import PlatformShell, { PlusIcon } from "../../components/platform/PlatformShell";
 
 export default function PlatformHome() {
   const router = useRouter();
-  const { apiKey, connected, authLoading, user, logout } = usePlatformAuth();
+  const { apiKey, connected } = usePlatformAuth();
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
-  // Redirect to login if not an authorized platform admin
-  useEffect(() => {
-    if (!authLoading && !connected) router.replace("/platform/login");
-  }, [connected, authLoading, router]);
-
-  // Load tenant list once we have a session
   useEffect(() => {
     if (!connected || !apiKey) return;
     let cancelled = false;
@@ -38,136 +32,116 @@ export default function PlatformHome() {
     return () => { cancelled = true; };
   }, [connected, apiKey]);
 
-  if (authLoading || !connected) {
-    return (
-      <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>
-        Loading…
-      </div>
-    );
-  }
-
   return (
-    <>
-      <Head>
-        <title>Ourlee Platform — Tenants</title>
-      </Head>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 20px" }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-          <div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: "var(--primary)", letterSpacing: 1 }}>
-              OURLEE
-            </div>
-            <div style={{ color: "var(--text-muted)", fontSize: 11, letterSpacing: 2 }}>
-              PLATFORM DASHBOARD
-            </div>
+    <PlatformShell
+      activeNav="tenants"
+      breadcrumbs={[{ label: "Tenants" }]}
+      title="Tenants"
+      subtitle={
+        tenants.length > 0
+          ? `${tenants.length} total — click a row to manage config and feature flags.`
+          : "Create and manage every tenant on the platform."
+      }
+      actions={
+        <Link href="/platform/tenants/new" className="p-btn p-btn--primary">
+          <PlusIcon />
+          <span>New tenant</span>
+        </Link>
+      }
+    >
+      {err && <div className="p-msg p-msg--error" style={{ marginBottom: 16 }}>{err}</div>}
+
+      <div className="p-card">
+        {loading ? (
+          <div className="p-card-body" style={{ color: "var(--p-text-muted)", textAlign: "center", padding: 48 }}>
+            Loading tenants…
           </div>
-          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            {user?.email}
-            <button
-              onClick={logout}
-              style={{ marginLeft: 12, fontSize: 11, padding: "4px 10px" }}
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "baseline", gap: 16, marginTop: 32 }}>
-          <h2 className="section-head" style={{ margin: 0 }}>
-            Tenants {tenants.length > 0 && <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>({tenants.length})</span>}
-          </h2>
-          <Link
-            href="/platform/tenants/new"
-            style={{ fontSize: 12, padding: "4px 12px", background: "var(--primary)", color: "var(--bg, #fff)", borderRadius: 999, textDecoration: "none" }}
-          >
-            + New tenant
-          </Link>
-        </div>
-
-        {err && <p className="err">{err}</p>}
-        {loading && <p style={{ color: "var(--text-muted)" }}>Loading tenants…</p>}
-
-        {!loading && tenants.length > 0 && (
-          <div className="tbl">
-            <div className="th">
-              <span style={{ flex: 2 }}>Tenant</span>
-              <span style={{ flex: 1 }}>Status</span>
-              <span style={{ flex: 1 }} className="text-r">Members</span>
-              <span style={{ flex: 1 }} className="text-r">Admins</span>
-              <span style={{ flex: 1 }} className="text-r">Features</span>
-              <span style={{ flex: 1 }} className="text-r">Stripe</span>
+        ) : tenants.length === 0 && !err ? (
+          <div className="p-card-body" style={{ textAlign: "center", padding: 48 }}>
+            <div style={{ fontSize: 14, color: "var(--p-text-muted)", marginBottom: 12 }}>
+              No tenants yet.
             </div>
-            {tenants.map((t) => (
-              <div
-                key={t.id}
-                className="tr click"
-                onClick={() => router.push(`/platform/tenants/${t.slug}`)}
-                style={{ cursor: "pointer" }}
-              >
-                <span style={{ flex: 2 }}>
-                  <strong>{t.name}</strong>
-                  <br />
-                  <span className="email-sm">{t.slug}.ourlee.co</span>
-                </span>
-                <span style={{ flex: 1 }}>
-                  <span
-                    className="badge"
-                    style={{
-                      background: t.status === "active" ? "#4C8D73" : "#9aa29b",
-                      color: "#EDF3E3",
-                      fontSize: 9,
-                    }}
+            <Link href="/platform/tenants/new" className="p-btn p-btn--primary">
+              <PlusIcon />
+              <span>Create the first tenant</span>
+            </Link>
+          </div>
+        ) : (
+          <div className="p-card-body p-card-body--flush">
+            <table className="p-table">
+              <thead>
+                <tr>
+                  <th style={{ width: "32%" }}>Tenant</th>
+                  <th style={{ width: "12%" }}>Status</th>
+                  <th style={{ width: "12%" }} className="p-table-num">Members</th>
+                  <th style={{ width: "12%" }} className="p-table-num">Admins</th>
+                  <th style={{ width: "14%" }} className="p-table-num">Features</th>
+                  <th style={{ width: "18%" }}>Stripe</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tenants.map((t) => (
+                  <tr
+                    key={t.id}
+                    className="is-clickable"
+                    onClick={() => router.push(`/platform/tenants/${t.slug}`)}
                   >
-                    {String(t.status || "").toUpperCase()}
-                  </span>
-                </span>
-                <span style={{ flex: 1 }} className="text-r tab-num">{t.member_count}</span>
-                <span style={{ flex: 1 }} className="text-r tab-num">{t.admin_count}</span>
-                <span style={{ flex: 1 }} className="text-r tab-num">
-                  {t.feature_summary.enabled}/{t.feature_summary.total}
-                </span>
-                <span style={{ flex: 1 }} className="text-r">
-                  {stripeLabel(t.stripe)}
-                </span>
-              </div>
-            ))}
+                    <td>
+                      <div style={{ fontWeight: 600, color: "var(--p-text)" }}>{t.name}</div>
+                      <div className="p-mono p-muted" style={{ marginTop: 2 }}>
+                        {t.slug}.ourlee.co
+                      </div>
+                    </td>
+                    <td>
+                      <StatusPill status={t.status} />
+                    </td>
+                    <td className="p-table-num">{t.member_count}</td>
+                    <td className="p-table-num">{t.admin_count}</td>
+                    <td className="p-table-num">
+                      {t.feature_summary.enabled}
+                      <span className="p-subtle"> / {t.feature_summary.total}</span>
+                    </td>
+                    <td>
+                      <StripeCell stripe={t.stripe} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
-
-        {!loading && tenants.length === 0 && !err && (
-          <p style={{ color: "var(--text-muted)" }}>No tenants yet.</p>
-        )}
-
-        <p style={{ marginTop: 32, fontSize: 11, color: "var(--text-muted)" }}>
-          Click a tenant to edit Stripe config or feature flags. Create / delete /
-          branding-from-platform come in a later slice.
-        </p>
       </div>
-    </>
+    </PlatformShell>
   );
 }
 
-function stripeLabel(s) {
-  if (!s) return <span className="muted">—</span>;
-  if (!s.enabled) {
-    return (
-      <span className="badge" style={{ background: "#9aa29b", color: "#EDF3E3", fontSize: 9 }}>
-        DISABLED
-      </span>
-    );
+function StatusPill({ status }) {
+  const s = String(status || "").toLowerCase();
+  if (s === "active") {
+    return <span className="p-pill p-pill--green"><span className="p-pill-dot" />Active</span>;
   }
-  const hasWhs = s.has_webhook_secret;
-  const modeColor = s.mode === "live" ? "#4C8D73" : "#C77B3C";
+  if (s === "suspended") {
+    return <span className="p-pill p-pill--amber">Suspended</span>;
+  }
+  return <span className="p-pill p-pill--gray">{s || "—"}</span>;
+}
+
+function StripeCell({ stripe }) {
+  if (!stripe) return <span className="p-subtle">—</span>;
+  if (!stripe.enabled) {
+    return <span className="p-pill p-pill--gray">Disabled</span>;
+  }
+  const isLive = stripe.mode === "live";
   return (
-    <span style={{ display: "inline-flex", gap: 4, alignItems: "center", justifyContent: "flex-end" }}>
-      <span className="badge" style={{ background: modeColor, color: "#EDF3E3", fontSize: 9 }}>
-        {String(s.mode || "").toUpperCase()}
+    <div className="p-row" style={{ gap: 6 }}>
+      <span className={`p-pill ${isLive ? "p-pill--green" : "p-pill--amber"}`}>
+        {String(stripe.mode || "").toUpperCase()}
       </span>
-      {!hasWhs && (
-        <span className="badge" title="No webhook_secret set" style={{ background: "var(--red)", color: "#EDF3E3", fontSize: 9 }}>
-          NO WHS
+      {!stripe.has_webhook_secret && (
+        <span className="p-pill p-pill--red" title="No webhook_secret set">
+          No WHS
         </span>
       )}
-    </span>
+    </div>
   );
 }

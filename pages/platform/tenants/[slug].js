@@ -1,8 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
-import Link from "next/link";
-import Head from "next/head";
 import { usePlatformAuth } from "../../../hooks/usePlatformAuth";
+import PlatformShell from "../../../components/platform/PlatformShell";
 import TenantBranding from "../../../components/settings/TenantBranding";
 
 const TABS = ["Overview", "Branding", "Stripe", "Seam", "Features"];
@@ -22,15 +21,11 @@ const FEATURE_KEYS = [
 export default function PlatformTenantDetail() {
   const router = useRouter();
   const { slug } = router.query;
-  const { apiKey, connected, authLoading } = usePlatformAuth();
+  const { apiKey, connected } = usePlatformAuth();
   const [detail, setDetail] = useState(null);
   const [tab, setTab] = useState("Overview");
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-
-  useEffect(() => {
-    if (!authLoading && !connected) router.replace("/platform/login");
-  }, [connected, authLoading, router]);
 
   const reload = useCallback(async () => {
     if (!slug || !apiKey) return;
@@ -49,81 +44,99 @@ export default function PlatformTenantDetail() {
     setLoading(false);
   }, [slug, apiKey]);
 
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => { if (connected) reload(); }, [reload, connected]);
 
-  if (authLoading || !connected) {
-    return <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>Loading…</div>;
-  }
+  const tenantName = detail?.tenant?.name || slug || "Tenant";
+  const tenantStatus = detail?.tenant?.status;
 
   return (
-    <>
-      <Head>
-        <title>{detail?.tenant?.name || slug} — Ourlee Platform</title>
-      </Head>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 20px" }}>
-        <Link href="/platform" style={{ fontSize: 11, color: "var(--text-muted)", letterSpacing: 1 }}>
-          ← All tenants
-        </Link>
+    <PlatformShell
+      activeNav="tenants"
+      breadcrumbs={[
+        { label: "Tenants", href: "/platform" },
+        { label: tenantName },
+      ]}
+      title={tenantName}
+      subtitle={
+        detail ? (
+          <span className="p-row" style={{ gap: 10, fontSize: 13, alignItems: "center" }}>
+            <StatusPill status={tenantStatus} />
+            <a
+              href={`https://${detail.tenant.slug}.ourlee.co`}
+              target="_blank"
+              rel="noreferrer"
+              className="p-mono"
+              style={{ color: "var(--p-text-muted)", textDecoration: "none" }}
+            >
+              {detail.tenant.slug}.ourlee.co <span aria-hidden>↗</span>
+            </a>
+          </span>
+        ) : undefined
+      }
+    >
+      {loading && !detail && (
+        <div className="p-muted" style={{ padding: 32 }}>Loading tenant…</div>
+      )}
+      {err && <div className="p-msg p-msg--error" style={{ marginBottom: 16 }}>{err}</div>}
 
-        {loading && <p style={{ color: "var(--text-muted)" }}>Loading tenant…</p>}
-        {err && <p className="err">{err}</p>}
-
-        {detail && (
-          <>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 16, marginTop: 16 }}>
-              <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>{detail.tenant.name}</h1>
-              <span
-                className="badge"
-                style={{
-                  background: detail.tenant.status === "active" ? "#4C8D73" : "#9aa29b",
-                  color: "#EDF3E3",
-                  fontSize: 9,
-                }}
+      {detail && (
+        <>
+          <div className="p-tabs">
+            {TABS.map((t) => (
+              <button
+                key={t}
+                className={`p-tab ${tab === t ? "is-active" : ""}`}
+                onClick={() => setTab(t)}
               >
-                {String(detail.tenant.status || "").toUpperCase()}
-              </span>
-              <a
-                href={`https://${detail.tenant.slug}.ourlee.co`}
-                target="_blank"
-                rel="noreferrer"
-                style={{ fontSize: 12, color: "var(--text-muted)" }}
-              >
-                {detail.tenant.slug}.ourlee.co ↗
-              </a>
-            </div>
+                {t}
+              </button>
+            ))}
+          </div>
 
-            <div style={{ display: "flex", gap: 4, marginTop: 24, borderBottom: "1px solid var(--border, #ddd)" }}>
-              {TABS.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  style={{
-                    padding: "8px 16px",
-                    border: 0,
-                    background: tab === t ? "var(--surface, #fff)" : "transparent",
-                    borderBottom: tab === t ? "2px solid var(--primary)" : "2px solid transparent",
-                    fontSize: 13,
-                    fontWeight: tab === t ? 600 : 400,
-                    color: tab === t ? "var(--text)" : "var(--text-muted)",
-                    cursor: "pointer",
-                  }}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
+          {tab === "Overview" && <OverviewTab detail={detail} apiKey={apiKey} onSaved={reload} />}
+          {tab === "Branding" && <BrandingTab detail={detail} apiKey={apiKey} />}
+          {tab === "Stripe" && <StripeTab detail={detail} apiKey={apiKey} onSaved={reload} />}
+          {tab === "Seam" && <SeamTab detail={detail} apiKey={apiKey} />}
+          {tab === "Features" && <FeaturesTab detail={detail} apiKey={apiKey} onSaved={reload} />}
+        </>
+      )}
+    </PlatformShell>
+  );
+}
 
-            <div style={{ padding: "24px 0" }}>
-              {tab === "Overview" && <OverviewTab detail={detail} apiKey={apiKey} onSaved={reload} />}
-              {tab === "Branding" && <BrandingTab detail={detail} apiKey={apiKey} />}
-              {tab === "Stripe" && <StripeTab detail={detail} apiKey={apiKey} onSaved={reload} />}
-              {tab === "Seam" && <SeamTab detail={detail} apiKey={apiKey} />}
-              {tab === "Features" && <FeaturesTab detail={detail} apiKey={apiKey} onSaved={reload} />}
-            </div>
-          </>
-        )}
+function StatusPill({ status }) {
+  const s = String(status || "").toLowerCase();
+  if (s === "active") {
+    return <span className="p-pill p-pill--green"><span className="p-pill-dot" />Active</span>;
+  }
+  if (s === "suspended") {
+    return <span className="p-pill p-pill--amber">Suspended</span>;
+  }
+  return <span className="p-pill p-pill--gray">{s || "—"}</span>;
+}
+
+// ───────────────────────────────────────────────────────────
+// Overview
+// ───────────────────────────────────────────────────────────
+
+function StatCard({ label, value, tone }) {
+  return (
+    <div className="p-card" style={{ padding: "14px 16px" }}>
+      <div className="p-muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+        {label}
       </div>
-    </>
+      <div
+        style={{
+          fontSize: 22,
+          fontWeight: 600,
+          marginTop: 4,
+          fontFamily: "var(--p-font-mono)",
+          color: tone === "green" ? "var(--p-primary-text)" : tone === "muted" ? "var(--p-text-muted)" : "var(--p-text)",
+        }}
+      >
+        {value}
+      </div>
+    </div>
   );
 }
 
@@ -184,7 +197,6 @@ function OverviewTab({ detail, apiKey, onSaved }) {
         if (d.counts) setDeleteBlockedCounts(d.counts);
         throw new Error(d.detail || d.error || "Delete failed");
       }
-      // Success — bounce back to the tenant list.
       router.replace("/platform");
     } catch (e) {
       setDeleteErr(e.message);
@@ -192,139 +204,166 @@ function OverviewTab({ detail, apiKey, onSaved }) {
     }
   }
 
+  const stripeValue = stripe
+    ? stripe.enabled
+      ? String(stripe.mode || "").toUpperCase()
+      : "DISABLED"
+    : "NONE";
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      <div className="summary">
-        <div className="sum-item">
-          <span className="sum-val">{stats.member_count}</span>
-          <span className="sum-lbl">Members</span>
-        </div>
-        <div className="sum-item">
-          <span className="sum-val">{stats.admin_count}</span>
-          <span className="sum-lbl">Admins</span>
-        </div>
-        <div className="sum-item">
-          <span className="sum-val">{enabledFeatures}/{features.length}</span>
-          <span className="sum-lbl">Features On</span>
-        </div>
-        <div className="sum-item">
-          <span className={`sum-val ${stripe?.enabled ? "green" : ""}`} style={{ fontSize: 18 }}>
-            {stripe ? (stripe.enabled ? stripe.mode?.toUpperCase() : "DISABLED") : "NONE"}
-          </span>
-          <span className="sum-lbl">Stripe</span>
-        </div>
+    <div className="p-stack">
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+        <StatCard label="Members" value={stats.member_count} />
+        <StatCard label="Admins" value={stats.admin_count} />
+        <StatCard label="Features on" value={`${enabledFeatures}/${features.length}`} />
+        <StatCard label="Stripe" value={stripeValue} tone={stripe?.enabled ? "green" : "muted"} />
       </div>
 
-      <div>
-        <h3 className="section-head">Tenant Admins</h3>
-        {admins.length === 0 && <p className="muted">None</p>}
-        {admins.length > 0 && (
-          <ul style={{ fontSize: 13, lineHeight: 1.8 }}>
-            {admins.map((a) => (
-              <li key={a.user_id}>{a.email}</li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div>
-        <h3 className="section-head">Tier Breakdown</h3>
-        {Object.entries(stats.tier_breakdown || {}).length === 0 && <p className="muted">No members yet</p>}
-        {Object.entries(stats.tier_breakdown || {}).map(([tier, count]) => (
-          <div key={tier} style={{ fontSize: 13, display: "flex", justifyContent: "space-between", maxWidth: 280 }}>
-            <span>{tier}</span>
-            <span className="tab-num">{count}</span>
+      {/* Admins + tier breakdown side-by-side */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div className="p-card">
+          <div className="p-card-header">
+            <div>
+              <div className="p-card-title">Tenant admins</div>
+              <div className="p-card-subtitle">Users linked to <code className="p-mono">admins</code> for this tenant</div>
+            </div>
+            <span className="p-pill p-pill--gray">{admins.length}</span>
           </div>
-        ))}
-      </div>
+          <div className="p-card-body">
+            {admins.length === 0 ? (
+              <div className="p-muted">None</div>
+            ) : (
+              <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
+                {admins.map((a) => (
+                  <li key={a.user_id} className="p-mono" style={{ color: "var(--p-text)" }}>
+                    {a.email}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
 
-      <div>
-        <h3 className="section-head">Status</h3>
-        <p className="muted" style={{ fontSize: 12, marginBottom: 10, maxWidth: 520 }}>
-          Suspended tenants return 404 on their subdomain when MULTI_TENANT_STRICT=true.
-          All data (bookings, members, orders, payments) is preserved.
-        </p>
-        <button
-          onClick={toggleStatus}
-          disabled={statusSaving}
-          style={{
-            padding: "8px 16px",
-            fontSize: 12,
-            background: tenant.status === "active" ? "var(--red)" : "var(--primary)",
-            color: "#EDF3E3",
-            border: 0,
-            borderRadius: 999,
-            cursor: statusSaving ? "wait" : "pointer",
-          }}
-        >
-          {statusSaving
-            ? "Saving…"
-            : tenant.status === "active"
-            ? "Suspend tenant"
-            : "Reactivate tenant"}
-        </button>
-        {statusErr && <p className="err" style={{ marginTop: 8 }}>{statusErr}</p>}
-      </div>
-
-      {tenant.status === "suspended" && (
-        <div>
-          <h3 className="section-head" style={{ color: "var(--red)" }}>Danger zone</h3>
-          <p className="muted" style={{ fontSize: 12, marginBottom: 10, maxWidth: 520 }}>
-            Hard-delete is only allowed on suspended tenants with zero data rows.
-            Branding, features, and Stripe config cascade. Bookings, members,
-            payments, shop orders, events, loyalty — any of these blocking will
-            abort the delete and show you which table(s) still hold rows.
-          </p>
-          <button
-            onClick={deleteTenant}
-            disabled={deleting}
-            style={{
-              padding: "8px 16px",
-              fontSize: 12,
-              background: "transparent",
-              color: "var(--red)",
-              border: "1.5px solid var(--red)",
-              borderRadius: 999,
-              cursor: deleting ? "wait" : "pointer",
-            }}
-          >
-            {deleting ? "Deleting…" : "Delete tenant permanently"}
-          </button>
-          {deleteErr && <p className="err" style={{ marginTop: 8 }}>{deleteErr}</p>}
-          {deleteBlockedCounts && (
-            <div style={{ marginTop: 8, fontSize: 11, color: "var(--text-muted)" }}>
-              <div style={{ marginBottom: 4, fontWeight: 600 }}>Blocking rows:</div>
-              {Object.entries(deleteBlockedCounts)
-                .filter(([, v]) => typeof v === "number" && v > 0)
-                .map(([tbl, n]) => (
-                  <div key={tbl}>
-                    <code>{tbl}</code>: {n}
+        <div className="p-card">
+          <div className="p-card-header">
+            <div>
+              <div className="p-card-title">Tier breakdown</div>
+              <div className="p-card-subtitle">Member count per membership tier</div>
+            </div>
+          </div>
+          <div className="p-card-body">
+            {Object.keys(stats.tier_breakdown || {}).length === 0 ? (
+              <div className="p-muted">No members yet</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
+                {Object.entries(stats.tier_breakdown).map(([tier, count]) => (
+                  <div key={tier} className="p-row-between">
+                    <span>{tier}</span>
+                    <span className="p-mono">{count}</span>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Status control */}
+      <div className="p-card">
+        <div className="p-card-header">
+          <div>
+            <div className="p-card-title">Status</div>
+            <div className="p-card-subtitle">
+              Suspended tenants return 404 on their subdomain. All data (bookings, members,
+              orders, payments) is preserved.
             </div>
-          )}
+          </div>
+          <StatusPill status={tenant.status} />
+        </div>
+        <div className="p-card-body" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            className={tenant.status === "active" ? "p-btn p-btn--danger" : "p-btn p-btn--primary"}
+            onClick={toggleStatus}
+            disabled={statusSaving}
+          >
+            {statusSaving
+              ? "Saving…"
+              : tenant.status === "active"
+              ? "Suspend tenant"
+              : "Reactivate tenant"}
+          </button>
+          {statusErr && <span className="p-msg p-msg--error" style={{ padding: "6px 10px" }}>{statusErr}</span>}
+        </div>
+      </div>
+
+      {/* Danger zone, only visible when suspended */}
+      {tenant.status === "suspended" && (
+        <div className="p-card" style={{ borderColor: "#fecaca" }}>
+          <div className="p-card-header" style={{ background: "var(--p-danger-soft)" }}>
+            <div>
+              <div className="p-card-title" style={{ color: "var(--p-danger-text)" }}>Danger zone</div>
+              <div className="p-card-subtitle" style={{ color: "var(--p-danger-text)" }}>
+                Hard-delete is only allowed on suspended tenants with zero data rows.
+                Branding, features, and Stripe config cascade. Bookings, members,
+                payments, shop orders, events, loyalty — any of these blocking will
+                abort the delete and show which table(s) still hold rows.
+              </div>
+            </div>
+          </div>
+          <div className="p-card-body">
+            <button
+              className="p-btn p-btn--danger-solid"
+              onClick={deleteTenant}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting…" : "Delete tenant permanently"}
+            </button>
+            {deleteErr && <div className="p-msg p-msg--error" style={{ marginTop: 12 }}>{deleteErr}</div>}
+            {deleteBlockedCounts && (
+              <div style={{ marginTop: 12, fontSize: 12 }}>
+                <div style={{ fontWeight: 600, marginBottom: 6, color: "var(--p-text)" }}>Blocking rows:</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  {Object.entries(deleteBlockedCounts)
+                    .filter(([, v]) => typeof v === "number" && v > 0)
+                    .map(([tbl, n]) => (
+                      <div key={tbl} className="p-mono" style={{ color: "var(--p-text-muted)" }}>
+                        {tbl}: {n}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+      <div className="p-subtle" style={{ fontSize: 11 }}>
         Created {new Date(tenant.created_at).toLocaleString()}
       </div>
     </div>
   );
 }
 
+// ───────────────────────────────────────────────────────────
+// Branding tab — delegates to the shared editor
+// ───────────────────────────────────────────────────────────
+
 function BrandingTab({ detail, apiKey }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ background: "#f6f7f4", padding: 14, borderRadius: 8, fontSize: 12, color: "var(--text-muted)" }}>
+    <div className="p-stack">
+      <div className="p-msg p-msg--info">
         Editing <strong>{detail.tenant.name}</strong>&rsquo;s branding. Uploads land in that tenant&rsquo;s
-        folder; saves flush the branding cache so changes show up on
-        <code> {detail.tenant.slug}.ourlee.co</code> within the next request.
+        folder; saves flush the branding cache so changes show up on <code className="p-mono">{detail.tenant.slug}.ourlee.co</code> within the next request.
       </div>
       <TenantBranding apiKey={apiKey} tenantIdOverride={detail.tenant.id} />
     </div>
   );
 }
+
+// ───────────────────────────────────────────────────────────
+// Stripe
+// ───────────────────────────────────────────────────────────
 
 function StripeTab({ detail, apiKey, onSaved }) {
   const s = detail.stripe;
@@ -364,48 +403,78 @@ function StripeTab({ detail, apiKey, onSaved }) {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 600 }}>
-      <div style={{ background: "#f6f7f4", padding: 14, borderRadius: 8, fontSize: 12, color: "var(--text-muted)" }}>
-        Secrets are write-only. Existing values are masked (last 4 chars shown). Leave a field
-        blank to keep it unchanged. Clear publishable / webhook by submitting <code>null</code>
-        via the API — this UI can only set values.
-      </div>
-
-      <div className="mf">
-        <label>Mode</label>
-        <select value={mode} onChange={(e) => setMode(e.target.value)}>
-          <option value="test">Test</option>
-          <option value="live">Live</option>
-        </select>
-      </div>
-
-      <div className="mf">
-        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-          <span>Enabled (kill-switch — off means getStripeClient throws)</span>
-        </label>
-      </div>
-
-      <KeyRow label="Secret key" existing={s?.secret_key} placeholder="sk_live_... or sk_test_..." value={sk} onChange={setSk} />
-      <KeyRow label="Publishable key" existing={s?.publishable_key} placeholder="pk_live_... or pk_test_... (optional)" value={pk} onChange={setPk} />
-      <KeyRow label="Webhook signing secret" existing={s?.webhook_secret} placeholder="whsec_..." value={whs} onChange={setWhs} />
-
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <button className="btn primary" onClick={save} disabled={saving} style={{ padding: "10px 24px", fontSize: 13 }}>
-          {saving ? "Saving…" : "Save Stripe config."}
-        </button>
-        {status && <span style={{ color: "var(--primary)", fontSize: 12 }}>{status}</span>}
-        {err && <span style={{ color: "var(--red)", fontSize: 12 }}>{err}</span>}
-      </div>
-
-      {s && (
-        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-          Last updated {s.updated_at ? new Date(s.updated_at).toLocaleString() : "—"}
+    <div className="p-card" style={{ maxWidth: 720 }}>
+      <div className="p-card-header">
+        <div>
+          <div className="p-card-title">Stripe configuration</div>
+          <div className="p-card-subtitle">
+            Secrets are write-only. Existing values are masked (prefix + last 4). Leave a
+            field blank to keep its current value.
+          </div>
         </div>
-      )}
+        <span className={`p-pill ${s?.enabled ? "p-pill--green" : "p-pill--gray"}`}>
+          {s ? (s.enabled ? "Enabled" : "Disabled") : "Not configured"}
+        </span>
+      </div>
+      <div className="p-card-body">
+        <div className="p-stack">
+          <div className="p-form-grid">
+            <div className="p-field">
+              <label className="p-field-label" htmlFor="stripe-mode">Mode</label>
+              <select
+                id="stripe-mode"
+                className="p-select"
+                value={mode}
+                onChange={(e) => setMode(e.target.value)}
+              >
+                <option value="test">Test</option>
+                <option value="live">Live</option>
+              </select>
+            </div>
+            <div className="p-field">
+              <label className="p-field-label">Kill switch</label>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0" }}>
+                <input
+                  className="p-checkbox"
+                  type="checkbox"
+                  checked={enabled}
+                  onChange={(e) => setEnabled(e.target.checked)}
+                />
+                <span style={{ fontSize: 13 }}>
+                  Enabled
+                  <span className="p-subtle" style={{ fontSize: 11, marginLeft: 6 }}>
+                    — off means <code className="p-mono">getStripeClient</code> throws
+                  </span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <KeyRow label="Secret key" existing={s?.secret_key} placeholder="sk_live_… or sk_test_…" value={sk} onChange={setSk} />
+          <KeyRow label="Publishable key (optional)" existing={s?.publishable_key} placeholder="pk_live_… or pk_test_…" value={pk} onChange={setPk} />
+          <KeyRow label="Webhook signing secret" existing={s?.webhook_secret} placeholder="whsec_…" value={whs} onChange={setWhs} />
+
+          {status && <div className="p-msg p-msg--ok">{status}</div>}
+          {err && <div className="p-msg p-msg--error">{err}</div>}
+        </div>
+      </div>
+      <div className="p-card-footer">
+        {s && (
+          <span className="p-subtle" style={{ fontSize: 11, marginRight: "auto", alignSelf: "center" }}>
+            Last updated {s.updated_at ? new Date(s.updated_at).toLocaleString() : "—"}
+          </span>
+        )}
+        <button className="p-btn p-btn--primary" onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Save Stripe config"}
+        </button>
+      </div>
     </div>
   );
 }
+
+// ───────────────────────────────────────────────────────────
+// Seam
+// ───────────────────────────────────────────────────────────
 
 function SeamTab({ detail, apiKey }) {
   const tenantId = detail.tenant.id;
@@ -466,104 +535,100 @@ function SeamTab({ detail, apiKey }) {
     setSaving(false);
   }
 
-  if (loading) return <p className="muted">Loading Seam config…</p>;
+  if (loading) return <div className="p-muted">Loading Seam config…</div>;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 600 }}>
-      <div style={{ background: "#f6f7f4", padding: 14, borderRadius: 8, fontSize: 12, color: "var(--text-muted)" }}>
-        Seam (smart-lock) credentials used by the <code>process-access-codes</code>
-        edge function to generate per-booking door codes. Only relevant when the
-        Access Codes feature is enabled. Secrets are write-only — existing values
-        are masked (prefix + last 4). Leave the api_key field blank to keep the
-        current key.
-      </div>
-
-      <div className="mf">
-        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-          <span>Enabled (kill-switch — off pauses code generation without deleting keys)</span>
-        </label>
-      </div>
-
-      <KeyRow
-        label="Seam API key"
-        existing={cfg?.api_key}
-        placeholder="seam_..."
-        value={apiInput}
-        onChange={setApiInput}
-      />
-
-      <div className="mf">
-        <label>Seam Device ID</label>
-        <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>
-          {cfg?.device_id
-            ? <>Current: <code>{cfg.device_id}</code></>
-            : <>Not configured</>
-          }
+    <div className="p-card" style={{ maxWidth: 720 }}>
+      <div className="p-card-header">
+        <div>
+          <div className="p-card-title">Seam (smart-lock) configuration</div>
+          <div className="p-card-subtitle">
+            Credentials used by <code className="p-mono">process-access-codes</code> to
+            generate per-booking door codes. Only relevant when the Access Codes feature is enabled.
+          </div>
         </div>
-        <input
-          type="text"
-          value={deviceInput}
-          onChange={(e) => setDeviceInput(e.target.value)}
-          placeholder="uuid of the physical smart lock in Seam"
-          style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 12 }}
-        />
+        <span className={`p-pill ${cfg?.enabled ? "p-pill--green" : "p-pill--gray"}`}>
+          {cfg ? (cfg.enabled ? "Enabled" : "Disabled") : "Not configured"}
+        </span>
       </div>
+      <div className="p-card-body">
+        <div className="p-stack">
+          <div className="p-field">
+            <label className="p-field-label">Kill switch</label>
+            <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0" }}>
+              <input
+                className="p-checkbox"
+                type="checkbox"
+                checked={enabled}
+                onChange={(e) => setEnabled(e.target.checked)}
+              />
+              <span style={{ fontSize: 13 }}>
+                Enabled
+                <span className="p-subtle" style={{ fontSize: 11, marginLeft: 6 }}>
+                  — off pauses code generation without deleting keys
+                </span>
+              </span>
+            </label>
+          </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <KeyRow
+            label="Seam API key"
+            existing={cfg?.api_key}
+            placeholder="seam_…"
+            value={apiInput}
+            onChange={setApiInput}
+          />
+
+          <div className="p-field">
+            <label className="p-field-label" htmlFor="seam-device">Seam device ID</label>
+            <div className="p-field-hint">
+              {cfg?.device_id
+                ? <>Current: <code className="p-mono">{cfg.device_id}</code></>
+                : <>Not configured</>
+              }
+            </div>
+            <input
+              id="seam-device"
+              className="p-input p-input--mono"
+              type="text"
+              value={deviceInput}
+              onChange={(e) => setDeviceInput(e.target.value)}
+              placeholder="uuid of the physical smart lock in Seam"
+            />
+          </div>
+
+          {status && <div className="p-msg p-msg--ok">{status}</div>}
+          {err && <div className="p-msg p-msg--error">{err}</div>}
+        </div>
+      </div>
+      <div className="p-card-footer">
+        {cfg && (
+          <span className="p-subtle" style={{ fontSize: 11, marginRight: "auto", alignSelf: "center" }}>
+            Last updated {cfg.updated_at ? new Date(cfg.updated_at).toLocaleString() : "—"}
+          </span>
+        )}
         <button
-          className="btn primary"
+          className="p-btn p-btn--primary"
           onClick={save}
           disabled={saving || (!cfg && (!apiInput.trim() || !deviceInput.trim()))}
-          style={{ padding: "10px 24px", fontSize: 13 }}
         >
-          {saving ? "Saving…" : "Save Seam config."}
+          {saving ? "Saving…" : "Save Seam config"}
         </button>
-        {status && <span style={{ color: "var(--primary)", fontSize: 12 }}>{status}</span>}
-        {err && <span style={{ color: "var(--red)", fontSize: 12 }}>{err}</span>}
       </div>
-
-      {cfg && (
-        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-          Last updated {cfg.updated_at ? new Date(cfg.updated_at).toLocaleString() : "—"}
-        </div>
-      )}
     </div>
   );
 }
 
-function KeyRow({ label, existing, placeholder, value, onChange }) {
-  const [show, setShow] = useState(false);
-  return (
-    <div className="mf">
-      <label>{label}</label>
-      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>
-        {existing
-          ? <>Current: <code>{existing.prefix}</code>…<code>{existing.last4}</code> ({existing.length} chars)</>
-          : <>Not configured</>
-        }
-      </div>
-      <input
-        type={show ? "text" : "password"}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 12 }}
-      />
-      <label style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
-        <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} />
-        <span>Show value while typing</span>
-      </label>
-    </div>
-  );
-}
+// ───────────────────────────────────────────────────────────
+// Features
+// ───────────────────────────────────────────────────────────
 
 function FeaturesTab({ detail, apiKey, onSaved }) {
   const tenantId = detail.tenant.id;
   const current = {};
   (detail.features || []).forEach((f) => { current[f.feature_key] = !!f.enabled; });
 
-  const [pending, setPending] = useState({}); // feature_key -> "saving" | "saved" | "err"
+  const [pending, setPending] = useState({});
   const [err, setErr] = useState("");
 
   async function toggle(key, nextEnabled) {
@@ -585,45 +650,95 @@ function FeaturesTab({ detail, apiKey, onSaved }) {
     }
   }
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 720 }}>
-      <div style={{ background: "#f6f7f4", padding: 14, borderRadius: 8, fontSize: 12, color: "var(--text-muted)" }}>
-        Nothing in the app reads tenant_features yet — Phase 4 wires these toggles to
-        <code> assertFeature</code> guards and the <code>useTenantFeatures</code> hook.
-        Toggling here writes DB rows so the data is ready when Phase 4 lands.
-      </div>
+  const onCount = Object.values(current).filter(Boolean).length;
 
-      <div className="tbl">
-        <div className="th">
-          <span style={{ flex: 2 }}>Feature</span>
-          <span style={{ flex: 3 }}>Description</span>
-          <span style={{ flex: 1 }} className="text-r">Enabled</span>
+  return (
+    <div className="p-card" style={{ maxWidth: 900 }}>
+      <div className="p-card-header">
+        <div>
+          <div className="p-card-title">Feature flags</div>
+          <div className="p-card-subtitle">
+            Each toggle writes one row in <code className="p-mono">tenant_features</code>.
+            Server-side <code className="p-mono">assertFeature</code> and the client
+            <code className="p-mono"> useTenantFeatures</code> hook honor these.
+          </div>
         </div>
-        {FEATURE_KEYS.map(({ key, label, hint }) => {
-          const isOn = !!current[key];
-          const state = pending[key];
-          return (
-            <div key={key} className="tr">
-              <span style={{ flex: 2 }}><strong>{label}</strong><br /><code style={{ fontSize: 10, color: "var(--text-muted)" }}>{key}</code></span>
-              <span style={{ flex: 3, fontSize: 12, color: "var(--text-muted)" }}>{hint}</span>
-              <span style={{ flex: 1 }} className="text-r">
-                <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <input
-                    type="checkbox"
-                    checked={isOn}
-                    disabled={state === "saving"}
-                    onChange={(e) => toggle(key, e.target.checked)}
-                  />
-                  {state === "saving" && <span style={{ fontSize: 10, color: "var(--text-muted)" }}>…</span>}
-                  {state === "saved" && <span style={{ fontSize: 10, color: "var(--primary)" }}>✓</span>}
-                  {state === "err" && <span style={{ fontSize: 10, color: "var(--red)" }}>err</span>}
-                </label>
-              </span>
-            </div>
-          );
-        })}
+        <span className="p-pill p-pill--green">{onCount} on</span>
       </div>
-      {err && <p className="err">{err}</p>}
+      <div className="p-card-body p-card-body--flush">
+        <table className="p-table">
+          <thead>
+            <tr>
+              <th style={{ width: "26%" }}>Feature</th>
+              <th>Description</th>
+              <th style={{ width: 120, textAlign: "right" }}>Enabled</th>
+            </tr>
+          </thead>
+          <tbody>
+            {FEATURE_KEYS.map(({ key, label, hint }) => {
+              const isOn = !!current[key];
+              const state = pending[key];
+              return (
+                <tr key={key}>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{label}</div>
+                    <div className="p-mono p-muted" style={{ marginTop: 2 }}>{key}</div>
+                  </td>
+                  <td className="p-muted">{hint}</td>
+                  <td style={{ textAlign: "right" }}>
+                    <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      {state === "saving" && <span className="p-subtle" style={{ fontSize: 11 }}>saving…</span>}
+                      {state === "saved" && <span style={{ color: "var(--p-primary-text)", fontSize: 11 }}>✓</span>}
+                      {state === "err" && <span style={{ color: "var(--p-danger-text)", fontSize: 11 }}>err</span>}
+                      <input
+                        className="p-checkbox"
+                        type="checkbox"
+                        checked={isOn}
+                        disabled={state === "saving"}
+                        onChange={(e) => toggle(key, e.target.checked)}
+                      />
+                    </label>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {err && <div className="p-card-footer" style={{ justifyContent: "flex-start" }}>
+        <div className="p-msg p-msg--error">{err}</div>
+      </div>}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// KeyRow — used by Stripe + Seam for write-only secrets
+// ───────────────────────────────────────────────────────────
+
+function KeyRow({ label, existing, placeholder, value, onChange }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="p-field">
+      <label className="p-field-label">{label}</label>
+      <div className="p-field-hint">
+        {existing ? (
+          <>Current: <code className="p-mono">{existing.prefix}</code>…<code className="p-mono">{existing.last4}</code> ({existing.length} chars)</>
+        ) : (
+          <>Not configured</>
+        )}
+      </div>
+      <input
+        className="p-input p-input--mono"
+        type={show ? "text" : "password"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
+      <label style={{ fontSize: 11, color: "var(--p-text-muted)", display: "flex", alignItems: "center", gap: 6 }}>
+        <input className="p-checkbox" type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} />
+        <span>Show value while typing</span>
+      </label>
     </div>
   );
 }
