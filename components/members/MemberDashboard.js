@@ -196,7 +196,7 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
         {member.verify_token && (
           <div className="mem-card" style={{ borderColor: "var(--primary)", cursor: "pointer" }} onClick={() => setShowQR(true)}>
             <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(qrPayload(member))}&color=35443B&bgcolor=FFFFFF`}
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(qrPayload(member))}&color=4C8D73&bgcolor=FFFFFF`}
               alt="QR"
               style={{ width: 48, height: 48, borderRadius: 4 }}
             />
@@ -213,7 +213,7 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
             Show this code at the register to apply your member discount.
           </p>
           <img
-            src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qrPayload(member))}&color=35443B&bgcolor=FFFFFF`}
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qrPayload(member))}&color=4C8D73&bgcolor=FFFFFF`}
             alt="Member QR Code"
             style={{ width: 240, height: 240, borderRadius: 8 }}
           />
