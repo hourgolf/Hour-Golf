@@ -234,16 +234,12 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
     setSheetBooking(false);
   }
 
-  // Lock body scroll and hide floating FABs while sheet is open.
+  // Lock body scroll while sheet is open.
   useEffect(() => {
     if (!sheetOpen) return;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    document.body.classList.add("mem-sheet-open");
-    return () => {
-      document.body.style.overflow = prevOverflow;
-      document.body.classList.remove("mem-sheet-open");
-    };
+    return () => { document.body.style.overflow = prevOverflow; };
   }, [sheetOpen]);
 
   const canSubmitSheet = hasCard
