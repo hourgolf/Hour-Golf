@@ -1,0 +1,288 @@
+import { useState, useEffect, useRef, useMemo } from "react";
+
+// ---- date utilities ------------------------------------------------------
+
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+function toISODate(y, monthIdx, d) {
+  return `${y}-${pad2(monthIdx + 1)}-${pad2(d)}`;
+}
+
+function parseISODate(s) {
+  const [y, m, d] = s.split("-").map(Number);
+  return { y, m: m - 1, d };
+}
+
+function todayInTZ(tz) {
+  return new Date().toLocaleDateString("en-CA", { timeZone: tz });
+}
+
+function formatDisplay(iso) {
+  const { y, m, d } = parseISODate(iso);
+  // Noon local time dodges DST rollover weirdness for display only.
+  const dt = new Date(y, m, d, 12);
+  return dt.toLocaleDateString("en-US", {
+    weekday: "short", month: "short", day: "numeric", year: "numeric",
+  });
+}
+
+function daysInMonth(y, monthIdx) {
+  return new Date(y, monthIdx + 1, 0).getDate();
+}
+
+// JS getDay(): Sunday=0..Saturday=6.  Monday-first remap: Mon=0..Sun=6.
+function mondayFirstWeekday(jsDay) {
+  return (jsDay + 6) % 7;
+}
+
+const WEEKDAYS_MON_FIRST = ["M", "T", "W", "T", "F", "S", "S"];
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+// ---- component -----------------------------------------------------------
+
+export default function DatePicker({
+  value,
+  onChange,
+  min,
+  max,
+  timezone = "America/Los_Angeles",
+  placeholder = "Pick a date",
+}) {
+  const today = todayInTZ(timezone);
+  const initial = value || today;
+  const { y: initY, m: initM } = parseISODate(initial);
+
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState({ y: initY, m: initM });
+  const [focusedISO, setFocusedISO] = useState(initial);
+
+  const triggerRef = useRef(null);
+  const popoverRef = useRef(null);
+  const gridRef = useRef(null);
+
+  // Sync view + focus when value changes externally (e.g. today changes at midnight).
+  useEffect(() => {
+    if (!value) return;
+    const { y, m } = parseISODate(value);
+    setView({ y, m });
+    setFocusedISO(value);
+  }, [value]);
+
+  // Escape + outside-click while open.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    const onDown = (e) => {
+      if (popoverRef.current?.contains(e.target)) return;
+      if (triggerRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [open]);
+
+  // Move DOM focus to the focused cell whenever it changes while open.
+  useEffect(() => {
+    if (!open) return;
+    const el = gridRef.current?.querySelector(`[data-iso="${focusedISO}"]`);
+    el?.focus({ preventScroll: true });
+  }, [open, focusedISO]);
+
+  function openPicker() {
+    const start = value || today;
+    const { y, m } = parseISODate(start);
+    setView({ y, m });
+    setFocusedISO(start);
+    setOpen(true);
+  }
+
+  function isDisabled(iso) {
+    if (min && iso < min) return true;
+    if (max && iso > max) return true;
+    return false;
+  }
+
+  function selectDate(iso) {
+    if (isDisabled(iso)) return;
+    onChange(iso);
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  function changeMonth(delta) {
+    const next = new Date(view.y, view.m + delta, 1);
+    setView({ y: next.getFullYear(), m: next.getMonth() });
+  }
+
+  function moveFocus(days) {
+    const { y, m, d } = parseISODate(focusedISO);
+    const next = new Date(y, m, d + days);
+    const nextISO = toISODate(next.getFullYear(), next.getMonth(), next.getDate());
+    if (isDisabled(nextISO)) return;
+    setFocusedISO(nextISO);
+    if (next.getFullYear() !== view.y || next.getMonth() !== view.m) {
+      setView({ y: next.getFullYear(), m: next.getMonth() });
+    }
+  }
+
+  function onGridKeyDown(e) {
+    switch (e.key) {
+      case "ArrowLeft":  e.preventDefault(); moveFocus(-1); break;
+      case "ArrowRight": e.preventDefault(); moveFocus(1);  break;
+      case "ArrowUp":    e.preventDefault(); moveFocus(-7); break;
+      case "ArrowDown":  e.preventDefault(); moveFocus(7);  break;
+      case "Enter":
+      case " ":
+        e.preventDefault();
+        selectDate(focusedISO);
+        break;
+      default: break;
+    }
+  }
+
+  // 6 x 7 = 42 cells, Monday-first, with leading/trailing days from adjacent months.
+  const grid = useMemo(() => {
+    const { y, m } = view;
+    const firstDow = mondayFirstWeekday(new Date(y, m, 1).getDay());
+    const thisMonthDays = daysInMonth(y, m);
+    const prevMonthDays = daysInMonth(y, m - 1);
+    const cells = [];
+    for (let i = firstDow - 1; i >= 0; i--) {
+      const day = prevMonthDays - i;
+      const dt = new Date(y, m - 1, day);
+      cells.push({ iso: toISODate(dt.getFullYear(), dt.getMonth(), day), day, inMonth: false });
+    }
+    for (let d = 1; d <= thisMonthDays; d++) {
+      cells.push({ iso: toISODate(y, m, d), day: d, inMonth: true });
+    }
+    let nd = 1;
+    while (cells.length < 42) {
+      const dt = new Date(y, m + 1, nd);
+      cells.push({ iso: toISODate(dt.getFullYear(), dt.getMonth(), nd), day: nd, inMonth: false });
+      nd++;
+    }
+    return cells;
+  }, [view]);
+
+  const firstOfView = toISODate(view.y, view.m, 1);
+  const lastOfView  = toISODate(view.y, view.m, daysInMonth(view.y, view.m));
+  const canPrev = !min || firstOfView > min;
+  const canNext = !max || lastOfView < max;
+
+  return (
+    <div className="hg-datepicker">
+      <button
+        type="button"
+        ref={triggerRef}
+        className="hg-dp-trigger"
+        onClick={() => (open ? setOpen(false) : openPicker())}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+      >
+        <span className={value ? "" : "hg-dp-placeholder"}>
+          {value ? formatDisplay(value) : placeholder}
+        </span>
+        <svg className="hg-dp-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8"  y1="2" x2="8"  y2="6" />
+          <line x1="3"  y1="10" x2="21" y2="10" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="hg-dp-popover" ref={popoverRef} role="dialog" aria-label="Choose a date">
+          <div className="hg-dp-head">
+            <button
+              type="button"
+              className="hg-dp-nav"
+              onClick={() => changeMonth(-1)}
+              disabled={!canPrev}
+              aria-label="Previous month"
+            >
+              &lsaquo;
+            </button>
+            <div className="hg-dp-month">{MONTHS[view.m]} {view.y}</div>
+            <button
+              type="button"
+              className="hg-dp-nav"
+              onClick={() => changeMonth(1)}
+              disabled={!canNext}
+              aria-label="Next month"
+            >
+              &rsaquo;
+            </button>
+          </div>
+
+          <div className="hg-dp-weekdays">
+            {WEEKDAYS_MON_FIRST.map((w, i) => (
+              <div key={i} className="hg-dp-weekday">{w}</div>
+            ))}
+          </div>
+
+          <div className="hg-dp-grid" ref={gridRef} role="grid" onKeyDown={onGridKeyDown}>
+            {grid.map((cell) => {
+              const disabled = isDisabled(cell.iso);
+              const selected = cell.iso === value;
+              const isToday  = cell.iso === today;
+              const focused  = cell.iso === focusedISO;
+              const cls = [
+                "hg-dp-cell",
+                selected && "selected",
+                isToday && "today",
+                !cell.inMonth && "out",
+                disabled && "disabled",
+              ].filter(Boolean).join(" ");
+              return (
+                <button
+                  type="button"
+                  key={cell.iso}
+                  data-iso={cell.iso}
+                  className={cls}
+                  onClick={() => selectDate(cell.iso)}
+                  disabled={disabled}
+                  tabIndex={focused ? 0 : -1}
+                  aria-selected={selected}
+                  aria-current={isToday ? "date" : undefined}
+                >
+                  {cell.day}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="hg-dp-foot">
+            <button
+              type="button"
+              className="hg-dp-today"
+              onClick={() => selectDate(today)}
+              disabled={isDisabled(today)}
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              className="hg-dp-close"
+              onClick={() => { setOpen(false); triggerRef.current?.focus(); }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

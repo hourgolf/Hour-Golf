@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { BAYS, TZ } from "../../lib/constants";
 import { fT, fDL } from "../../lib/format";
 import { useBranding } from "../../hooks/useBranding";
+import DatePicker from "../DatePicker";
 
 function buildHours(startHour, endHour) {
   const hours = [];
@@ -254,14 +255,6 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
     ? branding.support_email
     : (branding?.support_phone || null);
 
-  // Accept the user's raw selection so out-of-range dates surface the
-  // existing error message instead of silently snapping to day 7.
-  function handleDateChange(e) {
-    const val = e.target.value;
-    if (!val) return;
-    setBookDate(val);
-  }
-
   return (
     <>
       {!hasCard && (
@@ -284,12 +277,12 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
         <div className="mem-book-form">
           <div className="mem-form-row">
             <label>Date</label>
-            <input
-              type="date"
+            <DatePicker
               value={bookDate}
+              onChange={setBookDate}
               min={todayStr}
               max={maxDateStr}
-              onChange={handleDateChange}
+              timezone={TZ}
             />
             <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
               Book up to 7 days in advance.
