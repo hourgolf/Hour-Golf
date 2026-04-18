@@ -49,6 +49,16 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
   const [bookMsg, setBookMsg] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
 
+  // Quick-book sheet state — opened by tapping an availability cell.
+  // Keeps its own bay/start/end/terms so the top form isn't clobbered.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetBay, setSheetBay] = useState("Bay 1");
+  const [sheetStart, setSheetStart] = useState(defaultStart);
+  const [sheetEnd, setSheetEnd] = useState(defaultEnd);
+  const [sheetTerms, setSheetTerms] = useState(false);
+  const [sheetBooking, setSheetBooking] = useState(false);
+  const [sheetMsg, setSheetMsg] = useState("");
+
   // Filter hours: if booking today, hide times that have already passed
   const isToday = bookDate === todayStr;
   const currentTime = nowPacific();
@@ -94,6 +104,34 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
   const dateTooFar = bookDate > maxDateStr;
   const timeInPast = isToday && bookStartTime < currentTime;
 
+  // Shared POST to /api/customer-book. Callers handle their own UI reset.
+  async function postBooking({ date, startTime, endTime, bay }) {
+    const r = await fetch("/api/customer-book", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        email: member.email,
+        name: member.name,
+        date,
+        startTime,
+        endTime,
+        bay,
+        terms_accepted: true,
+      }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || d.detail || "Booking failed");
+    return d;
+  }
+
+  function refetchAvailability() {
+    fetch(`/api/customer-availability?date=${bookDate}`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => setAvailability(d.bookings || []))
+      .catch(() => {});
+  }
+
   async function handleBook() {
     // Client-side validation
     if (dateInPast) { setBookMsg("Cannot book in the past."); return; }
@@ -103,22 +141,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
     setBooking(true);
     setBookMsg("");
     try {
-      const r = await fetch("/api/customer-book", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          email: member.email,
-          name: member.name,
-          date: bookDate,
-          startTime: bookStartTime,
-          endTime: bookEndTime,
-          bay: bookBay,
-          terms_accepted: true,
-        }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || d.detail || "Booking failed");
+      await postBooking({ date: bookDate, startTime: bookStartTime, endTime: bookEndTime, bay: bookBay });
       showToast("\u2713 Booking confirmed! Check your email.");
       // Advance to the slot right after what was just booked so the form
       // doesn't immediately show a red conflict against the new booking.
@@ -140,15 +163,96 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
       }
       setBookBay("Bay 1");
       setTermsAccepted(false);
-      fetch(`/api/customer-availability?date=${bookDate}`, { credentials: "include" })
-        .then((r) => r.json())
-        .then((d) => setAvailability(d.bookings || []))
-        .catch(() => {});
+      refetchAvailability();
     } catch (err) {
       setBookMsg(err.message);
     }
     setBooking(false);
   }
+
+  // ---- Quick-book sheet ---------------------------------------------------
+
+  function openSheet(bay, h) {
+    setSheetBay(bay);
+    setSheetStart(h);
+    // Default to a 1-hour booking (4 x 15-min slots) when possible.
+    const idx = ALL_HOURS.indexOf(h);
+    const endIdx = idx >= 0 ? Math.min(idx + 4, ALL_HOURS.length - 1) : -1;
+    setSheetEnd(endIdx > idx ? ALL_HOURS[endIdx] : (idx + 1 < ALL_HOURS.length ? ALL_HOURS[idx + 1] : h));
+    setSheetTerms(false);
+    setSheetMsg("");
+    setSheetOpen(true);
+  }
+
+  function closeSheet() {
+    if (sheetBooking) return;
+    setSheetOpen(false);
+    setSheetMsg("");
+  }
+
+  const sheetDurationHrs = sheetStart && sheetEnd
+    ? Math.max(0, (new Date(`${bookDate}T${sheetEnd}:00`) - new Date(`${bookDate}T${sheetStart}:00`)) / 3600000)
+    : 0;
+
+  const sheetConflict = sheetStart && sheetEnd && isSlotTaken(sheetBay, sheetStart, sheetEnd);
+
+  // Preset durations offered as chips (in hours).
+  const DURATION_PRESETS = [0.5, 1, 1.5, 2];
+
+  function applyDuration(hours) {
+    const startIdx = ALL_HOURS.indexOf(sheetStart);
+    if (startIdx < 0) return;
+    const slotsNeeded = Math.round(hours * 4); // 15-min slots per hour
+    const endIdx = Math.min(startIdx + slotsNeeded, ALL_HOURS.length - 1);
+    setSheetEnd(ALL_HOURS[endIdx]);
+  }
+
+  function setSheetStartClamped(newStart) {
+    setSheetStart(newStart);
+    // If new start >= current end, push end to start + 15min.
+    const startIdx = ALL_HOURS.indexOf(newStart);
+    const endIdx = ALL_HOURS.indexOf(sheetEnd);
+    if (endIdx <= startIdx) {
+      setSheetEnd(ALL_HOURS[Math.min(startIdx + 1, ALL_HOURS.length - 1)]);
+    }
+  }
+
+  async function submitSheet() {
+    setSheetMsg("");
+    if (dateInPast) { setSheetMsg("Cannot book in the past."); return; }
+    if (dateTooFar) { setSheetMsg("Bookings are limited to 7 days in advance."); return; }
+    if (isToday && sheetStart < currentTime) { setSheetMsg("That time has already passed."); return; }
+    setSheetBooking(true);
+    try {
+      await postBooking({ date: bookDate, startTime: sheetStart, endTime: sheetEnd, bay: sheetBay });
+      showToast("\u2713 Booking confirmed! Check your email.");
+      setSheetOpen(false);
+      refetchAvailability();
+    } catch (err) {
+      setSheetMsg(err.message);
+    }
+    setSheetBooking(false);
+  }
+
+  // Lock body scroll while sheet is open.
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [sheetOpen]);
+
+  const canSubmitSheet = hasCard
+    && !sheetBooking
+    && !sheetConflict
+    && sheetDurationHrs > 0
+    && sheetTerms
+    && !dateInPast
+    && !dateTooFar;
+
+  const supportContact = branding?.support_email
+    ? branding.support_email
+    : (branding?.support_phone || null);
 
   // Accept the user's raw selection so out-of-range dates surface the
   // existing error message instead of silently snapping to day 7.
@@ -278,11 +382,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
                       key={bay}
                       className={`mem-avail-cell ${taken ? "taken" : isPast ? "taken" : "open"}`}
                       onClick={() => {
-                        if (!taken && !isPast) {
-                          setBookBay(bay);
-                          setBookStartTime(h);
-                          setBookEndTime(nextH);
-                        }
+                        if (!taken && !isPast && hasCard) openSheet(bay, h);
                       }}
                     >
                       {taken ? "Booked" : isPast ? "Past" : "Open"}
@@ -294,6 +394,124 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
           })}
         </div>
       </div>
+
+      {sheetOpen && (
+        <div className="mem-sheet-backdrop" onClick={closeSheet}>
+          <div className="mem-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="mem-sheet-head">
+              <div className="mem-sheet-title">Confirm booking</div>
+              <button type="button" className="mem-sheet-close" onClick={closeSheet} aria-label="Close">&times;</button>
+            </div>
+            <div className="mem-sheet-body">
+              <div className="mem-sheet-summary">
+                <div className="mem-sheet-summary-bay">{sheetBay}</div>
+                <div className="mem-sheet-summary-date">{fDL(new Date(bookDate + "T12:00:00"))}</div>
+                <div className="mem-sheet-summary-time">
+                  {fT(new Date(`2026-01-01T${sheetStart}:00`))} &ndash; {fT(new Date(`2026-01-01T${sheetEnd}:00`))}
+                  <span className="mem-sheet-summary-dur">&nbsp;&middot; {sheetDurationHrs.toFixed(sheetDurationHrs % 1 === 0 ? 0 : 1)} hr</span>
+                </div>
+              </div>
+
+              <div className="mem-sheet-section">
+                <div className="mem-sheet-label">Bay</div>
+                <div className="mem-sheet-chips">
+                  {BAYS.map((b) => (
+                    <button
+                      type="button"
+                      key={b}
+                      className={`mem-sheet-chip ${sheetBay === b ? "active" : ""}`}
+                      onClick={() => setSheetBay(b)}
+                    >
+                      {b}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mem-sheet-section">
+                <div className="mem-sheet-label">Duration</div>
+                <div className="mem-sheet-chips">
+                  {DURATION_PRESETS.map((hrs) => (
+                    <button
+                      type="button"
+                      key={hrs}
+                      className={`mem-sheet-chip ${Math.abs(sheetDurationHrs - hrs) < 0.01 ? "active" : ""}`}
+                      onClick={() => applyDuration(hrs)}
+                    >
+                      {hrs === 0.5 ? "30m" : `${hrs}h`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mem-sheet-section">
+                <div className="mem-sheet-label">Fine-tune (15-min increments)</div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <div className="mem-form-row" style={{ flex: 1, margin: 0 }}>
+                    <label>Start</label>
+                    <select value={sheetStart} onChange={(e) => setSheetStartClamped(e.target.value)}>
+                      {HOURS.map((h) => (
+                        <option key={h} value={h}>{fT(new Date(`2026-01-01T${h}:00`))}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mem-form-row" style={{ flex: 1, margin: 0 }}>
+                    <label>End</label>
+                    <select value={sheetEnd} onChange={(e) => setSheetEnd(e.target.value)}>
+                      {ALL_HOURS.filter((h) => h > sheetStart).map((h) => (
+                        <option key={h} value={h}>{fT(new Date(`2026-01-01T${h}:00`))}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {sheetConflict && (
+                <div className="mem-err" style={{ marginTop: 4 }}>
+                  That time on {sheetBay} is already booked. Pick another slot.
+                </div>
+              )}
+
+              <div className="mem-sheet-policy">
+                <div><strong>Cancellation:</strong> Cancellations within 3 hours of your booking may be charged a fee.</div>
+                <div><strong>Access code:</strong> A door code will be emailed to you about 10 minutes before your start time.</div>
+                {supportContact && (
+                  <div><strong>Need to change something?</strong> Reach out at {supportContact}.</div>
+                )}
+              </div>
+
+              <label className="mem-sheet-terms">
+                <input
+                  type="checkbox"
+                  checked={sheetTerms}
+                  onChange={(e) => setSheetTerms(e.target.checked)}
+                  style={{ marginTop: 2, accentColor: "#4C8D73" }}
+                />
+                <span>
+                  I agree to the {branding?.legal_url ? <a href={branding.legal_url} target="_blank" rel="noopener noreferrer">Terms &amp; Conditions</a> : <strong>Terms &amp; Conditions</strong>} and {branding?.terms_url ? <a href={branding.terms_url} target="_blank" rel="noopener noreferrer">Club Policies</a> : <strong>Club Policies</strong>}.
+                </span>
+              </label>
+
+              {sheetMsg && <div className="mem-err" style={{ marginTop: 4 }}>{sheetMsg}</div>}
+
+              <div className="mem-sheet-actions">
+                <button type="button" className="mem-sheet-cancel" onClick={closeSheet} disabled={sheetBooking}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="mem-book-btn"
+                  onClick={submitSheet}
+                  disabled={!canSubmitSheet}
+                  style={{ flex: 2, margin: 0 }}
+                >
+                  {sheetBooking ? "Booking\u2026" : "Confirm booking"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
