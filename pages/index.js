@@ -165,10 +165,26 @@ export default function Dashboard() {
   async function updateTier(email, tier, name) {
     setSaving(true);
     try {
-      const ex = members.find((m) => m.email === email);
-      if (ex) await supaPatch(apiKey, "members", { email }, { tier });
-      else await supaPost(apiKey, "members", { email, name: name || email, tier });
-      showToast(`${name || email} \u2192 ${tier}`);
+      // Server endpoint instead of direct PostgREST: it bypasses the
+      // members RLS-INSERT policy with service-role and also looks up
+      // an existing Stripe customer/subscription by email so a
+      // migrated member (e.g. AllBooked → HG) gets linked instead of
+      // orphaned. Read-only Stripe call — no charge ever fires here.
+      const r = await fetch("/api/admin-update-tier", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ email, tier, name }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || d.error || `Update failed (${r.status})`);
+      showToast(
+        d.linked_stripe
+          ? `${name || email} → ${tier} (linked Stripe subscription)`
+          : `${name || email} → ${tier}`
+      );
       await refresh();
     } catch (e) {
       showToast(e.message, "error");
