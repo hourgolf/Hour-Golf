@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
 import { QRCodeSVG } from "qrcode.react";
-import { TIER_COLORS } from "../../lib/constants";
 import { useBranding } from "../../hooks/useBranding";
 import { DEFAULT_CANCEL_CUTOFF_HOURS } from "../../lib/branding";
 import Modal from "../ui/Modal";
@@ -168,13 +167,6 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
 
   const fmt = (n) => Number(n || 0).toFixed(1);
 
-  // Tier color for the inline pill. Tenants can define per-tier colors
-  // in tenant_branding.tier_colors; falls back to the HG palette in
-  // TIER_COLORS, then to a primary-bg/primary scheme so any unmapped
-  // tier on a freshly-onboarded tenant still renders something branded.
-  const tierColorsMap = branding?.tier_colors || TIER_COLORS;
-  const tierObj = tierColorsMap[member.tier] || TIER_COLORS[member.tier] || { bg: "var(--primary-bg)", text: "var(--primary)" };
-
   // Cancel-cutoff window comes from tenant policy. UI hides the inline
   // Cancel button inside this window; server-side member-cancel.js
   // enforces the same value so the button-disabled UX matches the API
@@ -210,25 +202,13 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
 
   return (
     <>
-      {/* Compact greeting strip: name + tier + member # + a "Show code"
-          shortcut to surface the in-store discount QR without burying it
-          in the stat row. */}
+      {/* Compact greeting strip: name + a "Show code" shortcut to
+          surface the in-store discount QR. Tier badge + member # live
+          in the persistent header (MemberLayout) — duplicating them
+          here was visual noise. */}
       <div className="mem2-greet">
         <div className="mem2-greet-text">
-          <div className="mem2-greet-hi">Hi, {firstName}</div>
-          <div className="mem2-greet-sub">
-            <span
-              className="mem2-tier-pill"
-              style={{ background: tierObj.bg, color: tierObj.text }}
-            >
-              {member.tier}
-            </span>
-            {member.member_number && (
-              <span className="mem2-member-no">
-                #{String(member.member_number).padStart(3, "0")}
-              </span>
-            )}
-          </div>
+          <div className="mem2-greet-hi">Hello, {firstName}</div>
         </div>
         {member.verify_token && (
           <button
@@ -278,15 +258,27 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
                 <span className="mem2-hero-bay"> · {nextBooking.bay}</span>
               </div>
               <div className="mem2-hero-date">{fDL(s)}</div>
-              <div className="mem2-hero-meta">
-                {hoursUntil > 0 && hoursUntil <= 1 ? (
-                  <>🔑 Access code arrives ~10 min before start (check email).</>
-                ) : isLive ? (
-                  <>🔑 Your access code is in your inbox.</>
-                ) : (
-                  <>🔑 We email your access code ~10 min before start.</>
-                )}
-              </div>
+              {/* Access-code surface. If the cron job has issued a
+                  code (status='sent' on access_code_jobs), show it
+                  inline so the member doesn't have to flip back to
+                  email. Falls back to contextual "we'll email it"
+                  copy when the code isn't ready yet. */}
+              {nextBooking.access_code ? (
+                <div className="mem2-hero-code">
+                  <div className="mem2-hero-code-label">Door code</div>
+                  <div className="mem2-hero-code-value">{nextBooking.access_code}</div>
+                </div>
+              ) : (
+                <div className="mem2-hero-meta">
+                  {hoursUntil > 0 && hoursUntil <= 1 ? (
+                    <>🔑 Access code arrives ~10 min before start (check email).</>
+                  ) : isLive ? (
+                    <>🔑 Your access code is in your inbox.</>
+                  ) : (
+                    <>🔑 We email your access code ~10 min before start.</>
+                  )}
+                </div>
+              )}
               <div className="mem2-hero-actions">
                 <button
                   className="mem2-btn-primary"

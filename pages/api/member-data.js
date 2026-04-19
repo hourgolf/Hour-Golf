@@ -57,6 +57,36 @@ export default async function handler(req, res) {
       ).then((r) => r.json());
     } catch (_) { upcoming = []; }
 
+    // Attach Seam access codes for upcoming bookings whose access-code
+    // job has reached the `sent` state. Members get the code on the
+    // dashboard the moment the cron run issues it (~10 min before
+    // start) — saves them flipping back to email. Best-effort: failure
+    // here just means the dashboard renders without the inline code.
+    if (Array.isArray(upcoming) && upcoming.length > 0) {
+      try {
+        const ids = upcoming
+          .map((b) => b.booking_id)
+          .filter((id) => typeof id === "string" && id.length > 0)
+          .map((id) => `"${id.replace(/"/g, '\\"')}"`);
+        if (ids.length > 0) {
+          const codeRows = await fetch(
+            `${SUPABASE_URL}/rest/v1/access_code_jobs?tenant_id=eq.${tenantId}&status=eq.sent&booking_id=in.(${ids.join(",")})&select=booking_id,access_code,code_start,code_end`,
+            { headers: { apikey: key, Authorization: `Bearer ${key}` } }
+          ).then((r) => r.json());
+          const byId = new Map();
+          for (const r of codeRows || []) {
+            if (r?.booking_id && r?.access_code) byId.set(r.booking_id, r);
+          }
+          upcoming = upcoming.map((b) => {
+            const job = byId.get(b.booking_id);
+            return job
+              ? { ...b, access_code: job.access_code, access_code_start: job.code_start, access_code_end: job.code_end }
+              : b;
+          });
+        }
+      } catch (_) { /* best-effort attach */ }
+    }
+
     // This month's confirmed bookings
     let monthBookings = [];
     try {

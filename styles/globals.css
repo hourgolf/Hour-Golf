@@ -1008,6 +1008,37 @@ html { overflow-y: scroll; }
 .mem2-hero-bay { font-weight: 500; opacity: 0.9; }
 .mem2-hero-date { font-size: 13px; opacity: 0.85; margin-top: 2px; margin-bottom: 10px; }
 .mem2-hero-meta { font-size: 13px; opacity: 0.92; margin-bottom: 14px; line-height: 1.4; }
+
+/* Door-code panel inside the hero. Surfaces the access code the
+   moment access_code_jobs reports status='sent' so the member doesn't
+   need to flip back to email. Inverted-on-primary background so it
+   reads as the most important thing in the hero. */
+.mem2-hero-code {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 12px;
+}
+.mem2-hero-code-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.mem2-hero-code-value {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  font-variant-numeric: tabular-nums;
+}
 .mem2-hero-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .mem2-btn-primary {
   padding: 10px 18px; border: none; border-radius: var(--radius);
