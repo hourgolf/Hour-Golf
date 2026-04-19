@@ -26,6 +26,7 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
   const [upcoming, setUpcoming] = useState([]);
   const [monthBookings, setMonthBookings] = useState([]);
   const [myEvents, setMyEvents] = useState([]);
+  const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cancelConfirm, setCancelConfirm] = useState(null); // booking_id being confirmed
   const [cancelling, setCancelling] = useState(false);
@@ -56,6 +57,13 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
       fetch("/api/member-shop?action=loyalty", { credentials: "include" })
         .then((lr) => lr.ok ? lr.json() : null)
         .then((ld) => { if (ld) setLoyalty(ld); })
+        .catch(() => {});
+      // News / announcements admins have flagged for the dashboard
+      // surface. Empty array = nothing pinned right now; the section
+      // stays hidden so the home tab doesn't show empty noise.
+      fetch("/api/member-news?surface=dashboard", { credentials: "include" })
+        .then((nr) => nr.ok ? nr.json() : null)
+        .then((items) => { if (Array.isArray(items)) setNews(items); })
         .catch(() => {});
       // Upcoming events the member has registered for or expressed
       // interest in. /api/member-events returns every published event
@@ -236,6 +244,60 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
                   {loyalty.is_member !== false && p.pct >= 100 && (
                     <div style={{ fontSize: 11, color: "#ddd480", fontWeight: 600, marginTop: 2 }}>Threshold reached! Credit issued at month end.</div>
                   )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Announcements — pinned by admin via /api/admin-news. Hidden
+          when nothing is active so the home tab stays uncluttered.
+          Severity drives accent color (urgent = red, warning = gold,
+          success / info = green). */}
+      {news.length > 0 && (
+        <div className="mem-section">
+          <div className="mem-section-head">Announcements</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {news.map((n) => {
+              const accent =
+                n.severity === "urgent" ? "#C92F1F" :
+                n.severity === "warning" ? "#ddd480" :
+                n.severity === "success" ? "#4C8D73" :
+                "#4C8D73";
+              const label =
+                n.severity === "urgent" ? "Important" :
+                n.severity === "warning" ? "Heads up" :
+                n.severity === "success" ? "Good news" :
+                "Update";
+              return (
+                <div
+                  key={n.id}
+                  style={{
+                    display: "flex", gap: 12,
+                    padding: 12, borderRadius: 12,
+                    background: "var(--surface)", border: "1px solid var(--border)",
+                    borderLeft: `4px solid ${accent}`,
+                  }}
+                >
+                  {n.image_url && (
+                    <img src={n.image_url} alt="" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{
+                      display: "inline-block", padding: "1px 8px", borderRadius: 999,
+                      background: accent, color: "#fff", fontSize: 9, fontWeight: 700,
+                      letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 4,
+                    }}>
+                      {label}
+                    </span>
+                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2, color: "var(--text)" }}>
+                      {n.title}
+                    </div>
+                    <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>
+                      {n.body}
+                    </div>
+                  </div>
                 </div>
               );
             })}

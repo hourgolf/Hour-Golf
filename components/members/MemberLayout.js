@@ -22,6 +22,62 @@ const NAV_ITEMS = [
   { key: "account", label: "Account", href: "/members/account" },
 ];
 
+// Small severity-aware popup for /api/member-news items. Modeled on
+// EventPopup but news has no detail page so the only action is
+// dismiss. Severity drives the accent color so urgent closures look
+// urgent at a glance.
+const NEWS_SEVERITY_STYLE = {
+  info:    { accent: "#4C8D73", label: "Update" },
+  success: { accent: "#4C8D73", label: "Good news" },
+  warning: { accent: "#ddd480", label: "Heads up" },
+  urgent:  { accent: "#C92F1F", label: "Important" },
+};
+function NewsPopup({ item, onDismiss }) {
+  const sev = NEWS_SEVERITY_STYLE[item.severity] || NEWS_SEVERITY_STYLE.info;
+  return (
+    <div
+      onClick={onDismiss}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 2500 }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: 480, width: "100%", background: "var(--surface)",
+          borderRadius: 16, overflow: "hidden", borderTop: `6px solid ${sev.accent}`,
+          boxShadow: "0 24px 60px rgba(0,0,0,0.35)",
+        }}
+      >
+        {item.image_url && (
+          <img src={item.image_url} alt="" style={{ width: "100%", maxHeight: 240, objectFit: "cover", display: "block" }} />
+        )}
+        <div style={{ padding: "20px 22px 18px" }}>
+          <div style={{
+            display: "inline-block", padding: "2px 10px", borderRadius: 999,
+            background: sev.accent, color: "#fff", fontSize: 10, fontWeight: 700,
+            letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 10,
+          }}>
+            {sev.label}
+          </div>
+          <h2 style={{ margin: "0 0 8px 0", fontSize: 20, fontFamily: "var(--font-display)", color: "var(--text)" }}>{item.title}</h2>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: "var(--text)", whiteSpace: "pre-wrap" }}>{item.body}</p>
+          <button
+            type="button"
+            onClick={onDismiss}
+            style={{
+              marginTop: 18, width: "100%", padding: "12px 16px",
+              background: sev.accent, color: "#fff", border: "none",
+              borderRadius: 12, fontFamily: "var(--font-display)",
+              fontSize: 14, fontWeight: 700, cursor: "pointer",
+            }}
+          >
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MemberLayout({ activeTab, children }) {
   const router = useRouter();
   const { member, tierConfig, loading, error, login, signup, completeAccount, logout, refresh } = useMemberAuth();
@@ -61,19 +117,54 @@ export default function MemberLayout({ activeTab, children }) {
 
   // Event popup — use ref to prevent double-fetch
   const [popupEvent, setPopupEvent] = useState(null);
+  // Queue of news popups (urgent first) to surface after the event popup
+  // (or immediately if there's no event). One at a time so members can
+  // read each before dismissing.
+  const [popupNewsQueue, setPopupNewsQueue] = useState([]);
   const popupChecked = useRef(false);
   useEffect(() => {
     if (member && !member.needsAccountSetup && !loading && !popupChecked.current) {
       popupChecked.current = true;
       const timer = setTimeout(() => {
-        fetch("/api/member-event-popup", { credentials: "include" })
-          .then((r) => r.ok ? r.json() : [])
-          .then((events) => { if (events.length > 0) setPopupEvent(events[0]); })
-          .catch(() => {});
+        // Fetch event popup + news popups in parallel.
+        Promise.all([
+          fetch("/api/member-event-popup", { credentials: "include" })
+            .then((r) => r.ok ? r.json() : [])
+            .catch(() => []),
+          fetch("/api/member-news?surface=popup", { credentials: "include" })
+            .then((r) => r.ok ? r.json() : [])
+            .catch(() => []),
+        ]).then(([events, news]) => {
+          if (events.length > 0) setPopupEvent(events[0]);
+          if (news.length > 0) {
+            // Sort urgent first so closures jump the queue.
+            const sorted = [...news].sort((a, b) => {
+              if (a.severity === "urgent" && b.severity !== "urgent") return -1;
+              if (b.severity === "urgent" && a.severity !== "urgent") return 1;
+              return 0;
+            });
+            setPopupNewsQueue(sorted);
+          }
+        });
       }, 300);
       return () => clearTimeout(timer);
     }
   }, [member, loading]);
+
+  function dismissCurrentNewsPopup() {
+    setPopupNewsQueue((q) => {
+      const head = q[0];
+      if (head) {
+        fetch("/api/member-news", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ news_id: head.id }),
+        }).catch(() => {});
+      }
+      return q.slice(1);
+    });
+  }
 
   // Toast
   const [toast, setToast] = useState(null);
@@ -534,7 +625,7 @@ export default function MemberLayout({ activeTab, children }) {
       {/* Toast */}
       {toast && <div className={`mem-toast ${toast.type}`}>{toast.msg}</div>}
 
-      {/* Event popup */}
+      {/* Event popup — fires first; news popups queue below */}
       {popupEvent && (
         <EventPopup
           event={popupEvent}
@@ -548,6 +639,13 @@ export default function MemberLayout({ activeTab, children }) {
             setPopupEvent(null);
           }}
         />
+      )}
+
+      {/* News popup queue — only shown after the event popup is dismissed
+          (or immediately if there's no event). One at a time so urgent
+          alerts stack predictably. */}
+      {!popupEvent && popupNewsQueue.length > 0 && (
+        <NewsPopup item={popupNewsQueue[0]} onDismiss={dismissCurrentNewsPopup} />
       )}
 
       {/* Booking FAB — opens the quick-book sheet directly (MemberBooking

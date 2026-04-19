@@ -555,6 +555,287 @@ function BirthdayBonusSection({ jwt }) {
   );
 }
 
+const NEWS_SEVERITIES = ["info", "success", "warning", "urgent"];
+const NEWS_SEVERITY_HEX = {
+  info:    "#4C8D73",
+  success: "#4C8D73",
+  warning: "#ddd480",
+  urgent:  "#C92F1F",
+};
+const EMPTY_NEWS_DRAFT = {
+  title: "",
+  body: "",
+  image_url: "",
+  severity: "info",
+  show_as_popup: false,
+  show_on_dashboard: true,
+  is_published: true,
+  starts_at: "",
+  ends_at: "",
+};
+
+function NewsSection({ jwt }) {
+  const [news, setNews] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [draft, setDraft] = useState(EMPTY_NEWS_DRAFT);
+  const [editingId, setEditingId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const r = await fetch("/api/admin-news", { headers: { Authorization: `Bearer ${jwt}` } });
+      if (r.ok) {
+        const d = await r.json();
+        setNews(d.news || []);
+      }
+    } catch {}
+    setLoading(false);
+  }
+
+  function startEdit(item) {
+    setEditingId(item.id);
+    setDraft({
+      title: item.title || "",
+      body: item.body || "",
+      image_url: item.image_url || "",
+      severity: item.severity || "info",
+      show_as_popup: !!item.show_as_popup,
+      show_on_dashboard: item.show_on_dashboard !== false,
+      is_published: item.is_published !== false,
+      starts_at: item.starts_at ? item.starts_at.slice(0, 16) : "",
+      ends_at: item.ends_at ? item.ends_at.slice(0, 16) : "",
+    });
+    setError("");
+  }
+
+  function resetDraft() {
+    setDraft(EMPTY_NEWS_DRAFT);
+    setEditingId(null);
+    setError("");
+  }
+
+  async function save() {
+    if (!draft.title.trim() || !draft.body.trim()) {
+      setError("Title and body required.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    const payload = {
+      title: draft.title.trim(),
+      body: draft.body.trim(),
+      image_url: draft.image_url.trim() || null,
+      severity: draft.severity,
+      show_as_popup: draft.show_as_popup,
+      show_on_dashboard: draft.show_on_dashboard,
+      is_published: draft.is_published,
+      starts_at: draft.starts_at || null,
+      ends_at: draft.ends_at || null,
+    };
+    try {
+      const url = editingId ? `/api/admin-news?id=${editingId}` : "/api/admin-news";
+      const method = editingId ? "PATCH" : "POST";
+      const r = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify(payload),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || "Save failed");
+      resetDraft();
+      await load();
+    } catch (e) {
+      setError(e.message);
+    }
+    setSaving(false);
+  }
+
+  async function remove(id) {
+    if (!confirm("Delete this news item? Members will stop seeing it.")) return;
+    try {
+      await fetch(`/api/admin-news?id=${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      await load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function togglePublished(item) {
+    try {
+      await fetch(`/api/admin-news?id=${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ is_published: !item.is_published }),
+      });
+      await load();
+    } catch {}
+  }
+
+  if (loading) return <div style={{ padding: 12, color: "var(--text-muted)" }}>Loading news…</div>;
+
+  return (
+    <>
+      {/* Editor */}
+      <div style={{ padding: 14, border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)", marginBottom: 16, maxWidth: 720 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 10, color: "var(--text)" }}>
+          {editingId ? "Edit news item" : "Create news item"}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <input
+            type="text"
+            value={draft.title}
+            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+            placeholder="Title (required)"
+            style={{ padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13 }}
+          />
+          <textarea
+            value={draft.body}
+            onChange={(e) => setDraft({ ...draft, body: e.target.value })}
+            placeholder="Body — what should members know? (required)"
+            rows={3}
+            style={{ padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", resize: "vertical" }}
+          />
+          <input
+            type="url"
+            value={draft.image_url}
+            onChange={(e) => setDraft({ ...draft, image_url: e.target.value })}
+            placeholder="Image URL (optional)"
+            style={{ padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, fontFamily: "var(--font-mono)" }}
+          />
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {NEWS_SEVERITIES.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setDraft({ ...draft, severity: s })}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  border: draft.severity === s ? `2px solid ${NEWS_SEVERITY_HEX[s]}` : "1.5px solid var(--border)",
+                  background: draft.severity === s ? NEWS_SEVERITY_HEX[s] : "transparent",
+                  color: draft.severity === s ? "#fff" : "var(--text)",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.4,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 12 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+              <input type="checkbox" checked={draft.is_published} onChange={(e) => setDraft({ ...draft, is_published: e.target.checked })} style={{ accentColor: "var(--primary)" }} />
+              <span>Published</span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+              <input type="checkbox" checked={draft.show_on_dashboard} onChange={(e) => setDraft({ ...draft, show_on_dashboard: e.target.checked })} style={{ accentColor: "var(--primary)" }} />
+              <span>Show on member home page</span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+              <input type="checkbox" checked={draft.show_as_popup} onChange={(e) => setDraft({ ...draft, show_as_popup: e.target.checked })} style={{ accentColor: "var(--primary)" }} />
+              <span>Show as popup on portal load</span>
+            </label>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 10, color: "var(--text-muted)", marginBottom: 2 }}>Starts (optional)</label>
+              <input
+                type="datetime-local"
+                value={draft.starts_at}
+                onChange={(e) => setDraft({ ...draft, starts_at: e.target.value })}
+                style={{ width: "100%", padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 10, color: "var(--text-muted)", marginBottom: 2 }}>Ends (optional)</label>
+              <input
+                type="datetime-local"
+                value={draft.ends_at}
+                onChange={(e) => setDraft({ ...draft, ends_at: e.target.value })}
+                style={{ width: "100%", padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+              />
+            </div>
+          </div>
+
+          {error && (
+            <div style={{ background: "var(--red-bg)", color: "var(--red)", padding: 8, borderRadius: 6, fontSize: 12 }}>{error}</div>
+          )}
+
+          <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+            <button className="btn primary" onClick={save} disabled={saving} style={{ fontSize: 11 }}>
+              {saving ? "Saving…" : editingId ? "Update" : "Publish"}
+            </button>
+            {editingId && (
+              <button className="btn" onClick={resetDraft} style={{ fontSize: 11 }}>Cancel edit</button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Existing items list */}
+      {news.length === 0 ? (
+        <div style={{ padding: 12, color: "var(--text-muted)", fontSize: 12 }}>No news items yet.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {news.map((n) => (
+            <div
+              key={n.id}
+              style={{
+                padding: 10,
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                background: "var(--surface)",
+                borderLeft: `4px solid ${NEWS_SEVERITY_HEX[n.severity] || "var(--border)"}`,
+                display: "flex", flexDirection: "column", gap: 4,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{
+                    padding: "1px 8px", borderRadius: 999,
+                    background: NEWS_SEVERITY_HEX[n.severity] || "var(--text-muted)", color: "#fff",
+                    fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4,
+                  }}>{n.severity}</span>
+                  <strong style={{ fontSize: 13 }}>{n.title}</strong>
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button className="btn" onClick={() => togglePublished(n)} style={{ fontSize: 10 }}>
+                    {n.is_published ? "Unpublish" : "Publish"}
+                  </button>
+                  <button className="btn" onClick={() => startEdit(n)} style={{ fontSize: 10 }}>Edit</button>
+                  <button className="btn" onClick={() => remove(n.id)} style={{ fontSize: 10, color: "var(--red)" }}>Delete</button>
+                </div>
+              </div>
+              <div style={{ fontSize: 12, color: "var(--text)", whiteSpace: "pre-wrap" }}>{n.body}</div>
+              <div style={{ fontSize: 10, color: "var(--text-muted)", display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {n.show_as_popup && <span>📣 Popup</span>}
+                {n.show_on_dashboard && <span>📌 Home page</span>}
+                {!n.is_published && <span>🚫 Unpublished</span>}
+                {n.starts_at && <span>From {new Date(n.starts_at).toLocaleString()}</span>}
+                {n.ends_at && <span>Until {new Date(n.ends_at).toLocaleString()}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStripe, onSaveTier, onSelectMember, jwt }) {
   const [linking, setLinking] = useState(null);
   const [editTier, setEditTier] = useState(null);
@@ -608,6 +889,9 @@ export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStrip
 
       <h2 className="section-head" style={{ marginTop: 24 }}>Birthday Bonus</h2>
       <BirthdayBonusSection jwt={jwt} />
+
+      <h2 className="section-head" style={{ marginTop: 24 }}>News &amp; Announcements</h2>
+      <NewsSection jwt={jwt} />
 
       <h2 className="section-head" style={{ marginTop: 24 }}>Members ({members.length})</h2>
       {/* Desktop table */}
