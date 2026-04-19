@@ -4,6 +4,7 @@ import { getSquareCredentials } from "../../lib/square-config";
 import { adjustGiftCard } from "../../lib/square-api";
 import { getShippoCredentials } from "../../lib/shippo-config";
 import { buildParcelFromItems, createShipmentAndGetRates, purchaseLabel } from "../../lib/shippo-api";
+import { customerShippingChargeCents } from "../../lib/shop-shipping";
 import { sendShopOrderNotification } from "../../lib/email";
 import { assertFeature } from "../../lib/feature-guard";
 import { getSessionWithMember } from "../../lib/member-session";
@@ -353,11 +354,12 @@ export default async function handler(req, res) {
       const deliveryMethod = cobody.delivery_method === "ship" ? "ship" : "pickup";
       const shipping = cobody.shipping || null;
       if (deliveryMethod === "ship") {
-        if (!shipping || !shipping.rate_id || !shipping.address) {
-          return res.status(400).json({ error: "Shipping rate + address required for ship delivery" });
+        if (!shipping || !shipping.address) {
+          return res.status(400).json({ error: "Shipping address required for ship delivery" });
         }
-        if (typeof shipping.amount !== "number" || shipping.amount <= 0) {
-          return res.status(400).json({ error: "Shipping amount missing" });
+        const a = shipping.address;
+        if (!a.street1 || !a.city || !a.state || !a.zip) {
+          return res.status(400).json({ error: "Shipping address incomplete" });
         }
       }
       // 1. Fetch cart
@@ -393,12 +395,69 @@ export default async function handler(req, res) {
 
       grandTotal = Math.round(grandTotal * 100) / 100;
 
-      // 4. Apply pro shop credits (against item total only — shipping is
-      //    a passthrough cost paid in full on the card).
+      // 4a. For shipping orders: pre-validate the destination via
+      //     Shippo. We pick the cheapest carrier rate; merchant
+      //     absorbs the actual cost. Customer always pays our flat
+      //     shipping price ($10 unless subtotal >= $100). If Shippo
+      //     can't ship to the address, fail BEFORE charging.
+      let chosenShippoRateId = null;
+      let chosenShippoCarrier = null;
+      let chosenShippoService = null;
+      if (deliveryMethod === "ship") {
+        let shippoCreds;
+        try { shippoCreds = await getShippoCredentials(tenantId); }
+        catch (e) { return res.status(503).json({ error: "Shipping not configured for this tenant", detail: e.message }); }
+
+        const parcel = buildParcelFromItems(
+          lineItems.map((li) => ({ ...li.item, quantity: li.cart.quantity }))
+        );
+        try {
+          const rateResult = await createShipmentAndGetRates({
+            apiKey: shippoCreds.apiKey,
+            addressFrom: shippoCreds.originAddress,
+            addressTo: {
+              name: member.name || "",
+              street1: shipping.address.street1,
+              street2: shipping.address.street2 || "",
+              city: shipping.address.city,
+              state: String(shipping.address.state).toUpperCase(),
+              zip: shipping.address.zip,
+              country: String(shipping.address.country || "US").toUpperCase(),
+              phone: member.phone || "",
+              email: member.email,
+            },
+            parcel,
+          });
+          const validRates = (rateResult.rates || [])
+            .filter((r) => r.amount && Number(r.amount) > 0)
+            .sort((a, b) => Number(a.amount) - Number(b.amount));
+          if (validRates.length === 0) {
+            return res.status(400).json({
+              error: "We couldn't ship to that address. Please double-check it or choose pickup.",
+            });
+          }
+          const cheapest = validRates[0];
+          chosenShippoRateId = cheapest.object_id;
+          chosenShippoCarrier = cheapest.provider;
+          chosenShippoService = cheapest.servicelevel?.name || cheapest.servicelevel?.token || "";
+        } catch (e) {
+          console.error("member-shop shipping rate lookup failed:", e?.message || e);
+          return res.status(503).json({
+            error: "Could not validate shipping address. Try again or choose pickup.",
+          });
+        }
+      }
+
+      // 4b. Apply pro shop credits (against item total only — shipping
+      //     is a passthrough cost paid in full on the card).
       const creditBalance = Number(member.shop_credit_balance || 0);
       const creditsUsed = Math.min(creditBalance, grandTotal);
       const itemsCardChargeCents = Math.round((grandTotal - creditsUsed) * 100);
-      const shippingCents = deliveryMethod === "ship" ? Math.round(shipping.amount * 100) : 0;
+      // Customer-facing shipping price uses the flat policy. Server
+      // pays Shippo whatever the cheapest rate costs (chosen above).
+      const shippingCents = deliveryMethod === "ship"
+        ? customerShippingChargeCents(Math.round(grandTotal * 100))
+        : 0;
       const cardCharge = Math.round((itemsCardChargeCents + shippingCents)) / 100;
       const cardChargeCents = itemsCardChargeCents + shippingCents;
 
@@ -577,15 +636,14 @@ export default async function handler(req, res) {
       const taxTransactionId = pi?.__hg_tax_transaction_id || null;
 
       // Purchase the Shippo label NOW (PI succeeded, payment captured).
-      // First row of the order gets the label info; we mirror tracking
-      // onto every row in the for-loop below for display.
+      // Uses the cheapest rate id we picked pre-checkout.
       let label = null;
-      if (deliveryMethod === "ship" && pi?.status === "succeeded") {
+      if (deliveryMethod === "ship" && chosenShippoRateId && pi?.status === "succeeded") {
         try {
           const shippoCreds = await getShippoCredentials(tenantId);
           label = await purchaseLabel({
             apiKey: shippoCreds.apiKey,
-            rateId: shipping.rate_id,
+            rateId: chosenShippoRateId,
           });
           console.log(`member-shop: label purchased (tracking ${label.tracking_number})`);
         } catch (e) {
@@ -647,10 +705,10 @@ export default async function handler(req, res) {
             // mirrored onto every row so the Orders tab shows it.
             delivery_method: deliveryMethod,
             shipping_address: deliveryMethod === "ship" && isFirst ? shipping.address : null,
-            shipping_amount: deliveryMethod === "ship" && isFirst ? shipping.amount : null,
-            shipping_carrier: deliveryMethod === "ship" && isFirst ? (shipping.carrier || null) : null,
-            shipping_service: deliveryMethod === "ship" && isFirst ? (shipping.service || null) : null,
-            shippo_rate_id: deliveryMethod === "ship" && isFirst ? shipping.rate_id : null,
+            shipping_amount: deliveryMethod === "ship" && isFirst ? shippingCents / 100 : null,
+            shipping_carrier: deliveryMethod === "ship" && isFirst ? (chosenShippoCarrier || null) : null,
+            shipping_service: deliveryMethod === "ship" && isFirst ? (chosenShippoService || null) : null,
+            shippo_rate_id: deliveryMethod === "ship" && isFirst ? chosenShippoRateId : null,
             shippo_transaction_id: label?.transaction_id || null,
             tracking_number: label?.tracking_number || null,
             tracking_url: label?.tracking_url || null,
@@ -687,7 +745,7 @@ export default async function handler(req, res) {
         total: grandTotal,
         credits_used: creditsUsed,
         card_charged: cardCharge,
-        shipping_amount: deliveryMethod === "ship" ? shipping.amount : null,
+        shipping_amount: deliveryMethod === "ship" ? shippingCents / 100 : null,
         delivery_method: deliveryMethod,
         tracking_number: label?.tracking_number || null,
         tracking_url: label?.tracking_url || null,

@@ -55,16 +55,13 @@ export default function MemberShop({ member, tierConfig, showToast }) {
 
   // Checkout
   const [showCheckout, setShowCheckout] = useState(false);
-  // Shipping state — same shape as the public /shop page so member +
-  // guest flows mirror each other.
+  // Shipping state. Customer-facing pricing is flat ($10 unless
+  // subtotal >= $100, then free) — server picks the cheapest carrier
+  // rate at checkout, customer never sees per-carrier options.
   const [deliveryMethod, setDeliveryMethod] = useState("pickup");
   const [shipAddr, setShipAddr] = useState({
     street1: "", street2: "", city: "", state: "", zip: "", country: "US",
   });
-  const [rates, setRates] = useState([]);
-  const [selectedRateId, setSelectedRateId] = useState("");
-  const [fetchingRates, setFetchingRates] = useState(false);
-  const [ratesError, setRatesError] = useState("");
   const [checking, setChecking] = useState(false);
 
   const loadItems = useCallback(async () => {
@@ -148,65 +145,22 @@ export default function MemberShop({ member, tierConfig, showToast }) {
     } catch {}
   }
 
-  async function fetchRates() {
-    setRatesError("");
-    setRates([]);
-    setSelectedRateId("");
-    if (!shipAddr.street1 || !shipAddr.city || !shipAddr.state || !shipAddr.zip) {
-      setRatesError("Enter a complete shipping address.");
-      return;
-    }
-    setFetchingRates(true);
-    try {
-      const r = await fetch("/api/member-shop?action=rates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          destination: {
-            name: member.name || "",
-            street1: shipAddr.street1.trim(),
-            street2: shipAddr.street2.trim() || null,
-            city: shipAddr.city.trim(),
-            state: shipAddr.state.trim().toUpperCase(),
-            zip: shipAddr.zip.trim(),
-            country: (shipAddr.country || "US").toUpperCase(),
-            phone: member.phone || null,
-            email: member.email,
-          },
-        }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.detail || d.error || "Could not fetch shipping rates");
-      setRates(d.rates || []);
-      if (d.rates?.length > 0) setSelectedRateId(d.rates[0].object_id);
-    } catch (e) {
-      setRatesError(e.message);
-    }
-    setFetchingRates(false);
-  }
-
   function setShipField(field, value) {
     setShipAddr((prev) => ({ ...prev, [field]: value }));
-    setRates([]);
-    setSelectedRateId("");
   }
 
   async function handleCheckout() {
-    if (deliveryMethod === "ship" && !selectedRateId) {
-      showToast("Pick a shipping rate first.", "error");
-      return;
+    if (deliveryMethod === "ship") {
+      if (!shipAddr.street1.trim() || !shipAddr.city.trim() || !shipAddr.state.trim() || !shipAddr.zip.trim()) {
+        showToast("Please complete your shipping address.", "error");
+        return;
+      }
     }
     setChecking(true);
     try {
-      const chosenRate = rates.find((r) => r.object_id === selectedRateId);
       const payload = { delivery_method: deliveryMethod };
-      if (deliveryMethod === "ship" && chosenRate) {
+      if (deliveryMethod === "ship") {
         payload.shipping = {
-          rate_id: chosenRate.object_id,
-          amount: chosenRate.amount,
-          carrier: chosenRate.provider,
-          service: chosenRate.servicelevel_name,
           address: {
             street1: shipAddr.street1.trim(),
             street2: shipAddr.street2.trim() || null,
@@ -238,8 +192,6 @@ export default function MemberShop({ member, tierConfig, showToast }) {
       setCartTotal(0);
       setDeliveryMethod("pickup");
       setShipAddr({ street1: "", street2: "", city: "", state: "", zip: "", country: "US" });
-      setRates([]);
-      setSelectedRateId("");
       setTab("orders");
       await loadOrders();
       await loadItems();
@@ -653,66 +605,34 @@ export default function MemberShop({ member, tierConfig, showToast }) {
               <input type="text" placeholder="Country" value={shipAddr.country} onChange={(e) => setShipField("country", e.target.value)} maxLength={2} style={{ padding: 10, border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", width: "100%" }} />
             </div>
 
-            <button
-              type="button"
-              onClick={fetchRates}
-              disabled={fetchingRates}
-              style={{
-                marginTop: 10, padding: "10px 14px",
-                background: "transparent", border: "1.5px solid var(--primary)",
-                color: "var(--primary)", borderRadius: 10,
-                fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer",
-              }}
-            >
-              {fetchingRates ? "Fetching rates\u2026" : (rates.length > 0 ? "Refresh rates" : "Get shipping rates")}
-            </button>
-
-            {ratesError && (
-              <div style={{ marginTop: 10, padding: 8, background: "var(--red-bg)", color: "var(--red)", borderRadius: 8, fontSize: 12 }}>
-                {ratesError}
-              </div>
-            )}
-
-            {rates.length > 0 && (
-              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-                {rates.map((r) => (
-                  <label
-                    key={r.object_id}
-                    style={{
-                      display: "flex", justifyContent: "space-between", alignItems: "center",
-                      padding: "10px 12px",
-                      border: selectedRateId === r.object_id ? "2px solid var(--primary)" : "1.5px solid var(--border)",
-                      borderRadius: 10, background: "var(--surface)", cursor: "pointer", fontSize: 13,
-                    }}
-                  >
-                    <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                      <span style={{ fontWeight: 600 }}>{r.provider} {r.servicelevel_name}</span>
-                      {r.estimated_days && (
-                        <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{r.estimated_days} business day{r.estimated_days === 1 ? "" : "s"}</span>
-                      )}
+            {/* Flat shipping cost: $10 unless cart subtotal hits $100,
+                then free. Server picks the cheapest carrier rate at
+                checkout + buys the label after payment. */}
+            {(() => {
+              const subtotal = cartTotal; // post-discount, pre-credits
+              const free = subtotal >= 100;
+              return (
+                <div style={{ marginTop: 10, padding: "10px 12px", background: "var(--surface)", border: "1.5px solid var(--border)", borderRadius: 10, fontSize: 13 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                    <span style={{ fontWeight: 600 }}>Standard Shipping</span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: free ? "#4C8D73" : "var(--primary)" }}>
+                      {free ? "Free" : "$10.00"}
                     </span>
-                    <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--primary)" }}>
-                        ${r.amount.toFixed(2)}
-                      </span>
-                      <input
-                        type="radio"
-                        name="member-shipping-rate"
-                        checked={selectedRateId === r.object_id}
-                        onChange={() => setSelectedRateId(r.object_id)}
-                        style={{ accentColor: "var(--primary)" }}
-                      />
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
+                  </div>
+                  {!free && (
+                    <div style={{ marginTop: 4, fontSize: 11, color: "var(--text-muted)" }}>
+                      Free shipping on orders ${(100 - subtotal).toFixed(2)} away.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
         {(() => {
           const shipCost = deliveryMethod === "ship"
-            ? (rates.find((r) => r.object_id === selectedRateId)?.amount || 0)
+            ? (cartTotal >= 100 ? 0 : 10)
             : 0;
           const grand = (cardChargeAmt || 0) + shipCost;
           return (
@@ -740,10 +660,10 @@ export default function MemberShop({ member, tierConfig, showToast }) {
 
         {(() => {
           const shipCost = deliveryMethod === "ship"
-            ? (rates.find((r) => r.object_id === selectedRateId)?.amount || 0)
+            ? (cartTotal >= 100 ? 0 : 10)
             : 0;
           const grand = (cardChargeAmt || 0) + shipCost;
-          const disabled = checking || (deliveryMethod === "ship" && !selectedRateId);
+          const disabled = checking;
           return (
             <button
               className="mem-btn mem-btn-primary mem-btn-full"

@@ -63,15 +63,12 @@ export default function PublicShopPage() {
   const [buyerEmail, setBuyerEmail] = useState("");
   const [buyerPhone, setBuyerPhone] = useState("");
 
-  // Delivery method + shipping address + rates
+  // Delivery method + shipping address. Server-side picks the carrier
+  // rate at checkout; customer always pays our flat shipping price.
   const [deliveryMethod, setDeliveryMethod] = useState("pickup");
   const [shipAddr, setShipAddr] = useState({
     street1: "", street2: "", city: "", state: "", zip: "", country: "US",
   });
-  const [rates, setRates] = useState([]);
-  const [selectedRateId, setSelectedRateId] = useState("");
-  const [fetchingRates, setFetchingRates] = useState(false);
-  const [ratesError, setRatesError] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -138,45 +135,6 @@ export default function PublicShopPage() {
     setCart((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  async function fetchRates() {
-    setRatesError("");
-    setRates([]);
-    setSelectedRateId("");
-    if (!buyerName.trim()) { setRatesError("Enter your name first."); return; }
-    if (!shipAddr.street1 || !shipAddr.city || !shipAddr.state || !shipAddr.zip) {
-      setRatesError("Enter a complete shipping address.");
-      return;
-    }
-    setFetchingRates(true);
-    try {
-      const r = await fetch("/api/public-shop?action=rates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: cart.map((c) => ({ item_id: c.item_id, quantity: c.quantity })),
-          destination: {
-            name: buyerName.trim(),
-            street1: shipAddr.street1.trim(),
-            street2: shipAddr.street2.trim() || null,
-            city: shipAddr.city.trim(),
-            state: shipAddr.state.trim().toUpperCase(),
-            zip: shipAddr.zip.trim(),
-            country: (shipAddr.country || "US").toUpperCase(),
-            phone: buyerPhone.trim() || null,
-            email: buyerEmail.trim() || null,
-          },
-        }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.detail || d.error || "Could not fetch shipping rates");
-      setRates(d.rates || []);
-      if (d.rates?.length > 0) setSelectedRateId(d.rates[0].object_id);
-    } catch (e) {
-      setRatesError(e.message);
-    }
-    setFetchingRates(false);
-  }
-
   async function checkout() {
     setError("");
     if (cart.length === 0) { setError("Your cart is empty."); return; }
@@ -186,11 +144,13 @@ export default function PublicShopPage() {
       return;
     }
     if (deliveryMethod === "ship") {
-      if (!selectedRateId) { setError("Please choose a shipping rate."); return; }
+      if (!shipAddr.street1.trim() || !shipAddr.city.trim() || !shipAddr.state.trim() || !shipAddr.zip.trim()) {
+        setError("Please complete your shipping address.");
+        return;
+      }
     }
     setSubmitting(true);
     try {
-      const chosenRate = rates.find((r) => r.object_id === selectedRateId);
       const payload = {
         items: cart,
         buyer: {
@@ -200,12 +160,8 @@ export default function PublicShopPage() {
         },
         delivery_method: deliveryMethod,
       };
-      if (deliveryMethod === "ship" && chosenRate) {
+      if (deliveryMethod === "ship") {
         payload.shipping = {
-          rate_id: chosenRate.object_id,
-          amount: chosenRate.amount,
-          carrier: chosenRate.provider,
-          service: chosenRate.servicelevel_name,
           address: {
             street1: shipAddr.street1.trim(),
             street2: shipAddr.street2.trim() || null,
@@ -236,9 +192,6 @@ export default function PublicShopPage() {
 
   function setShipField(field, value) {
     setShipAddr((prev) => ({ ...prev, [field]: value }));
-    // Clear stale rates whenever the address changes.
-    setRates([]);
-    setSelectedRateId("");
   }
 
   return (
@@ -519,65 +472,28 @@ export default function PublicShopPage() {
                       <input type="text" placeholder="Country" value={shipAddr.country} onChange={(e) => setShipField("country", e.target.value)} style={shopInput({})} maxLength={2} />
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={fetchRates}
-                      disabled={fetchingRates}
-                      style={{
-                        marginTop: 10,
-                        padding: "10px 14px",
-                        background: "transparent",
-                        border: "1.5px solid var(--primary)",
-                        color: "var(--primary)",
-                        borderRadius: 10,
-                        fontFamily: "inherit",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                      }}
-                    >
-                      {fetchingRates ? "Fetching rates\u2026" : (rates.length > 0 ? "Refresh rates" : "Get shipping rates")}
-                    </button>
-
-                    {ratesError && (
-                      <div style={{ marginTop: 10, padding: 8, background: "var(--red-bg)", color: "var(--red)", borderRadius: 8, fontSize: 12 }}>
-                        {ratesError}
-                      </div>
-                    )}
-
-                    {rates.length > 0 && (
-                      <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-                        {rates.map((r) => (
-                          <label
-                            key={r.object_id}
-                            style={{
-                              display: "flex", justifyContent: "space-between", alignItems: "center",
-                              padding: "10px 12px", border: selectedRateId === r.object_id ? "2px solid var(--primary)" : "1.5px solid var(--border)",
-                              borderRadius: 10, background: "var(--surface)", cursor: "pointer", fontSize: 13,
-                            }}
-                          >
-                            <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                              <span style={{ fontWeight: 600 }}>{r.provider} {r.servicelevel_name}</span>
-                              {r.estimated_days && (
-                                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{r.estimated_days} business day{r.estimated_days === 1 ? "" : "s"}</span>
-                              )}
+                    {/* Flat shipping cost: $10 unless cart subtotal is
+                        $100+, then free. Server validates the address
+                        + buys the carrier label after payment; the
+                        customer never sees individual carrier rates. */}
+                    {(() => {
+                      const free = cartTotal >= 100;
+                      return (
+                        <div style={{ marginTop: 10, padding: "10px 12px", background: "var(--surface)", border: "1.5px solid var(--border)", borderRadius: 10, fontSize: 13 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                            <span style={{ fontWeight: 600 }}>Standard Shipping</span>
+                            <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: free ? "#4C8D73" : "var(--primary)" }}>
+                              {free ? "Free" : "$10.00"}
                             </span>
-                            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--primary)" }}>
-                                ${r.amount.toFixed(2)}
-                              </span>
-                              <input
-                                type="radio"
-                                name="shipping-rate"
-                                checked={selectedRateId === r.object_id}
-                                onChange={() => setSelectedRateId(r.object_id)}
-                                style={{ accentColor: "var(--primary)" }}
-                              />
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
+                          </div>
+                          {!free && (
+                            <div style={{ marginTop: 4, fontSize: 11, color: "var(--text-muted)" }}>
+                              Free shipping on orders ${(100 - cartTotal).toFixed(2)} away.
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -595,10 +511,10 @@ export default function PublicShopPage() {
 
                 {(() => {
                   const shipCost = deliveryMethod === "ship"
-                    ? (rates.find((r) => r.object_id === selectedRateId)?.amount || 0)
+                    ? (cartTotal >= 100 ? 0 : 10)
                     : 0;
                   const grand = cartTotal + shipCost;
-                  const disabled = submitting || (deliveryMethod === "ship" && !selectedRateId);
+                  const disabled = submitting;
                   return (
                     <button
                       type="button"

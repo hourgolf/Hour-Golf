@@ -30,6 +30,7 @@ import {
   buildParcelFromItems,
   createShipmentAndGetRates,
 } from "../../lib/shippo-api";
+import { customerShippingChargeCents } from "../../lib/shop-shipping";
 
 export const config = { maxDuration: 30 };
 
@@ -173,15 +174,16 @@ export default async function handler(req, res) {
     }
     const buyerPhone = (buyer.phone || "").trim() || null;
 
+    // For shipping, we only need an address from the client. Server
+    // determines the carrier rate (cheapest available) and applies our
+    // flat customer shipping policy ($10, free over $100 subtotal).
     if (deliveryMethod === "ship") {
-      if (!shipping || !shipping.rate_id || !shipping.address) {
-        return res.status(400).json({ error: "Shipping rate + address required for ship delivery" });
+      if (!shipping || !shipping.address) {
+        return res.status(400).json({ error: "Shipping address required for ship delivery" });
       }
-      if (!shipping.address.street1 || !shipping.address.city || !shipping.address.state || !shipping.address.zip) {
+      const a = shipping.address;
+      if (!a.street1 || !a.city || !a.state || !a.zip) {
         return res.status(400).json({ error: "Shipping address incomplete" });
-      }
-      if (typeof shipping.amount !== "number" || shipping.amount <= 0) {
-        return res.status(400).json({ error: "Shipping amount missing" });
       }
     }
 
@@ -259,23 +261,78 @@ export default async function handler(req, res) {
     const host = req.headers["x-forwarded-host"] || req.headers.host;
     const origin = `${proto}://${host}`;
 
-    // Append shipping line item if shipping. Stripe will sum it into
-    // the total automatically; webhook reads metadata to know the
-    // shipping context for label generation.
+    // For shipping orders: pre-validate the destination via Shippo
+    // (rate fetch) so we (a) error out before charging if we can't
+    // ship there, and (b) capture the cheapest rate id so the
+    // webhook can purchase the label after payment without a second
+    // Shippo round-trip. Customer-facing price uses our flat policy;
+    // the merchant absorbs the difference.
+    let chosenShippoRateId = null;
+    let chosenShippoCarrier = null;
+    let chosenShippoService = null;
+    let customerShippingCents = 0;
+
     if (deliveryMethod === "ship") {
-      const shippingCents = Math.round(shipping.amount * 100);
-      stripeLineItems.push({
-        quantity: 1,
-        price_data: {
-          currency: "usd",
-          unit_amount: shippingCents,
-          product_data: {
-            name: shipping.carrier && shipping.service
-              ? `Shipping (${shipping.carrier} ${shipping.service})`
-              : "Shipping",
+      let shippoCreds;
+      try {
+        shippoCreds = await getShippoCredentials(tenantId);
+      } catch (e) {
+        return res.status(503).json({ error: "Shipping not configured for this tenant", detail: e.message });
+      }
+
+      // Re-fetch dims for parcel calc (lineItems carries the item rows).
+      const parcel = buildParcelFromItems(
+        lineItems.map((li) => ({ ...li.item, quantity: li.qty }))
+      );
+
+      try {
+        const rateResult = await createShipmentAndGetRates({
+          apiKey: shippoCreds.apiKey,
+          addressFrom: shippoCreds.originAddress,
+          addressTo: {
+            name: buyerName,
+            street1: shipping.address.street1,
+            street2: shipping.address.street2 || "",
+            city: shipping.address.city,
+            state: String(shipping.address.state).toUpperCase(),
+            zip: shipping.address.zip,
+            country: String(shipping.address.country || "US").toUpperCase(),
+            phone: buyerPhone || "",
+            email: buyer.email.trim().toLowerCase(),
           },
-        },
-      });
+          parcel,
+        });
+        const validRates = (rateResult.rates || [])
+          .filter((r) => r.amount && Number(r.amount) > 0)
+          .sort((a, b) => Number(a.amount) - Number(b.amount));
+        if (validRates.length === 0) {
+          return res.status(400).json({
+            error: "We couldn't ship to that address. Please double-check it or choose pickup.",
+          });
+        }
+        const cheapest = validRates[0];
+        chosenShippoRateId = cheapest.object_id;
+        chosenShippoCarrier = cheapest.provider;
+        chosenShippoService = cheapest.servicelevel?.name || cheapest.servicelevel?.token || "";
+      } catch (e) {
+        console.error("public-shop shipping rate lookup failed:", e?.message || e);
+        return res.status(503).json({
+          error: "Could not validate shipping address. Try again or choose pickup.",
+        });
+      }
+
+      // Customer-facing shipping price (flat $10, free over $100 subtotal).
+      customerShippingCents = customerShippingChargeCents(grandTotalCents);
+      if (customerShippingCents > 0) {
+        stripeLineItems.push({
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: customerShippingCents,
+            product_data: { name: "Standard Shipping" },
+          },
+        });
+      }
     }
 
     let session;
@@ -301,12 +358,13 @@ export default async function handler(req, res) {
           buyer_phone: buyerPhone || "",
           item_count: String(lineItems.length),
           delivery_method: deliveryMethod,
-          // Stash the chosen rate id so the webhook can purchase the
-          // label without re-running the Shippo rate API.
-          shippo_rate_id: deliveryMethod === "ship" ? (shipping.rate_id || "") : "",
-          shipping_amount: deliveryMethod === "ship" ? String(shipping.amount) : "",
-          shipping_carrier: deliveryMethod === "ship" ? (shipping.carrier || "") : "",
-          shipping_service: deliveryMethod === "ship" ? (shipping.service || "") : "",
+          // Stash the cheapest rate we found pre-checkout so the
+          // webhook can purchase the label without a second Shippo
+          // round-trip. Customer charge uses our flat policy.
+          shippo_rate_id: deliveryMethod === "ship" ? (chosenShippoRateId || "") : "",
+          shipping_amount: deliveryMethod === "ship" ? String(customerShippingCents / 100) : "",
+          shipping_carrier: deliveryMethod === "ship" ? (chosenShippoCarrier || "") : "",
+          shipping_service: deliveryMethod === "ship" ? (chosenShippoService || "") : "",
         },
         payment_intent_data: {
           metadata: {
@@ -360,10 +418,10 @@ export default async function handler(req, res) {
             guest_phone: buyerPhone,
             delivery_method: deliveryMethod,
             shipping_address: deliveryMethod === "ship" && isFirst ? shipping.address : null,
-            shipping_amount: deliveryMethod === "ship" && isFirst ? shipping.amount : null,
-            shipping_carrier: deliveryMethod === "ship" && isFirst ? (shipping.carrier || null) : null,
-            shipping_service: deliveryMethod === "ship" && isFirst ? (shipping.service || null) : null,
-            shippo_rate_id: deliveryMethod === "ship" && isFirst ? shipping.rate_id : null,
+            shipping_amount: deliveryMethod === "ship" && isFirst ? customerShippingCents / 100 : null,
+            shipping_carrier: deliveryMethod === "ship" && isFirst ? (chosenShippoCarrier || null) : null,
+            shipping_service: deliveryMethod === "ship" && isFirst ? (chosenShippoService || null) : null,
+            shippo_rate_id: deliveryMethod === "ship" && isFirst ? chosenShippoRateId : null,
             notes: deliveryMethod === "ship" ? "Will ship after payment" : "Pickup at next visit",
           }),
         });
