@@ -1,5 +1,6 @@
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { getSessionWithMember } from "../../lib/member-session";
+import { pacificMonthWindow, pacificMonthTag, pacificMonthWindowFor } from "../../lib/format";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -42,11 +43,15 @@ export default async function handler(req, res) {
       } catch (_) { /* ignore */ }
     }
 
-    // Build billing month window
+    // Build billing month window in Pacific time. Members live in PT;
+    // a session that starts at 9pm PT on March 31 (= April 1 04:00 UTC)
+    // belongs in March, not April. Bucketing by PT keeps this endpoint
+    // in lockstep with the monthly_usage view (rebuilt with PT bucketing
+    // in migration 20260419030000) so admin overage + member dashboard
+    // never disagree on the same data.
     const now = new Date();
-    const billingMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+    const billingMonth = pacificMonthTag(now);
+    const { startISO: monthStart, endISO: monthEnd } = pacificMonthWindow(now);
 
     // Upcoming + currently-live confirmed bookings.
     //
@@ -123,8 +128,12 @@ export default async function handler(req, res) {
           const checkMonth = `${ry}-${String(rm).padStart(2, "0")}`;
           if (checkMonth >= currentMonth) break; // don't reconcile current month
 
-          const pmStart = new Date(ry, rm - 1, 1).toISOString();
-          const pmEnd = new Date(ry, rm, 1).toISOString();
+          // Use Pacific-time month bounds so this matches monthly_usage
+          // (the view that the admin sees + the current-month query
+          // above). Walking by UTC bounds attributed PT-late-night
+          // bookings to the wrong month and over- or under-counted
+          // overage when consuming bonus hours.
+          const { startISO: pmStart, endISO: pmEnd } = pacificMonthWindowFor(checkMonth);
           const pmBookings = await fetch(
             `${SUPABASE_URL}/rest/v1/bookings?customer_email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}&booking_status=eq.Confirmed&booking_start=gte.${pmStart}&booking_start=lt.${pmEnd}&select=duration_hours`,
             { headers: { apikey: key, Authorization: `Bearer ${key}` } }

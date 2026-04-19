@@ -8,6 +8,7 @@ import { customerShippingChargeCents } from "../../lib/shop-shipping";
 import { sendShopOrderNotification } from "../../lib/email";
 import { assertFeature } from "../../lib/feature-guard";
 import { getSessionWithMember } from "../../lib/member-session";
+import { pacificMonthWindow } from "../../lib/format";
 
 // Phase 7B-2b: per-tenant Stripe client via lib/stripe-config.
 
@@ -142,11 +143,10 @@ export default async function handler(req, res) {
       const rules = rulesResp.ok ? await rulesResp.json() : [];
       if (!rules.length) return res.status(200).json({ rules: [], progress: [] });
 
-      // Current month
-      const now = new Date();
-      const period = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
-      const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
+      // Pacific-month bounds — same as monthly_usage view + admin
+      // loyalty processor, so the live progress bar matches what
+      // gets credited at month end.
+      const { startISO: monthStart, endISO: monthEnd } = pacificMonthWindow();
 
       // Booking hours + count this month
       const bkResp = await sb(key, `bookings?tenant_id=eq.${tenantId}&booking_status=eq.Confirmed&customer_email=eq.${encodeURIComponent(member.email)}&booking_start=gte.${monthStart}&booking_start=lt.${monthEnd}&select=duration_hours`);
@@ -154,10 +154,25 @@ export default async function handler(req, res) {
       const totalHours = bks.reduce((s, b) => s + Number(b.duration_hours || 0), 0);
       const totalBookings = bks.length;
 
-      // Shop spend this month
+      // Shop spend this month — in-app orders. status='confirmed'
+      // already excludes refunded/cancelled orders. Net total goes
+      // straight to loyalty progress.
       const ordResp = await sb(key, `shop_orders?tenant_id=eq.${tenantId}&status=eq.confirmed&member_email=eq.${encodeURIComponent(member.email)}&created_at=gte.${monthStart}&created_at=lt.${monthEnd}&select=total`);
       const ords = ordResp.ok ? await ordResp.json() : [];
-      const totalSpend = ords.reduce((s, o) => s + Number(o.total || 0), 0);
+      let totalSpend = ords.reduce((s, o) => s + Number(o.total || 0), 0);
+
+      // Square POS in-store spend, net of refunds. Mirrors how
+      // /api/admin-loyalty rolls Square purchases into shop_spend so a
+      // member who buys at the register sees their progress bar tick
+      // up the same way an in-app purchase would. Excludes gift-card
+      // tenders (they'd double-reward).
+      const sqResp = await sb(key, `payments?tenant_id=eq.${tenantId}&source=eq.square_pos&status=eq.succeeded&member_email=eq.${encodeURIComponent(member.email)}&billing_month=gte.${monthStart}&billing_month=lt.${monthEnd}&select=amount_cents,refunded_cents,payment_method`);
+      const sqRows = sqResp.ok ? await sqResp.json() : [];
+      for (const r of sqRows) {
+        if (r.payment_method === "gift_card") continue;
+        const net = Math.max(0, Number(r.amount_cents || 0) - Number(r.refunded_cents || 0));
+        if (net > 0) totalSpend += net / 100;
+      }
 
       // Recent rewards
       const ledgerResp = await sb(key, `loyalty_ledger?member_email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}&reward_issued=gt.0&order=created_at.desc&limit=10`);

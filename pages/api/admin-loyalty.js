@@ -2,6 +2,7 @@ import { verifyAdmin, getServiceKey, SUPABASE_URL } from "../../lib/api-helpers"
 import { assertFeature } from "../../lib/feature-guard";
 import { getSquareCredentials } from "../../lib/square-config";
 import { adjustGiftCard } from "../../lib/square-api";
+import { pacificMonthWindowFor } from "../../lib/format";
 
 function sb(key, path, opts = {}) {
   return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -61,11 +62,13 @@ export default async function handler(req, res) {
       const { month } = req.body || {};
       if (!month) return res.status(400).json({ error: "month required (YYYY-MM)" });
 
-      // Period format: "2026-04"
+      // Period format: "2026-04". Bounds in Pacific time so the month
+      // window matches what members saw in their dashboard / loyalty
+      // progress bar (both also bucket by PT). UTC bounds previously
+      // attributed PT-late-night bookings to the wrong month, which
+      // could double-credit or under-credit at month end.
       const period = month.slice(0, 7);
-      const [yr, mo] = period.split("-").map(Number);
-      const monthStart = new Date(Date.UTC(yr, mo - 1, 1)).toISOString();
-      const monthEnd = new Date(Date.UTC(yr, mo, 1)).toISOString();
+      const { startISO: monthStart, endISO: monthEnd } = pacificMonthWindowFor(period);
 
       // Fetch enabled rules within this tenant
       const rulesResp = await sb(key, `loyalty_rules?tenant_id=eq.${tenantId}&enabled=eq.true`);
