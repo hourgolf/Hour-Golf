@@ -1,9 +1,20 @@
 import { useState, useEffect } from "react";
 import { useBranding } from "../../hooks/useBranding";
 
+// Detect if the page is running as an installed PWA. Checks every
+// standalone-ish display mode plus iOS's legacy navigator.standalone
+// flag plus the Android TWA referrer. Any match = treat as installed.
 function isStandalone() {
   if (typeof window === "undefined") return false;
-  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  const modes = ["standalone", "fullscreen", "minimal-ui", "window-controls-overlay"];
+  for (const m of modes) {
+    try {
+      if (window.matchMedia(`(display-mode: ${m})`).matches) return true;
+    } catch { /* older browsers */ }
+  }
+  if (window.navigator && window.navigator.standalone === true) return true;
+  if (typeof document !== "undefined" && document.referrer.startsWith("android-app://")) return true;
+  return false;
 }
 
 function getOS() {
@@ -14,6 +25,32 @@ function getOS() {
   return "desktop";
 }
 
+// Dismissal persists for 30 days via localStorage. sessionStorage was
+// too aggressive (dies with the tab) AND too sticky (one dismissal
+// in a still-open tab hides the banner even after uninstall, which
+// made the prompt feel inverted on reopen). 30 days gives a
+// "don't nag me this month, but remind me eventually" cadence.
+const DISMISS_KEY = "hg-install-dismissed-until";
+const DISMISS_DAYS = 30;
+
+function isDismissedActive() {
+  if (typeof localStorage === "undefined") return false;
+  try {
+    const until = Number(localStorage.getItem(DISMISS_KEY) || 0);
+    return until > Date.now();
+  } catch { return false; }
+}
+
+function setDismissedNow() {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(DISMISS_KEY, String(Date.now() + DISMISS_DAYS * 24 * 3600 * 1000));
+  } catch { /* quota / private mode */ }
+  // Best-effort: clear any lingering sessionStorage flag from older
+  // builds so state doesn't get carried forward.
+  try { sessionStorage.removeItem("hg-install-dismissed"); } catch {}
+}
+
 export default function InstallPrompt({ variant = "banner" }) {
   const [show, setShow] = useState(false);
   const [os, setOS] = useState("unknown");
@@ -22,10 +59,10 @@ export default function InstallPrompt({ variant = "banner" }) {
   const appName = branding?.app_name || "app";
 
   useEffect(() => {
-    // Don't show if already installed as app
+    // Don't show if already installed.
     if (isStandalone()) return;
-    // Don't show if previously dismissed this session
-    if (typeof sessionStorage !== "undefined" && sessionStorage.getItem("hg-install-dismissed")) return;
+    // Respect a recent dismissal.
+    if (isDismissedActive()) return;
     setOS(getOS());
     setShow(true);
   }, []);
@@ -33,9 +70,7 @@ export default function InstallPrompt({ variant = "banner" }) {
   function dismiss() {
     setDismissed(true);
     setShow(false);
-    if (typeof sessionStorage !== "undefined") {
-      sessionStorage.setItem("hg-install-dismissed", "1");
-    }
+    setDismissedNow();
   }
 
   if (!show || dismissed) return null;
