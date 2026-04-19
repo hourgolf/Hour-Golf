@@ -128,7 +128,7 @@ Templates to audit (from `lib/email.js`):
 - [x] [shared] [medium] [feature] [P2] — Tenant-configurable bay noun + bay list — shipped 2026-04-19 (`tenant_branding.bays` + `bay_label_singular`).
 - [x] [shared] [medium] [feature] [P3] — Per-tenant tier coloring — shipped 2026-04-19 (`tenant_branding.tier_colors` JSONB).
 - [x] [shared] [small] [feature] [P2] — Facility address on calendar invites — shipped 2026-04-19 (`tenant_branding.facility_address`).
-- [ ] [shared] [small] [feature] [P3] — Admin views (TodayView, WeekView, ReportsView, BookingForm) still import `BAYS` from `lib/constants` — refactor to read from branding for full multi-tenant readiness on the operator side.
+- [x] [shared] [small] [feature] [P3] — Admin views (TodayView, WeekView, ReportsView, BookingForm) refactored to read from branding — shipped 2026-04-19. Plus Badge component + dynamic grid columns.
 
 ### Theme: Loyalty / subscriptions / punch passes
 
