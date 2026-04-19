@@ -55,6 +55,16 @@ export default function MemberShop({ member, tierConfig, showToast }) {
 
   // Checkout
   const [showCheckout, setShowCheckout] = useState(false);
+  // Shipping state — same shape as the public /shop page so member +
+  // guest flows mirror each other.
+  const [deliveryMethod, setDeliveryMethod] = useState("pickup");
+  const [shipAddr, setShipAddr] = useState({
+    street1: "", street2: "", city: "", state: "", zip: "", country: "US",
+  });
+  const [rates, setRates] = useState([]);
+  const [selectedRateId, setSelectedRateId] = useState("");
+  const [fetchingRates, setFetchingRates] = useState(false);
+  const [ratesError, setRatesError] = useState("");
   const [checking, setChecking] = useState(false);
 
   const loadItems = useCallback(async () => {
@@ -138,24 +148,98 @@ export default function MemberShop({ member, tierConfig, showToast }) {
     } catch {}
   }
 
+  async function fetchRates() {
+    setRatesError("");
+    setRates([]);
+    setSelectedRateId("");
+    if (!shipAddr.street1 || !shipAddr.city || !shipAddr.state || !shipAddr.zip) {
+      setRatesError("Enter a complete shipping address.");
+      return;
+    }
+    setFetchingRates(true);
+    try {
+      const r = await fetch("/api/member-shop?action=rates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          destination: {
+            name: member.name || "",
+            street1: shipAddr.street1.trim(),
+            street2: shipAddr.street2.trim() || null,
+            city: shipAddr.city.trim(),
+            state: shipAddr.state.trim().toUpperCase(),
+            zip: shipAddr.zip.trim(),
+            country: (shipAddr.country || "US").toUpperCase(),
+            phone: member.phone || null,
+            email: member.email,
+          },
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || "Could not fetch shipping rates");
+      setRates(d.rates || []);
+      if (d.rates?.length > 0) setSelectedRateId(d.rates[0].object_id);
+    } catch (e) {
+      setRatesError(e.message);
+    }
+    setFetchingRates(false);
+  }
+
+  function setShipField(field, value) {
+    setShipAddr((prev) => ({ ...prev, [field]: value }));
+    setRates([]);
+    setSelectedRateId("");
+  }
+
   async function handleCheckout() {
+    if (deliveryMethod === "ship" && !selectedRateId) {
+      showToast("Pick a shipping rate first.", "error");
+      return;
+    }
     setChecking(true);
     try {
+      const chosenRate = rates.find((r) => r.object_id === selectedRateId);
+      const payload = { delivery_method: deliveryMethod };
+      if (deliveryMethod === "ship" && chosenRate) {
+        payload.shipping = {
+          rate_id: chosenRate.object_id,
+          amount: chosenRate.amount,
+          carrier: chosenRate.provider,
+          service: chosenRate.servicelevel_name,
+          address: {
+            street1: shipAddr.street1.trim(),
+            street2: shipAddr.street2.trim() || null,
+            city: shipAddr.city.trim(),
+            state: shipAddr.state.trim().toUpperCase(),
+            zip: shipAddr.zip.trim(),
+            country: (shipAddr.country || "US").toUpperCase(),
+          },
+        };
+      }
       const r = await fetch("/api/member-shop?action=checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify(payload),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error);
+      const tail = deliveryMethod === "ship"
+        ? (data.tracking_number ? ` Tracking #${data.tracking_number}.` : " We'll ship it shortly.")
+        : " Pick up at your next visit.";
       const msg = data.credits_used > 0
-        ? `Purchase complete! $${data.credits_used.toFixed(2)} in credits used${data.card_charged > 0 ? `, $${data.card_charged.toFixed(2)} charged to card` : ""}. Pick up at your next visit.`
-        : `Purchase complete! $${data.total.toFixed(2)} charged. Pick up at your next visit.`;
+        ? `Purchase complete! $${data.credits_used.toFixed(2)} in credits used${data.card_charged > 0 ? `, $${data.card_charged.toFixed(2)} charged to card` : ""}.${tail}`
+        : `Purchase complete! $${data.total.toFixed(2)} charged.${tail}`;
       showToast(msg);
       setShowCheckout(false);
       setCart([]);
       setCartCount(0);
       setCartTotal(0);
+      setDeliveryMethod("pickup");
+      setShipAddr({ street1: "", street2: "", city: "", state: "", zip: "", country: "US" });
+      setRates([]);
+      setSelectedRateId("");
       setTab("orders");
       await loadOrders();
       await loadItems();
@@ -532,10 +616,112 @@ export default function MemberShop({ member, tierConfig, showToast }) {
             <span>&minus;${creditsApplied.toFixed(2)}</span>
           </div>
         )}
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 20, fontWeight: 700, fontFamily: "var(--font-display)", padding: "8px 0", borderTop: "1.5px solid var(--border)" }}>
-          <span>{cardChargeAmt > 0 ? "Card Charge" : "Total"}</span>
-          <span>{cardChargeAmt > 0 ? `$${cardChargeAmt.toFixed(2)}` : "$0.00"}</span>
+
+        {/* Delivery method selector */}
+        <div style={{ margin: "16px 0 12px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>Delivery</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {["pickup", "ship"].map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setDeliveryMethod(m)}
+                style={{
+                  flex: 1, padding: "10px 12px", borderRadius: 10,
+                  border: deliveryMethod === m ? "2px solid var(--primary)" : "1.5px solid var(--border)",
+                  background: deliveryMethod === m ? "var(--primary-bg)" : "var(--surface)",
+                  color: deliveryMethod === m ? "var(--primary)" : "var(--text)",
+                  fontWeight: 600, cursor: "pointer", fontFamily: "inherit", fontSize: 13, textAlign: "center",
+                }}
+              >
+                {m === "pickup" ? "Pick up at club" : "Ship to me"}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {/* Shipping address + rate selection (only when shipping) */}
+        {deliveryMethod === "ship" && (
+          <div style={{ marginBottom: 12, padding: 12, background: "var(--primary-bg)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>Ship to</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <input type="text" placeholder="Street address" value={shipAddr.street1} onChange={(e) => setShipField("street1", e.target.value)} style={{ gridColumn: "1 / -1", padding: 10, border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", width: "100%" }} />
+              <input type="text" placeholder="Apt, suite, etc. (optional)" value={shipAddr.street2} onChange={(e) => setShipField("street2", e.target.value)} style={{ gridColumn: "1 / -1", padding: 10, border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", width: "100%" }} />
+              <input type="text" placeholder="City" value={shipAddr.city} onChange={(e) => setShipField("city", e.target.value)} style={{ padding: 10, border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", width: "100%" }} />
+              <input type="text" placeholder="State" value={shipAddr.state} onChange={(e) => setShipField("state", e.target.value)} maxLength={2} style={{ padding: 10, border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", width: "100%" }} />
+              <input type="text" placeholder="ZIP" value={shipAddr.zip} onChange={(e) => setShipField("zip", e.target.value)} style={{ padding: 10, border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", width: "100%" }} />
+              <input type="text" placeholder="Country" value={shipAddr.country} onChange={(e) => setShipField("country", e.target.value)} maxLength={2} style={{ padding: 10, border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", width: "100%" }} />
+            </div>
+
+            <button
+              type="button"
+              onClick={fetchRates}
+              disabled={fetchingRates}
+              style={{
+                marginTop: 10, padding: "10px 14px",
+                background: "transparent", border: "1.5px solid var(--primary)",
+                color: "var(--primary)", borderRadius: 10,
+                fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer",
+              }}
+            >
+              {fetchingRates ? "Fetching rates\u2026" : (rates.length > 0 ? "Refresh rates" : "Get shipping rates")}
+            </button>
+
+            {ratesError && (
+              <div style={{ marginTop: 10, padding: 8, background: "var(--red-bg)", color: "var(--red)", borderRadius: 8, fontSize: 12 }}>
+                {ratesError}
+              </div>
+            )}
+
+            {rates.length > 0 && (
+              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                {rates.map((r) => (
+                  <label
+                    key={r.object_id}
+                    style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "10px 12px",
+                      border: selectedRateId === r.object_id ? "2px solid var(--primary)" : "1.5px solid var(--border)",
+                      borderRadius: 10, background: "var(--surface)", cursor: "pointer", fontSize: 13,
+                    }}
+                  >
+                    <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <span style={{ fontWeight: 600 }}>{r.provider} {r.servicelevel_name}</span>
+                      {r.estimated_days && (
+                        <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{r.estimated_days} business day{r.estimated_days === 1 ? "" : "s"}</span>
+                      )}
+                    </span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--primary)" }}>
+                        ${r.amount.toFixed(2)}
+                      </span>
+                      <input
+                        type="radio"
+                        name="member-shipping-rate"
+                        checked={selectedRateId === r.object_id}
+                        onChange={() => setSelectedRateId(r.object_id)}
+                        style={{ accentColor: "var(--primary)" }}
+                      />
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {(() => {
+          const shipCost = deliveryMethod === "ship"
+            ? (rates.find((r) => r.object_id === selectedRateId)?.amount || 0)
+            : 0;
+          const grand = (cardChargeAmt || 0) + shipCost;
+          return (
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 20, fontWeight: 700, fontFamily: "var(--font-display)", padding: "8px 0", borderTop: "1.5px solid var(--border)" }}>
+              <span>{grand > 0 ? "Card Charge" : "Total"}</span>
+              <span>${grand.toFixed(2)}</span>
+            </div>
+          );
+        })()}
 
         {creditsApplied > 0 && cardChargeAmt <= 0 && (
           <div style={{ background: "#ddd480", borderRadius: "var(--radius)", padding: "10px 14px", margin: "8px 0 16px", fontSize: 13, textAlign: "center", color: "#35443B", fontWeight: 600 }}>
@@ -543,22 +729,38 @@ export default function MemberShop({ member, tierConfig, showToast }) {
           </div>
         )}
 
-        <div style={{ background: "var(--primary-bg)", borderRadius: "var(--radius)", padding: "12px 16px", margin: "16px 0", fontSize: 13 }}>
-          <strong style={{ color: "var(--primary)" }}>Pickup at your next visit</strong>
-          <p style={{ margin: "4px 0 0 0", color: "var(--text-muted)", fontSize: 12 }}>
-            Your items will be held at the front desk. Just let us know your name when you arrive.
-          </p>
-        </div>
+        {deliveryMethod === "pickup" && (
+          <div style={{ background: "var(--primary-bg)", borderRadius: "var(--radius)", padding: "12px 16px", margin: "16px 0", fontSize: 13 }}>
+            <strong style={{ color: "var(--primary)" }}>Pickup at your next visit</strong>
+            <p style={{ margin: "4px 0 0 0", color: "var(--text-muted)", fontSize: 12 }}>
+              Your items will be held at the front desk. Just let us know your name when you arrive.
+            </p>
+          </div>
+        )}
 
-        <button
-          className="mem-btn mem-btn-primary mem-btn-full"
-          onClick={handleCheckout}
-          disabled={checking}
-        >
-          {checking ? "Processing..." : cardChargeAmt > 0 ? `Confirm Purchase — $${cardChargeAmt.toFixed(2)}` : "Confirm Purchase — Free"}
-        </button>
+        {(() => {
+          const shipCost = deliveryMethod === "ship"
+            ? (rates.find((r) => r.object_id === selectedRateId)?.amount || 0)
+            : 0;
+          const grand = (cardChargeAmt || 0) + shipCost;
+          const disabled = checking || (deliveryMethod === "ship" && !selectedRateId);
+          return (
+            <button
+              className="mem-btn mem-btn-primary mem-btn-full"
+              onClick={handleCheckout}
+              disabled={disabled}
+              style={disabled ? { opacity: 0.6, cursor: "default" } : undefined}
+            >
+              {checking
+                ? "Processing..."
+                : grand > 0
+                  ? `Confirm Purchase — $${grand.toFixed(2)}`
+                  : "Confirm Purchase — Free"}
+            </button>
+          );
+        })()}
         <p style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", marginTop: 8 }}>
-          {cardChargeAmt > 0 ? `Your card on file will be charged $${cardChargeAmt.toFixed(2)}. This is a final sale.` : "No card charge — covered by credits. This is a final sale."}
+          {cardChargeAmt > 0 || deliveryMethod === "ship" ? "Your card on file will be charged. This is a final sale." : "No card charge — covered by credits. This is a final sale."}
         </p>
       </Modal>
     </>

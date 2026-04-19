@@ -2,6 +2,8 @@ import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers"
 import { getStripeClient } from "../../lib/stripe-config";
 import { getSquareCredentials } from "../../lib/square-config";
 import { adjustGiftCard } from "../../lib/square-api";
+import { getShippoCredentials } from "../../lib/shippo-config";
+import { buildParcelFromItems, createShipmentAndGetRates, purchaseLabel } from "../../lib/shippo-api";
 import { sendShopOrderNotification } from "../../lib/email";
 import { assertFeature } from "../../lib/feature-guard";
 import { getSessionWithMember } from "../../lib/member-session";
@@ -276,8 +278,88 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
+    // ── POST: shipping rate quote (mirrors public-shop) ──
+    if (req.method === "POST" && action === "rates") {
+      const dest = (req.body || {}).destination || {};
+      if (!dest.street1 || !dest.city || !dest.state || !dest.zip) {
+        return res.status(400).json({ error: "Destination address incomplete" });
+      }
+      // Pull cart for parcel assembly.
+      const cartResp = await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}&order=created_at.asc`);
+      const cartItems = cartResp.ok ? await cartResp.json() : [];
+      if (!cartItems.length) return res.status(400).json({ error: "Cart is empty" });
+
+      let shippo;
+      try { shippo = await getShippoCredentials(tenantId); }
+      catch (e) { return res.status(503).json({ error: "Shipping not configured", detail: e.message }); }
+
+      const itemIds = [...new Set(cartItems.map((c) => c.item_id))];
+      const itResp = await sb(key, `shop_items?id=in.(${itemIds.join(",")})&tenant_id=eq.${tenantId}&select=id,is_shippable,weight_oz,length_in,width_in,height_in`);
+      const items = itResp.ok ? await itResp.json() : [];
+      const itemMap = {};
+      items.forEach((i) => { itemMap[i.id] = i; });
+
+      for (const c of cartItems) {
+        const it = itemMap[c.item_id];
+        if (!it) return res.status(400).json({ error: "Item not found" });
+        if (it.is_shippable === false) return res.status(400).json({ error: "Cart contains a pickup-only item" });
+      }
+
+      const itemsWithDims = cartItems.map((c) => ({ ...itemMap[c.item_id], quantity: c.quantity }));
+      const parcel = buildParcelFromItems(itemsWithDims);
+
+      try {
+        const result = await createShipmentAndGetRates({
+          apiKey: shippo.apiKey,
+          addressFrom: shippo.originAddress,
+          addressTo: {
+            name: dest.name || member.name || "",
+            street1: dest.street1,
+            street2: dest.street2 || "",
+            city: dest.city,
+            state: dest.state.toUpperCase(),
+            zip: dest.zip,
+            country: (dest.country || "US").toUpperCase(),
+            phone: dest.phone || member.phone || "",
+            email: dest.email || member.email,
+          },
+          parcel,
+        });
+        const rates = (result.rates || [])
+          .filter((r) => r.amount && Number(r.amount) > 0)
+          .map((r) => ({
+            object_id: r.object_id,
+            provider: r.provider,
+            servicelevel_name: r.servicelevel?.name || r.servicelevel?.token || "",
+            amount: Number(r.amount),
+            currency: r.currency || "USD",
+            estimated_days: r.estimated_days || null,
+          }))
+          .sort((a, b) => a.amount - b.amount)
+          .slice(0, 8);
+        if (rates.length === 0) {
+          return res.status(400).json({ error: "No shipping rates available for this destination." });
+        }
+        return res.status(200).json({ rates });
+      } catch (e) {
+        console.error("member-shop rates error:", e?.message || e);
+        return res.status(500).json({ error: "Could not fetch shipping rates", detail: e.message });
+      }
+    }
+
     // ── POST: checkout (charge full cart) ──
     if (req.method === "POST" && action === "checkout") {
+      const cobody = req.body || {};
+      const deliveryMethod = cobody.delivery_method === "ship" ? "ship" : "pickup";
+      const shipping = cobody.shipping || null;
+      if (deliveryMethod === "ship") {
+        if (!shipping || !shipping.rate_id || !shipping.address) {
+          return res.status(400).json({ error: "Shipping rate + address required for ship delivery" });
+        }
+        if (typeof shipping.amount !== "number" || shipping.amount <= 0) {
+          return res.status(400).json({ error: "Shipping amount missing" });
+        }
+      }
       // 1. Fetch cart
       const cartResp = await sb(key, `shop_cart?member_email=eq.${encodeURIComponent(member.email)}&tenant_id=eq.${tenantId}&order=created_at.asc`);
       const cartItems = cartResp.ok ? await cartResp.json() : [];
@@ -311,11 +393,14 @@ export default async function handler(req, res) {
 
       grandTotal = Math.round(grandTotal * 100) / 100;
 
-      // 4. Apply pro shop credits
+      // 4. Apply pro shop credits (against item total only — shipping is
+      //    a passthrough cost paid in full on the card).
       const creditBalance = Number(member.shop_credit_balance || 0);
       const creditsUsed = Math.min(creditBalance, grandTotal);
-      const cardCharge = Math.round((grandTotal - creditsUsed) * 100) / 100;
-      const cardChargeCents = Math.round(cardCharge * 100);
+      const itemsCardChargeCents = Math.round((grandTotal - creditsUsed) * 100);
+      const shippingCents = deliveryMethod === "ship" ? Math.round(shipping.amount * 100) : 0;
+      const cardCharge = Math.round((itemsCardChargeCents + shippingCents)) / 100;
+      const cardChargeCents = itemsCardChargeCents + shippingCents;
 
       // 5. Charge Stripe (if card charge needed)
       let pi = null;
@@ -490,6 +575,25 @@ export default async function handler(req, res) {
       // back to the order tax total.
       const totalTaxCents = pi?.__hg_tax_cents || 0;
       const taxTransactionId = pi?.__hg_tax_transaction_id || null;
+
+      // Purchase the Shippo label NOW (PI succeeded, payment captured).
+      // First row of the order gets the label info; we mirror tracking
+      // onto every row in the for-loop below for display.
+      let label = null;
+      if (deliveryMethod === "ship" && pi?.status === "succeeded") {
+        try {
+          const shippoCreds = await getShippoCredentials(tenantId);
+          label = await purchaseLabel({
+            apiKey: shippoCreds.apiKey,
+            rateId: shipping.rate_id,
+          });
+          console.log(`member-shop: label purchased (tracking ${label.tracking_number})`);
+        } catch (e) {
+          console.error("member-shop: label purchase failed:", e.message);
+          // Don't fail the checkout — buyer's payment is captured.
+          // An admin can re-trigger label purchase manually later.
+        }
+      }
       // Allocate tax across line items proportional to lineTotal so
       // the per-row tax_amount column at least reflects each row's
       // share. Float drift is rounded to cents.
@@ -515,6 +619,7 @@ export default async function handler(req, res) {
             perRowTaxCents = Math.round((lineTotalCents / grandTotalCents) * totalTaxCents);
           }
         }
+        const isFirst = idx === 0;
         await sb(key, "shop_orders", {
           method: "POST",
           body: JSON.stringify({
@@ -529,14 +634,27 @@ export default async function handler(req, res) {
             total: li.lineTotal,
             status: "confirmed",
             stripe_payment_intent_id: pi?.id || null,
-            notes: "Pick up at next visit",
+            notes: deliveryMethod === "ship" ? "Will ship after payment" : "Pick up at next visit",
             receipt_url: receiptUrl,
             receipt_number: receiptNumber,
             payment_method: paymentMethodKind,
             card_last_4: cardLast4,
             card_brand: cardBrand,
             tax_amount: perRowTaxCents > 0 ? perRowTaxCents / 100 : null,
-            stripe_tax_transaction_id: idx === 0 && taxTransactionId ? taxTransactionId : null,
+            stripe_tax_transaction_id: isFirst && taxTransactionId ? taxTransactionId : null,
+            // Shipping context — first row of the order carries the
+            // address + amount + chosen rate; tracking info gets
+            // mirrored onto every row so the Orders tab shows it.
+            delivery_method: deliveryMethod,
+            shipping_address: deliveryMethod === "ship" && isFirst ? shipping.address : null,
+            shipping_amount: deliveryMethod === "ship" && isFirst ? shipping.amount : null,
+            shipping_carrier: deliveryMethod === "ship" && isFirst ? (shipping.carrier || null) : null,
+            shipping_service: deliveryMethod === "ship" && isFirst ? (shipping.service || null) : null,
+            shippo_rate_id: deliveryMethod === "ship" && isFirst ? shipping.rate_id : null,
+            shippo_transaction_id: label?.transaction_id || null,
+            tracking_number: label?.tracking_number || null,
+            tracking_url: label?.tracking_url || null,
+            label_url: label?.label_url || null,
           }),
         });
         // Increment quantity_claimed
@@ -569,6 +687,11 @@ export default async function handler(req, res) {
         total: grandTotal,
         credits_used: creditsUsed,
         card_charged: cardCharge,
+        shipping_amount: deliveryMethod === "ship" ? shipping.amount : null,
+        delivery_method: deliveryMethod,
+        tracking_number: label?.tracking_number || null,
+        tracking_url: label?.tracking_url || null,
+        label_url: label?.label_url || null,
         item_count: lineItems.length,
         stripe_payment_intent_id: pi?.id || null,
       });
