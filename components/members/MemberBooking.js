@@ -62,6 +62,18 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
   const [sheetBooking, setSheetBooking] = useState(false);
   const [sheetMsg, setSheetMsg] = useState("");
 
+  // Post-booking success panel — replaces the inline form after a
+  // successful submit so the form can't redraw a stale "slot conflict"
+  // red error against the booking the member just made (the previous
+  // auto-advance reset sometimes landed on a slot that conflicted with
+  // an unrelated existing booking, flashing red right after a success
+  // toast — confusing).
+  const [bookSuccess, setBookSuccess] = useState(null);
+
+  // Most recent past booking for the "Repeat last" chip in the sheet
+  // header. Populated lazily from /api/member-data; null hides the chip.
+  const [lastBooking, setLastBooking] = useState(null);
+
   // Filter hours: if booking today, hide times that have already passed
   const isToday = bookDate === todayStr;
   const currentTime = nowPacific();
@@ -78,6 +90,22 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
       .then((d) => setAvailability(d.bookings || []))
       .catch(() => setAvailability([]));
   }, [bookDate]);
+
+  // Pull the member's most recent booking once on mount so we can offer
+  // "Repeat last" in the sheet. Cheap — same /api/member-data the
+  // dashboard already uses; just here we only care about monthBookings.
+  useEffect(() => {
+    fetch("/api/member-data", { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (!d?.monthBookings || d.monthBookings.length === 0) return;
+        const sorted = [...d.monthBookings].sort(
+          (a, b) => new Date(b.booking_start) - new Date(a.booking_start)
+        );
+        setLastBooking(sorted[0] || null);
+      })
+      .catch(() => {});
+  }, []);
 
   // When date changes to today and start time is in the past, auto-advance
   useEffect(() => {
@@ -146,31 +174,41 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
     try {
       await postBooking({ date: bookDate, startTime: bookStartTime, endTime: bookEndTime, bay: bookBay });
       showToast("\u2713 Booking confirmed! Check your email.");
-      // Advance to the slot right after what was just booked so the form
-      // doesn't immediately show a red conflict against the new booking.
-      const justBookedDurationSlots = Math.max(
-        1,
-        HOURS.indexOf(bookEndTime) - HOURS.indexOf(bookStartTime)
-      );
-      const advancedStartIdx = HOURS.indexOf(bookEndTime);
-      if (advancedStartIdx >= 0 && advancedStartIdx + 1 < HOURS.length) {
-        setBookStartTime(HOURS[advancedStartIdx]);
-        const advancedEndIdx = Math.min(
-          advancedStartIdx + justBookedDurationSlots,
-          HOURS.length - 1
-        );
-        setBookEndTime(HOURS[advancedEndIdx]);
-      } else {
-        setBookStartTime(HOURS.length > 0 ? HOURS[0] : defaultStart);
-        setBookEndTime(HOURS.length > 4 ? HOURS[4] : HOURS[HOURS.length - 1] || defaultEnd);
-      }
-      setBookBay("Bay 1");
+      // Swap the form for a success panel. Holding the booking details
+      // here (date / start / end / bay) lets the panel show what was
+      // booked without depending on form state that we'd otherwise reset.
+      setBookSuccess({
+        date: bookDate,
+        startTime: bookStartTime,
+        endTime: bookEndTime,
+        bay: bookBay,
+      });
       setTermsAccepted(false);
       refetchAvailability();
     } catch (err) {
       setBookMsg(err.message);
     }
     setBooking(false);
+  }
+
+  // "Book another" — clears the success panel and resets the form to a
+  // sensible non-conflicting starting point (the slot right after the
+  // one just booked). Falls back to first bookable hour when the just-
+  // booked end was the last slot of the day.
+  function resetForBookAnother() {
+    if (!bookSuccess) { setBookSuccess(null); return; }
+    const advancedStartIdx = HOURS.indexOf(bookSuccess.endTime);
+    if (advancedStartIdx >= 0 && advancedStartIdx + 1 < HOURS.length) {
+      setBookStartTime(HOURS[advancedStartIdx]);
+      const dur = Math.max(1, HOURS.indexOf(bookSuccess.endTime) - HOURS.indexOf(bookSuccess.startTime));
+      const advancedEndIdx = Math.min(advancedStartIdx + dur, HOURS.length - 1);
+      setBookEndTime(HOURS[advancedEndIdx]);
+    } else {
+      setBookStartTime(HOURS[0] || defaultStart);
+      setBookEndTime(HOURS[4] || HOURS[HOURS.length - 1] || defaultEnd);
+    }
+    setBookBay("Bay 1");
+    setBookSuccess(null);
   }
 
   // ---- Quick-book sheet ---------------------------------------------------
@@ -292,6 +330,48 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
   const supportContact = branding?.support_email
     ? branding.support_email
     : (branding?.support_phone || null);
+  // Tap-to-contact helper for the sheet's policy line. Mirrors the
+  // pattern used on the dashboard: prefer email so members get a written
+  // paper trail; fall back to phone; renders as plain text if neither
+  // is configured for the tenant.
+  const supportLink = branding?.support_email
+    ? `mailto:${branding.support_email}`
+    : branding?.support_phone
+    ? `tel:${branding.support_phone.replace(/[^0-9+]/g, "")}`
+    : null;
+
+  // "Repeat last booking" — pre-fills the sheet from the member's most
+  // recent past booking. Bay carries over verbatim; start/end clamp to
+  // today's bookable HOURS window so we don't open the sheet into a
+  // 6:30am-but-it's-now-2pm conflict. Date stays whatever the grid is
+  // showing (members hit Repeat from inside the grid context).
+  function openSheetFromLast() {
+    if (!lastBooking) return;
+    const lb = lastBooking;
+    const lbStart = new Date(lb.booking_start);
+    const lbEnd = new Date(lb.booking_end);
+    const hh = (d) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    let s = hh(lbStart);
+    let e = hh(lbEnd);
+    // Clamp into current HOURS — if the original start has passed today,
+    // walk forward to the first bookable hour.
+    if (!HOURS.includes(s)) {
+      s = HOURS[0] || defaultStart;
+      // Match original duration when possible.
+      const dur = Math.max(1, Math.round((lbEnd - lbStart) / (15 * 60 * 1000)));
+      const sIdx = ALL_HOURS.indexOf(s);
+      const eIdx = sIdx >= 0 ? Math.min(sIdx + dur, ALL_HOURS.length - 1) : -1;
+      e = eIdx > sIdx ? ALL_HOURS[eIdx] : (HOURS[4] || HOURS[HOURS.length - 1] || defaultEnd);
+    } else if (!ALL_HOURS.includes(e) || ALL_HOURS.indexOf(e) <= ALL_HOURS.indexOf(s)) {
+      e = ALL_HOURS[Math.min(ALL_HOURS.indexOf(s) + 4, ALL_HOURS.length - 1)] || defaultEnd;
+    }
+    setSheetBay(lb.bay || "Bay 1");
+    setSheetStart(s);
+    setSheetEnd(e);
+    setSheetTerms(false);
+    setSheetMsg("");
+    setSheetOpen(true);
+  }
 
   return (
     <>
@@ -309,9 +389,43 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
         </div>
       )}
 
-      <div className="mem-section">
+      {/* Inline form — desktop-only after mobile polish; mobile users
+          drive everything from the availability grid + sheet, which has
+          presets, chips, and a clearer summary. */}
+      <div className="mem-section mem-book-inline">
         <div className="mem-section-head">Book a Bay</div>
 
+        {bookSuccess ? (
+          (() => {
+            const s = new Date(`${bookSuccess.date}T${bookSuccess.startTime}:00`);
+            const e = new Date(`${bookSuccess.date}T${bookSuccess.endTime}:00`);
+            return (
+              <div className="mem-book-success">
+                <div className="mem-book-success-icon" aria-hidden="true">✓</div>
+                <div className="mem-book-success-title">Booked.</div>
+                <div className="mem-book-success-when">
+                  {fT(s)} – {fT(e)} <span className="mem-book-success-bay">· {bookSuccess.bay}</span>
+                </div>
+                <div className="mem-book-success-date">{fDL(new Date(`${bookSuccess.date}T12:00:00`))}</div>
+                <div className="mem-book-success-meta">
+                  🔑 We'll email your access code about 10 min before start.
+                </div>
+                <div className="mem-book-success-actions">
+                  <button className="mem-book-btn" style={{ marginTop: 0, flex: 1 }} onClick={resetForBookAnother}>
+                    Book another
+                  </button>
+                  <button
+                    className="mem-btn"
+                    style={{ flex: 1, marginTop: 0 }}
+                    onClick={() => router.push("/members/dashboard")}
+                  >
+                    View dashboard
+                  </button>
+                </div>
+              </div>
+            );
+          })()
+        ) : (
         <div className="mem-book-form">
           <div className="mem-form-row">
             <label>Date</label>
@@ -390,12 +504,28 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
             {booking ? "Booking..." : "Confirm Booking."}
           </button>
         </div>
+        )}
       </div>
 
       {/* Availability Grid */}
       <div className="mem-section">
-        <div className="mem-section-head">
-          Availability &mdash; {fDL(new Date(bookDate + "T12:00:00"))}
+        {/* Sticky day-bar — keeps the date + a quick picker visible while
+            the member scrolls the long availability grid. On mobile this
+            replaces the inline form's date picker entirely. */}
+        <div className="mem-grid-date-bar">
+          <div className="mem-grid-date-bar-label">{fDL(new Date(bookDate + "T12:00:00"))}</div>
+          <div className="mem-grid-date-bar-picker">
+            <DatePicker
+              value={bookDate}
+              onChange={setBookDate}
+              min={todayStr}
+              max={maxDateStr}
+              timezone={TZ}
+            />
+          </div>
+        </div>
+        <div className="mem-section-head" style={{ marginTop: 4 }}>
+          Availability
         </div>
         <div className="mem-avail-grid">
           <div className="mem-avail-hdr">Time</div>
@@ -431,7 +561,19 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
           <div className="mem-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="mem-sheet-head">
               <div className="mem-sheet-title">Confirm booking</div>
-              <button type="button" className="mem-sheet-close" onClick={closeSheet} aria-label="Close">&times;</button>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {lastBooking && (
+                  <button
+                    type="button"
+                    className="mem-sheet-repeat"
+                    onClick={openSheetFromLast}
+                    title="Pre-fill with your last booking"
+                  >
+                    <span style={{ fontSize: 14, lineHeight: 1 }}>↻</span> Repeat last
+                  </button>
+                )}
+                <button type="button" className="mem-sheet-close" onClick={closeSheet} aria-label="Close">&times;</button>
+              </div>
             </div>
             <div className="mem-sheet-body">
               <div className="mem-sheet-summary">
@@ -452,6 +594,9 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
                   max={maxDateStr}
                   timezone={TZ}
                 />
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+                  Book up to 7 days in advance.
+                </div>
               </div>
 
               <div className="mem-sheet-section">
@@ -518,7 +663,16 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
                 <div><strong>Cancellation:</strong> Cancellations within 3 hours of your booking may be charged a fee.</div>
                 <div><strong>Access code:</strong> A door code will be emailed to you about 10 minutes before your start time.</div>
                 {supportContact && (
-                  <div><strong>Need to change something?</strong> Reach out at {supportContact}.</div>
+                  <div>
+                    <strong>Need to change something?</strong>{" "}
+                    {supportLink ? (
+                      <a href={supportLink} style={{ color: "var(--primary)", fontWeight: 600 }}>
+                        {supportContact}
+                      </a>
+                    ) : (
+                      <>Reach out at {supportContact}.</>
+                    )}
+                  </div>
                 )}
               </div>
 
