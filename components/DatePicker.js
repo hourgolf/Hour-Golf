@@ -26,6 +26,46 @@ function formatDisplay(iso) {
   });
 }
 
+// Accept free-form typed input in a handful of common US date formats
+// and normalize to our canonical YYYY-MM-DD. Returns "" for an empty
+// string (caller treats as clear), null for unparseable.
+function tryParseTypedDate(text) {
+  const s = (text || "").trim();
+  if (!s) return "";
+
+  // YYYY-MM-DD (our canonical — also what type="date" inputs emit)
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return validateISO(`${m[1]}-${pad2(m[2])}-${pad2(m[3])}`);
+
+  // MM/DD/YYYY and M/D/YYYY
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return validateISO(`${m[3]}-${pad2(m[1])}-${pad2(m[2])}`);
+
+  // MM/DD/YY — 2-digit year. <=49 -> 20YY, 50+ -> 19YY. Matches how
+  // browsers and most US business apps disambiguate.
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if (m) {
+    const yy = Number(m[3]);
+    const yyyy = yy <= 49 ? 2000 + yy : 1900 + yy;
+    return validateISO(`${yyyy}-${pad2(m[1])}-${pad2(m[2])}`);
+  }
+
+  // MM-DD-YYYY (some users do this)
+  m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (m) return validateISO(`${m[3]}-${pad2(m[1])}-${pad2(m[2])}`);
+
+  return null;
+}
+
+// Reject ISOs that aren't a real calendar date (e.g. 2024-02-30).
+function validateISO(iso) {
+  const { y, m, d } = parseISODate(iso);
+  if (y < 1 || m < 0 || m > 11 || d < 1) return null;
+  const dt = new Date(y, m, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== m || dt.getDate() !== d) return null;
+  return iso;
+}
+
 function daysInMonth(y, monthIdx) {
   return new Date(y, monthIdx + 1, 0).getDate();
 }
@@ -66,7 +106,11 @@ export default function DatePicker({
   const [open, setOpen] = useState(false);
   const [view, setView] = useState({ y: initY, m: initM });
   const [focusedISO, setFocusedISO] = useState(initial);
+  // typedText tracks what the user has typed since focusing the input;
+  // null means "show the formatted value, input isn't being edited".
+  const [typedText, setTypedText] = useState(null);
 
+  const inputRef = useRef(null);
   const triggerRef = useRef(null);
   const popoverRef = useRef(null);
   const gridRef = useRef(null);
@@ -77,6 +121,9 @@ export default function DatePicker({
     const { y, m } = parseISODate(value);
     setView({ y, m });
     setFocusedISO(value);
+    // External value change wins over anything the user typed; clear
+    // the typed buffer so the input renders the formatted display.
+    setTypedText(null);
   }, [value]);
 
   // Escape + outside-click while open.
@@ -126,9 +173,39 @@ export default function DatePicker({
   function selectDate(iso) {
     if (isDisabled(iso)) return;
     onChange(iso);
+    setTypedText(null);
     setOpen(false);
-    triggerRef.current?.focus();
+    inputRef.current?.focus();
   }
+
+  // Commit whatever the user typed on blur or Enter. Invalid input is
+  // left in place and visually flagged — we don't silently snap to a
+  // "close" date.
+  function commitTypedInput() {
+    if (typedText === null) return;
+    const parsed = tryParseTypedDate(typedText);
+    if (parsed === null) {
+      // Unparseable: keep the input open so the user can fix. The
+      // parseError flag drives the red border below.
+      return;
+    }
+    if (parsed === "") {
+      onChange("");
+      setTypedText(null);
+      return;
+    }
+    if (min && parsed < min) return;
+    if (max && parsed > max) return;
+    onChange(parsed);
+    setTypedText(null);
+  }
+
+  const typedParseAttempt = typedText !== null ? tryParseTypedDate(typedText) : null;
+  const typedParseError = typedText !== null && typedText !== "" && (
+    typedParseAttempt === null ||
+    (min && typedParseAttempt && typedParseAttempt < min) ||
+    (max && typedParseAttempt && typedParseAttempt > max)
+  );
 
   function changeMonth(delta) {
     const next = new Date(view.y, view.m + delta, 1);
@@ -206,24 +283,54 @@ export default function DatePicker({
 
   return (
     <div className="hg-datepicker">
-      <button
-        type="button"
+      <div
         ref={triggerRef}
-        className="hg-dp-trigger"
-        onClick={() => (open ? setOpen(false) : openPicker())}
-        aria-haspopup="dialog"
-        aria-expanded={open}
+        className={`hg-dp-trigger ${typedParseError ? "hg-dp-trigger--error" : ""}`}
       >
-        <span className={value ? "" : "hg-dp-placeholder"}>
-          {value ? formatDisplay(value) : placeholder}
-        </span>
-        <svg className="hg-dp-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <rect x="3" y="4" width="18" height="18" rx="2" />
-          <line x1="16" y1="2" x2="16" y2="6" />
-          <line x1="8"  y1="2" x2="8"  y2="6" />
-          <line x1="3"  y1="10" x2="21" y2="10" />
-        </svg>
-      </button>
+        <input
+          ref={inputRef}
+          type="text"
+          className="hg-dp-input"
+          value={typedText !== null ? typedText : (value ? formatDisplay(value) : "")}
+          placeholder={placeholder}
+          onFocus={() => {
+            // Enter "editing" mode — blank the input for typing if
+            // nothing is set, else show ISO for easier editing.
+            if (typedText === null) {
+              setTypedText(value || "");
+              // Defer selectAll so the browser sees the new value.
+              setTimeout(() => inputRef.current?.select(), 0);
+            }
+          }}
+          onChange={(e) => setTypedText(e.target.value)}
+          onBlur={commitTypedInput}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitTypedInput();
+            } else if (e.key === "Escape") {
+              setTypedText(null);
+              inputRef.current?.blur();
+            }
+          }}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+        />
+        <button
+          type="button"
+          className="hg-dp-trigger-icon-btn"
+          onClick={() => (open ? setOpen(false) : openPicker())}
+          aria-label={open ? "Close calendar" : "Open calendar"}
+          title={open ? "Close calendar" : "Open calendar"}
+        >
+          <svg className="hg-dp-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8"  y1="2" x2="8"  y2="6" />
+            <line x1="3"  y1="10" x2="21" y2="10" />
+          </svg>
+        </button>
+      </div>
 
       {open && (
         <div className="hg-dp-popover" ref={popoverRef} role="dialog" aria-label="Choose a date">
