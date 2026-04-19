@@ -4,7 +4,7 @@ import { usePlatformAuth } from "../../../hooks/usePlatformAuth";
 import PlatformShell from "../../../components/platform/PlatformShell";
 import TenantBranding from "../../../components/settings/TenantBranding";
 
-const TABS = ["Overview", "Branding", "Stripe", "Seam", "Square", "Features", "Billing"];
+const TABS = ["Overview", "Branding", "Stripe", "Seam", "Square", "Shippo", "Features", "Billing"];
 
 const FEATURE_KEYS = [
   { key: "bookings", label: "Bookings", hint: "Bay reservations, Skedda sync" },
@@ -98,6 +98,7 @@ export default function PlatformTenantDetail() {
           {tab === "Stripe" && <StripeTab detail={detail} apiKey={apiKey} onSaved={reload} />}
           {tab === "Seam" && <SeamTab detail={detail} apiKey={apiKey} />}
           {tab === "Square" && <SquareTab detail={detail} apiKey={apiKey} />}
+          {tab === "Shippo" && <ShippoTab detail={detail} apiKey={apiKey} />}
           {tab === "Features" && <FeaturesTab detail={detail} apiKey={apiKey} onSaved={reload} />}
           {tab === "Billing" && <BillingTab detail={detail} apiKey={apiKey} />}
         </>
@@ -1030,6 +1031,193 @@ function SquareTab({ detail, apiKey }) {
           {saving ? "Saving…" : "Save Square config"}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// Shippo
+// ───────────────────────────────────────────────────────────
+
+function ShippoTab({ detail, apiKey }) {
+  const tenantId = detail.tenant.id;
+  const [cfg, setCfg] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [enabled, setEnabled] = useState(false);
+  const [tokenInput, setTokenInput] = useState("");
+  // Origin address — flat fields so the form is straightforward.
+  const [origin, setOrigin] = useState({
+    name: "", company: "",
+    street1: "", street2: "",
+    city: "", state: "", zip: "", country: "US",
+    phone: "", email: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await fetch(`/api/platform-tenant-shippo?tenant_id=${encodeURIComponent(tenantId)}`, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        const d = r.ok ? await r.json() : null;
+        if (!cancelled) {
+          setCfg(d);
+          setEnabled(d?.enabled ?? false);
+          setOrigin({
+            name: d?.origin_name || "",
+            company: d?.origin_company || "",
+            street1: d?.origin_street1 || "",
+            street2: d?.origin_street2 || "",
+            city: d?.origin_city || "",
+            state: d?.origin_state || "",
+            zip: d?.origin_zip || "",
+            country: d?.origin_country || "US",
+            phone: d?.origin_phone || "",
+            email: d?.origin_email || "",
+          });
+        }
+      } catch (e) {
+        if (!cancelled) setErr(e.message);
+      }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [tenantId, apiKey]);
+
+  function setOriginField(field, value) {
+    setOrigin((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function save() {
+    setSaving(true);
+    setErr("");
+    setStatus("");
+    const payload = { tenant_id: tenantId, enabled };
+    if (tokenInput.trim()) payload.api_key = tokenInput.trim();
+    payload.origin_name = origin.name;
+    payload.origin_company = origin.company;
+    payload.origin_street1 = origin.street1;
+    payload.origin_street2 = origin.street2;
+    payload.origin_city = origin.city;
+    payload.origin_state = origin.state.toUpperCase();
+    payload.origin_zip = origin.zip;
+    payload.origin_country = origin.country.toUpperCase();
+    payload.origin_phone = origin.phone;
+    payload.origin_email = origin.email;
+    try {
+      const r = await fetch("/api/platform-tenant-shippo", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || "Save failed");
+      setCfg(d);
+      setTokenInput("");
+      setStatus("Saved. Cache invalidated — next rate quote uses new values.");
+    } catch (e) {
+      setErr(e.message);
+    }
+    setSaving(false);
+  }
+
+  if (loading) return <div className="p-muted">Loading Shippo config…</div>;
+
+  return (
+    <div className="p-card" style={{ maxWidth: 720 }}>
+      <div className="p-card-header">
+        <div>
+          <div className="p-card-title">Shippo (shipping carrier API)</div>
+          <div className="p-card-subtitle">
+            API key + origin address used by the public /shop guest
+            checkout to fetch rates and purchase labels post-payment.
+          </div>
+        </div>
+        <span className={`p-pill ${cfg?.enabled ? "p-pill--green" : "p-pill--gray"}`}>
+          {cfg ? (cfg.enabled ? "Enabled" : "Disabled") : "Not configured"}
+        </span>
+      </div>
+      <div className="p-card-body">
+        <div className="p-stack">
+          <div className="p-field">
+            <label className="p-field-label">Kill switch</label>
+            <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0" }}>
+              <input
+                className="p-checkbox"
+                type="checkbox"
+                checked={enabled}
+                onChange={(e) => setEnabled(e.target.checked)}
+              />
+              <span style={{ fontSize: 13 }}>
+                Enabled
+                <span className="p-subtle" style={{ fontSize: 11, marginLeft: 6 }}>
+                  — off pauses rate fetching + label purchase
+                </span>
+              </span>
+            </label>
+          </div>
+
+          <KeyRow
+            label="Shippo API token"
+            existing={cfg?.api_key}
+            placeholder="shippo_live_… or shippo_test_…"
+            value={tokenInput}
+            onChange={setTokenInput}
+          />
+
+          <div style={{ marginTop: 8, fontWeight: 700, fontSize: 12, color: "var(--p-text)" }}>Origin address (where labels ship from)</div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <ShippoInput label="Contact name"   value={origin.name}     onChange={(v) => setOriginField("name", v)} placeholder="Hour Golf" />
+            <ShippoInput label="Company"        value={origin.company}  onChange={(v) => setOriginField("company", v)} placeholder="Hour Golf LLC" />
+            <ShippoInput label="Street 1"       value={origin.street1}  onChange={(v) => setOriginField("street1", v)} placeholder="Required" wide />
+            <ShippoInput label="Street 2"       value={origin.street2}  onChange={(v) => setOriginField("street2", v)} placeholder="Suite, etc." wide />
+            <ShippoInput label="City"           value={origin.city}     onChange={(v) => setOriginField("city", v)} placeholder="Portland" />
+            <ShippoInput label="State"          value={origin.state}    onChange={(v) => setOriginField("state", v)} placeholder="OR" />
+            <ShippoInput label="ZIP"            value={origin.zip}      onChange={(v) => setOriginField("zip", v)} placeholder="97201" />
+            <ShippoInput label="Country"        value={origin.country}  onChange={(v) => setOriginField("country", v)} placeholder="US" />
+            <ShippoInput label="Phone"          value={origin.phone}    onChange={(v) => setOriginField("phone", v)} placeholder="503-555-1234" />
+            <ShippoInput label="Email"          value={origin.email}    onChange={(v) => setOriginField("email", v)} placeholder="ship@hour.golf" />
+          </div>
+
+          {status && <div className="p-msg p-msg--ok">{status}</div>}
+          {err && <div className="p-msg p-msg--error">{err}</div>}
+        </div>
+      </div>
+      <div className="p-card-footer">
+        {cfg && (
+          <span className="p-subtle" style={{ fontSize: 11, marginRight: "auto", alignSelf: "center" }}>
+            Last updated {cfg.updated_at ? new Date(cfg.updated_at).toLocaleString() : "—"}
+          </span>
+        )}
+        <button
+          className="p-btn p-btn--primary"
+          onClick={save}
+          disabled={saving || (!cfg && (!tokenInput.trim() || !origin.street1 || !origin.city || !origin.state || !origin.zip))}
+        >
+          {saving ? "Saving…" : "Save Shippo config"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ShippoInput({ label, value, onChange, placeholder, wide }) {
+  return (
+    <div className="p-field" style={wide ? { gridColumn: "1 / -1" } : undefined}>
+      <label className="p-field-label">{label}</label>
+      <input
+        className="p-input"
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder || ""}
+      />
     </div>
   );
 }

@@ -25,6 +25,11 @@ import {
   getTenantId,
 } from "../../lib/api-helpers";
 import { getStripeClient } from "../../lib/stripe-config";
+import { getShippoCredentials } from "../../lib/shippo-config";
+import {
+  buildParcelFromItems,
+  createShipmentAndGetRates,
+} from "../../lib/shippo-api";
 
 export const config = { maxDuration: 30 };
 
@@ -63,11 +68,98 @@ export default async function handler(req, res) {
     return res.status(200).json({ items });
   }
 
+  // ── POST: shipping rate quote ───────────────────────────────────────
+  // Body: { items: [{item_id, quantity}], destination: { name, street1,
+  //        street2?, city, state, zip, country?, phone?, email? } }
+  // Returns: { rates: [{ object_id, provider, servicelevel: { name },
+  //                      amount, currency, estimated_days }] }
+  if (req.method === "POST" && action === "rates") {
+    const body = req.body || {};
+    const cart = Array.isArray(body.items) ? body.items : [];
+    const dest = body.destination || {};
+    if (cart.length === 0) return res.status(400).json({ error: "Cart is empty" });
+    if (!dest.street1 || !dest.city || !dest.state || !dest.zip) {
+      return res.status(400).json({ error: "Destination address incomplete" });
+    }
+
+    let shippo;
+    try { shippo = await getShippoCredentials(tenantId); }
+    catch (e) { return res.status(503).json({ error: "Shipping not configured", detail: e.message }); }
+
+    // Fetch item dims to build the parcel.
+    const itemIds = [...new Set(cart.map((c) => c.item_id).filter(Boolean))];
+    const itResp = await sb(
+      key,
+      `shop_items?id=in.(${itemIds.join(",")})&tenant_id=eq.${tenantId}&select=id,is_shippable,weight_oz,length_in,width_in,height_in`
+    );
+    const items = itResp.ok ? await itResp.json() : [];
+    const itemMap = {};
+    items.forEach((i) => { itemMap[i.id] = i; });
+
+    // Reject if any item is flagged not-shippable.
+    for (const c of cart) {
+      const it = itemMap[c.item_id];
+      if (!it) return res.status(400).json({ error: "Item not found" });
+      if (it.is_shippable === false) {
+        return res.status(400).json({ error: "Cart contains a pickup-only item" });
+      }
+    }
+
+    const itemsWithDims = cart.map((c) => ({
+      ...itemMap[c.item_id],
+      quantity: c.quantity || 1,
+    }));
+    const parcel = buildParcelFromItems(itemsWithDims);
+
+    try {
+      const result = await createShipmentAndGetRates({
+        apiKey: shippo.apiKey,
+        addressFrom: shippo.originAddress,
+        addressTo: {
+          name: dest.name || "",
+          street1: dest.street1,
+          street2: dest.street2 || "",
+          city: dest.city,
+          state: dest.state.toUpperCase(),
+          zip: dest.zip,
+          country: (dest.country || "US").toUpperCase(),
+          phone: dest.phone || "",
+          email: dest.email || "",
+        },
+        parcel,
+      });
+      // Sort cheapest first; trim to a reasonable number so the UI
+      // doesn't drown in obscure servicelevels.
+      const rates = (result.rates || [])
+        .filter((r) => r.amount && Number(r.amount) > 0)
+        .map((r) => ({
+          object_id: r.object_id,
+          provider: r.provider,
+          servicelevel_name: r.servicelevel?.name || r.servicelevel?.token || "",
+          amount: Number(r.amount),
+          currency: r.currency || "USD",
+          estimated_days: r.estimated_days || null,
+          duration_terms: r.duration_terms || "",
+        }))
+        .sort((a, b) => a.amount - b.amount)
+        .slice(0, 8);
+      if (rates.length === 0) {
+        return res.status(400).json({ error: "No shipping rates available for this destination." });
+      }
+      return res.status(200).json({ shipment_id: result.shipment_id, rates });
+    } catch (e) {
+      console.error("public-shop rates error:", e?.message || e);
+      return res.status(500).json({ error: "Could not fetch shipping rates", detail: e.message });
+    }
+  }
+
   // ── POST: checkout ──────────────────────────────────────────────────
   if (req.method === "POST" && action === "checkout") {
     const body = req.body || {};
     const cart = Array.isArray(body.items) ? body.items : [];
     const buyer = body.buyer || {};
+    const deliveryMethod = body.delivery_method === "ship" ? "ship" : "pickup";
+    const shipping = body.shipping || null; // { address, rate_id, amount, carrier, service }
 
     if (cart.length === 0) {
       return res.status(400).json({ error: "Cart is empty" });
@@ -80,6 +172,18 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Name is required" });
     }
     const buyerPhone = (buyer.phone || "").trim() || null;
+
+    if (deliveryMethod === "ship") {
+      if (!shipping || !shipping.rate_id || !shipping.address) {
+        return res.status(400).json({ error: "Shipping rate + address required for ship delivery" });
+      }
+      if (!shipping.address.street1 || !shipping.address.city || !shipping.address.state || !shipping.address.zip) {
+        return res.status(400).json({ error: "Shipping address incomplete" });
+      }
+      if (typeof shipping.amount !== "number" || shipping.amount <= 0) {
+        return res.status(400).json({ error: "Shipping amount missing" });
+      }
+    }
 
     // Validate items + compute totals against the catalog (never trust
     // client-provided prices). Reject if anything is unpublished or out
@@ -155,6 +259,25 @@ export default async function handler(req, res) {
     const host = req.headers["x-forwarded-host"] || req.headers.host;
     const origin = `${proto}://${host}`;
 
+    // Append shipping line item if shipping. Stripe will sum it into
+    // the total automatically; webhook reads metadata to know the
+    // shipping context for label generation.
+    if (deliveryMethod === "ship") {
+      const shippingCents = Math.round(shipping.amount * 100);
+      stripeLineItems.push({
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: shippingCents,
+          product_data: {
+            name: shipping.carrier && shipping.service
+              ? `Shipping (${shipping.carrier} ${shipping.service})`
+              : "Shipping",
+          },
+        },
+      });
+    }
+
     let session;
     try {
       session = await stripe.checkout.sessions.create({
@@ -169,6 +292,13 @@ export default async function handler(req, res) {
           buyer_name: buyerName.slice(0, 200),
           buyer_phone: buyerPhone || "",
           item_count: String(lineItems.length),
+          delivery_method: deliveryMethod,
+          // Stash the chosen rate id so the webhook can purchase the
+          // label without re-running the Shippo rate API.
+          shippo_rate_id: deliveryMethod === "ship" ? (shipping.rate_id || "") : "",
+          shipping_amount: deliveryMethod === "ship" ? String(shipping.amount) : "",
+          shipping_carrier: deliveryMethod === "ship" ? (shipping.carrier || "") : "",
+          shipping_service: deliveryMethod === "ship" ? (shipping.service || "") : "",
         },
         payment_intent_data: {
           metadata: {
@@ -187,7 +317,13 @@ export default async function handler(req, res) {
     // rows remain pending and an admin can clean them up later.
     const buyerEmail = buyer.email.trim().toLowerCase();
     try {
-      for (const li of lineItems) {
+      for (let idx = 0; idx < lineItems.length; idx++) {
+        const li = lineItems[idx];
+        // Only the FIRST row in a multi-line order carries the
+        // shipping detail (shippo_rate_id, address, amount). The
+        // webhook purchases one label per session, then mirrors
+        // tracking info onto every row of that session for display.
+        const isFirst = idx === 0;
         await sb(key, "shop_orders", {
           method: "POST",
           headers: { Prefer: "return=minimal" },
@@ -205,7 +341,13 @@ export default async function handler(req, res) {
             stripe_checkout_session_id: session.id,
             is_guest: true,
             guest_phone: buyerPhone,
-            notes: "Pickup at next visit",
+            delivery_method: deliveryMethod,
+            shipping_address: deliveryMethod === "ship" && isFirst ? shipping.address : null,
+            shipping_amount: deliveryMethod === "ship" && isFirst ? shipping.amount : null,
+            shipping_carrier: deliveryMethod === "ship" && isFirst ? (shipping.carrier || null) : null,
+            shipping_service: deliveryMethod === "ship" && isFirst ? (shipping.service || null) : null,
+            shippo_rate_id: deliveryMethod === "ship" && isFirst ? shipping.rate_id : null,
+            notes: deliveryMethod === "ship" ? "Will ship after payment" : "Pickup at next visit",
           }),
         });
       }

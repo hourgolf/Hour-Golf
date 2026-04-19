@@ -17,6 +17,20 @@ export { noCacheSSR as getServerSideProps } from "../lib/no-cache-ssr";
 
 const CART_KEY = "hg-public-shop-cart-v1";
 
+function shopInput(extra) {
+  return {
+    padding: 10,
+    border: "1px solid var(--border)",
+    borderRadius: 8,
+    fontSize: 13,
+    fontFamily: "inherit",
+    background: "var(--surface)",
+    width: "100%",
+    boxSizing: "border-box",
+    ...(extra || {}),
+  };
+}
+
 function loadCart() {
   if (typeof window === "undefined") return [];
   try {
@@ -48,6 +62,16 @@ export default function PublicShopPage() {
   const [buyerName, setBuyerName] = useState("");
   const [buyerEmail, setBuyerEmail] = useState("");
   const [buyerPhone, setBuyerPhone] = useState("");
+
+  // Delivery method + shipping address + rates
+  const [deliveryMethod, setDeliveryMethod] = useState("pickup");
+  const [shipAddr, setShipAddr] = useState({
+    street1: "", street2: "", city: "", state: "", zip: "", country: "US",
+  });
+  const [rates, setRates] = useState([]);
+  const [selectedRateId, setSelectedRateId] = useState("");
+  const [fetchingRates, setFetchingRates] = useState(false);
+  const [ratesError, setRatesError] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -114,6 +138,45 @@ export default function PublicShopPage() {
     setCart((prev) => prev.filter((_, i) => i !== idx));
   }
 
+  async function fetchRates() {
+    setRatesError("");
+    setRates([]);
+    setSelectedRateId("");
+    if (!buyerName.trim()) { setRatesError("Enter your name first."); return; }
+    if (!shipAddr.street1 || !shipAddr.city || !shipAddr.state || !shipAddr.zip) {
+      setRatesError("Enter a complete shipping address.");
+      return;
+    }
+    setFetchingRates(true);
+    try {
+      const r = await fetch("/api/public-shop?action=rates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: cart.map((c) => ({ item_id: c.item_id, quantity: c.quantity })),
+          destination: {
+            name: buyerName.trim(),
+            street1: shipAddr.street1.trim(),
+            street2: shipAddr.street2.trim() || null,
+            city: shipAddr.city.trim(),
+            state: shipAddr.state.trim().toUpperCase(),
+            zip: shipAddr.zip.trim(),
+            country: (shipAddr.country || "US").toUpperCase(),
+            phone: buyerPhone.trim() || null,
+            email: buyerEmail.trim() || null,
+          },
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || "Could not fetch shipping rates");
+      setRates(d.rates || []);
+      if (d.rates?.length > 0) setSelectedRateId(d.rates[0].object_id);
+    } catch (e) {
+      setRatesError(e.message);
+    }
+    setFetchingRates(false);
+  }
+
   async function checkout() {
     setError("");
     if (cart.length === 0) { setError("Your cart is empty."); return; }
@@ -122,19 +185,41 @@ export default function PublicShopPage() {
       setError("Please enter a valid email address.");
       return;
     }
+    if (deliveryMethod === "ship") {
+      if (!selectedRateId) { setError("Please choose a shipping rate."); return; }
+    }
     setSubmitting(true);
     try {
+      const chosenRate = rates.find((r) => r.object_id === selectedRateId);
+      const payload = {
+        items: cart,
+        buyer: {
+          name: buyerName.trim(),
+          email: buyerEmail.trim(),
+          phone: buyerPhone.trim() || null,
+        },
+        delivery_method: deliveryMethod,
+      };
+      if (deliveryMethod === "ship" && chosenRate) {
+        payload.shipping = {
+          rate_id: chosenRate.object_id,
+          amount: chosenRate.amount,
+          carrier: chosenRate.provider,
+          service: chosenRate.servicelevel_name,
+          address: {
+            street1: shipAddr.street1.trim(),
+            street2: shipAddr.street2.trim() || null,
+            city: shipAddr.city.trim(),
+            state: shipAddr.state.trim().toUpperCase(),
+            zip: shipAddr.zip.trim(),
+            country: (shipAddr.country || "US").toUpperCase(),
+          },
+        };
+      }
       const r = await fetch("/api/public-shop?action=checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: cart,
-          buyer: {
-            name: buyerName.trim(),
-            email: buyerEmail.trim(),
-            phone: buyerPhone.trim() || null,
-          },
-        }),
+        body: JSON.stringify(payload),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Checkout failed");
@@ -147,6 +232,13 @@ export default function PublicShopPage() {
       setError(e.message);
       setSubmitting(false);
     }
+  }
+
+  function setShipField(field, value) {
+    setShipAddr((prev) => ({ ...prev, [field]: value }));
+    // Clear stale rates whenever the address changes.
+    setRates([]);
+    setSelectedRateId("");
   }
 
   return (
@@ -361,10 +453,6 @@ export default function PublicShopPage() {
                   <strong style={{ fontFamily: "var(--font-display)" }}>Subtotal</strong>
                   <strong style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "var(--primary)" }}>${cartTotal.toFixed(2)}</strong>
                 </div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 14 }}>
-                  Pickup at {venueName}. Shipping coming soon.
-                </div>
-
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
                   <input
                     type="text"
@@ -389,32 +477,153 @@ export default function PublicShopPage() {
                   />
                 </div>
 
+                {/* Delivery method */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>Delivery</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {["pickup", "ship"].map((m) => (
+                      <button
+                        type="button"
+                        key={m}
+                        onClick={() => setDeliveryMethod(m)}
+                        style={{
+                          flex: 1,
+                          padding: "10px 12px",
+                          borderRadius: 10,
+                          border: deliveryMethod === m ? "2px solid var(--primary)" : "1.5px solid var(--border)",
+                          background: deliveryMethod === m ? "var(--primary-bg)" : "var(--surface)",
+                          color: deliveryMethod === m ? "var(--primary)" : "var(--text)",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          fontSize: 13,
+                          textAlign: "center",
+                        }}
+                      >
+                        {m === "pickup" ? `Pick up at ${venueName}` : "Ship to me"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Shipping address + rate selection (only when shipping) */}
+                {deliveryMethod === "ship" && (
+                  <div style={{ marginBottom: 14, padding: 12, background: "var(--primary-bg)", borderRadius: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>Ship to</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <input type="text" placeholder="Street address" value={shipAddr.street1} onChange={(e) => setShipField("street1", e.target.value)} style={shopInput({ gridColumn: "1 / -1" })} />
+                      <input type="text" placeholder="Apt, suite, etc. (optional)" value={shipAddr.street2} onChange={(e) => setShipField("street2", e.target.value)} style={shopInput({ gridColumn: "1 / -1" })} />
+                      <input type="text" placeholder="City" value={shipAddr.city} onChange={(e) => setShipField("city", e.target.value)} style={shopInput({})} />
+                      <input type="text" placeholder="State" value={shipAddr.state} onChange={(e) => setShipField("state", e.target.value)} style={shopInput({})} maxLength={2} />
+                      <input type="text" placeholder="ZIP" value={shipAddr.zip} onChange={(e) => setShipField("zip", e.target.value)} style={shopInput({})} />
+                      <input type="text" placeholder="Country" value={shipAddr.country} onChange={(e) => setShipField("country", e.target.value)} style={shopInput({})} maxLength={2} />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={fetchRates}
+                      disabled={fetchingRates}
+                      style={{
+                        marginTop: 10,
+                        padding: "10px 14px",
+                        background: "transparent",
+                        border: "1.5px solid var(--primary)",
+                        color: "var(--primary)",
+                        borderRadius: 10,
+                        fontFamily: "inherit",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {fetchingRates ? "Fetching rates\u2026" : (rates.length > 0 ? "Refresh rates" : "Get shipping rates")}
+                    </button>
+
+                    {ratesError && (
+                      <div style={{ marginTop: 10, padding: 8, background: "var(--red-bg)", color: "var(--red)", borderRadius: 8, fontSize: 12 }}>
+                        {ratesError}
+                      </div>
+                    )}
+
+                    {rates.length > 0 && (
+                      <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                        {rates.map((r) => (
+                          <label
+                            key={r.object_id}
+                            style={{
+                              display: "flex", justifyContent: "space-between", alignItems: "center",
+                              padding: "10px 12px", border: selectedRateId === r.object_id ? "2px solid var(--primary)" : "1.5px solid var(--border)",
+                              borderRadius: 10, background: "var(--surface)", cursor: "pointer", fontSize: 13,
+                            }}
+                          >
+                            <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                              <span style={{ fontWeight: 600 }}>{r.provider} {r.servicelevel_name}</span>
+                              {r.estimated_days && (
+                                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{r.estimated_days} business day{r.estimated_days === 1 ? "" : "s"}</span>
+                              )}
+                            </span>
+                            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--primary)" }}>
+                                ${r.amount.toFixed(2)}
+                              </span>
+                              <input
+                                type="radio"
+                                name="shipping-rate"
+                                checked={selectedRateId === r.object_id}
+                                onChange={() => setSelectedRateId(r.object_id)}
+                                style={{ accentColor: "var(--primary)" }}
+                              />
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {deliveryMethod === "pickup" && (
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 14 }}>
+                    Your items will be ready at {venueName} on your next visit.
+                  </div>
+                )}
+
                 {error && (
                   <div style={{ background: "var(--red-bg)", color: "var(--red)", padding: 10, borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
                     {error}
                   </div>
                 )}
 
-                <button
-                  type="button"
-                  onClick={checkout}
-                  disabled={submitting}
-                  style={{
-                    width: "100%",
-                    padding: 14,
-                    background: "var(--primary)",
-                    color: "var(--bg)",
-                    border: "none",
-                    borderRadius: 12,
-                    fontFamily: "var(--font-display)",
-                    fontSize: 15,
-                    fontWeight: 700,
-                    cursor: submitting ? "default" : "pointer",
-                    opacity: submitting ? 0.6 : 1,
-                  }}
-                >
-                  {submitting ? "Redirecting to checkout\u2026" : `Checkout \u2014 $${cartTotal.toFixed(2)}`}
-                </button>
+                {(() => {
+                  const shipCost = deliveryMethod === "ship"
+                    ? (rates.find((r) => r.object_id === selectedRateId)?.amount || 0)
+                    : 0;
+                  const grand = cartTotal + shipCost;
+                  const disabled = submitting || (deliveryMethod === "ship" && !selectedRateId);
+                  return (
+                    <button
+                      type="button"
+                      onClick={checkout}
+                      disabled={disabled}
+                      style={{
+                        width: "100%",
+                        padding: 14,
+                        background: "var(--primary)",
+                        color: "var(--bg)",
+                        border: "none",
+                        borderRadius: 12,
+                        fontFamily: "var(--font-display)",
+                        fontSize: 15,
+                        fontWeight: 700,
+                        cursor: disabled ? "default" : "pointer",
+                        opacity: disabled ? 0.6 : 1,
+                      }}
+                    >
+                      {submitting
+                        ? "Redirecting to checkout\u2026"
+                        : `Checkout \u2014 $${grand.toFixed(2)}`}
+                    </button>
+                  );
+                })()}
               </>
             )}
           </div>
