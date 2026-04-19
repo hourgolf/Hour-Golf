@@ -55,6 +55,11 @@ export default function MemberShop({ member, tierConfig, showToast }) {
 
   // Checkout
   const [showCheckout, setShowCheckout] = useState(false);
+  // Pro-shop item requests (Tier 1 MVP).
+  const [requests, setRequests] = useState([]);
+  const [requestForm, setRequestForm] = useState(null); // null = closed; object = open with draft
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+
   // Shipping state. Customer-facing pricing is flat ($10 unless
   // subtotal >= $100, then free) — server picks the cheapest carrier
   // rate at checkout, customer never sees per-carrier options.
@@ -100,6 +105,85 @@ export default function MemberShop({ member, tierConfig, showToast }) {
 
   useEffect(() => { Promise.all([loadItems(), loadCart()]).then(() => setLoading(false)); }, [loadItems, loadCart]);
   useEffect(() => { if (tab === "orders") loadOrders(); }, [tab, loadOrders]);
+  useEffect(() => { if (tab === "requests") loadRequests(); }, [tab]);
+
+  async function loadRequests() {
+    try {
+      const r = await fetch("/api/member-shop-requests", { credentials: "include" });
+      if (r.ok) {
+        const d = await r.json();
+        setRequests(d.requests || []);
+      }
+    } catch {}
+  }
+
+  function openRequestForm() {
+    setRequestForm({
+      item_name: "",
+      brand: "",
+      size: "",
+      color: "",
+      quantity: 1,
+      budget_range: "",
+      reference_url: "",
+      notes: "",
+      member_phone: member.phone || "",
+    });
+  }
+
+  async function submitRequest() {
+    const draft = requestForm;
+    if (!draft?.item_name?.trim()) {
+      showToast("What item are you looking for?", "error");
+      return;
+    }
+    setSubmittingRequest(true);
+    try {
+      const r = await fetch("/api/member-shop-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          item_name: draft.item_name.trim(),
+          brand: draft.brand?.trim() || null,
+          size: draft.size?.trim() || null,
+          color: draft.color?.trim() || null,
+          quantity: Math.max(1, Number(draft.quantity) || 1),
+          budget_range: draft.budget_range?.trim() || null,
+          reference_url: draft.reference_url?.trim() || null,
+          notes: draft.notes?.trim() || null,
+          member_phone: draft.member_phone?.trim() || null,
+          member_name: member.name,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Submit failed");
+      setRequestForm(null);
+      showToast("Request sent — we'll be in touch!");
+      setTab("requests");
+      await loadRequests();
+    } catch (e) {
+      showToast(e.message, "error");
+    }
+    setSubmittingRequest(false);
+  }
+
+  async function cancelRequest(id) {
+    if (!confirm("Cancel this request?")) return;
+    try {
+      const r = await fetch(`/api/member-shop-requests?id=${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: "cancelled" }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Cancel failed");
+      await loadRequests();
+    } catch (e) {
+      showToast(e.message, "error");
+    }
+  }
 
   async function addToCart() {
     if (!selectedItem) return;
@@ -219,12 +303,13 @@ export default function MemberShop({ member, tierConfig, showToast }) {
   return (
     <>
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <button className={`mem-btn ${tab === "browse" ? "mem-btn-primary" : ""}`} onClick={() => setTab("browse")} style={{ flex: 1 }}>Browse</button>
-        <button className={`mem-btn ${tab === "cart" ? "mem-btn-primary" : ""}`} onClick={() => { setTab("cart"); loadCart(); }} style={{ flex: 1, position: "relative" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <button className={`mem-btn ${tab === "browse" ? "mem-btn-primary" : ""}`} onClick={() => setTab("browse")} style={{ flex: 1, minWidth: 70 }}>Browse</button>
+        <button className={`mem-btn ${tab === "cart" ? "mem-btn-primary" : ""}`} onClick={() => { setTab("cart"); loadCart(); }} style={{ flex: 1, minWidth: 70, position: "relative" }}>
           Cart{cartCount > 0 && <span style={{ background: "#C92F1F", color: "#EDF3E3", fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 10, marginLeft: 6 }}>{cartCount}</span>}
         </button>
-        <button className={`mem-btn ${tab === "orders" ? "mem-btn-primary" : ""}`} onClick={() => setTab("orders")} style={{ flex: 1 }}>Orders</button>
+        <button className={`mem-btn ${tab === "orders" ? "mem-btn-primary" : ""}`} onClick={() => setTab("orders")} style={{ flex: 1, minWidth: 70 }}>Orders</button>
+        <button className={`mem-btn ${tab === "requests" ? "mem-btn-primary" : ""}`} onClick={() => setTab("requests")} style={{ flex: 1, minWidth: 70 }}>Requests</button>
       </div>
 
       {/* ── BROWSE ── */}
@@ -259,22 +344,106 @@ export default function MemberShop({ member, tierConfig, showToast }) {
             <div className="mem-section" style={{ textAlign: "center", padding: 40, color: "var(--text-muted)" }}>No items available right now. Check back soon!</div>
           )}
 
-          {/* Floating cart badge */}
-          {cartCount > 0 && tab === "browse" && (
-            <button
-              onClick={() => { setTab("cart"); loadCart(); }}
-              style={{
-                position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 800,
-                background: "var(--primary)", color: "#EDF3E3", border: "none", borderRadius: 30,
-                padding: "12px 24px", fontSize: 14, fontWeight: 700, fontFamily: "var(--font-display)",
-                cursor: "pointer", boxShadow: "0 4px 16px rgba(53,68,59,0.3)",
-                display: "flex", alignItems: "center", gap: 8, letterSpacing: 1, textTransform: "uppercase",
-              }}
-            >
-              View Cart ({cartCount}) &mdash; ${cartTotal.toFixed(2)}
+          {/* Item-request CTA — invites members to ask for something
+              not currently stocked. Lands the request on the admin's
+              inbox + shows up in their own Requests tab. */}
+          <div style={{ marginTop: 24, padding: "16px 18px", background: "var(--primary-bg)", border: "1px dashed var(--primary)", borderRadius: 12 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: "var(--primary)" }}>
+              Can't find what you're looking for?
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text)", marginBottom: 10 }}>
+              Tell us what you want and we'll bring it in for you.
+            </div>
+            <button className="mem-btn mem-btn-primary" onClick={openRequestForm} style={{ fontSize: 13 }}>
+              Request an item
             </button>
+          </div>
+        </>
+      )}
+
+      {/* ── REQUESTS ── */}
+      {tab === "requests" && (
+        <>
+          <div style={{ marginBottom: 14 }}>
+            <button className="mem-btn mem-btn-primary" onClick={openRequestForm} style={{ fontSize: 13 }}>
+              + New request
+            </button>
+          </div>
+          {requests.length === 0 ? (
+            <div className="mem-section" style={{ textAlign: "center", padding: 40, color: "var(--text-muted)" }}>
+              You haven't requested anything yet.
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {requests.map((r) => {
+                const statusDisplay = (() => {
+                  switch (r.status) {
+                    case "pending":      return { label: "Request received",  color: "#6a7a6c", bg: "var(--primary-bg)" };
+                    case "acknowledged": return { label: "Reviewing",         color: "#6a7a6c", bg: "var(--primary-bg)" };
+                    case "ordering":     return { label: "We're sourcing this", color: "#35443B", bg: "#ddd480" };
+                    case "in_stock":     return { label: "Ready for pickup 🎉", color: "#fff",   bg: "var(--primary)" };
+                    case "declined":     return { label: "Unable to source",  color: "#fff",    bg: "#8BB5A0" };
+                    case "cancelled":    return { label: "Cancelled",         color: "#fff",    bg: "#8BB5A0" };
+                    default:             return { label: r.status,            color: "#6a7a6c", bg: "var(--primary-bg)" };
+                  }
+                })();
+                const canCancel = ["pending", "acknowledged", "ordering"].includes(r.status);
+                return (
+                  <div key={r.id} className="mem-section" style={{ padding: "12px 14px", margin: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 6 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <strong style={{ fontSize: 14 }}>{r.item_name}</strong>
+                        {(r.brand || r.size || r.color || r.quantity > 1) && (
+                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+                            {[r.brand, r.size && `Size ${r.size}`, r.color, r.quantity > 1 && `Qty ${r.quantity}`].filter(Boolean).join(" · ")}
+                          </div>
+                        )}
+                        {r.budget_range && (
+                          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Budget: {r.budget_range}</div>
+                        )}
+                        {r.notes && (
+                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4, fontStyle: "italic" }}>"{r.notes}"</div>
+                        )}
+                      </div>
+                      <span style={{
+                        padding: "3px 10px", borderRadius: 999, fontSize: 10, fontWeight: 700,
+                        textTransform: "uppercase", letterSpacing: 0.4, whiteSpace: "nowrap",
+                        background: statusDisplay.bg, color: statusDisplay.color,
+                      }}>{statusDisplay.label}</span>
+                    </div>
+                    {r.admin_response && (
+                      <div style={{ marginTop: 6, padding: "8px 10px", background: "var(--primary-bg)", borderRadius: 8, fontSize: 12, color: "var(--text)" }}>
+                        <strong>From the shop:</strong> {r.admin_response}
+                      </div>
+                    )}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, fontSize: 11, color: "var(--text-muted)" }}>
+                      <span>Requested {new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                      {canCancel && (
+                        <button className="mem-cancel-btn" onClick={() => cancelRequest(r.id)} style={{ fontSize: 10 }}>Cancel</button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </>
+      )}
+
+      {/* Floating cart badge — top-level so it renders across tabs. */}
+      {cartCount > 0 && tab === "browse" && (
+        <button
+          onClick={() => { setTab("cart"); loadCart(); }}
+          style={{
+            position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 800,
+            background: "var(--primary)", color: "#EDF3E3", border: "none", borderRadius: 30,
+            padding: "12px 24px", fontSize: 14, fontWeight: 700, fontFamily: "var(--font-display)",
+            cursor: "pointer", boxShadow: "0 4px 16px rgba(53,68,59,0.3)",
+            display: "flex", alignItems: "center", gap: 8, letterSpacing: 1, textTransform: "uppercase",
+          }}
+        >
+          View Cart ({cartCount}) &mdash; ${cartTotal.toFixed(2)}
+        </button>
       )}
 
       {/* ── CART ── */}
@@ -743,7 +912,118 @@ export default function MemberShop({ member, tierConfig, showToast }) {
           {cardChargeAmt > 0 || deliveryMethod === "ship" ? "Your card on file will be charged. This is a final sale." : "No card charge — covered by credits. This is a final sale."}
         </p>
       </Modal>
+
+      {/* ── REQUEST FORM MODAL ── */}
+      <Modal open={!!requestForm} onClose={() => setRequestForm(null)}>
+        {requestForm && (
+          <>
+            <h2 style={{ marginBottom: 4 }}>Request an item</h2>
+            <p style={{ margin: "0 0 16px 0", fontSize: 13, color: "var(--text-muted)" }}>
+              Tell us what you want and we'll look into bringing it in for you.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <RequestField
+                label="Item"
+                required
+                value={requestForm.item_name}
+                onChange={(v) => setRequestForm({ ...requestForm, item_name: v })}
+                placeholder="Taylor Made Stealth 3-wood"
+              />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <RequestField
+                  label="Brand (optional)"
+                  value={requestForm.brand}
+                  onChange={(v) => setRequestForm({ ...requestForm, brand: v })}
+                  placeholder="Titleist"
+                />
+                <RequestField
+                  label="Size (optional)"
+                  value={requestForm.size}
+                  onChange={(v) => setRequestForm({ ...requestForm, size: v })}
+                  placeholder="M, 10.5, 8.5"
+                />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <RequestField
+                  label="Color (optional)"
+                  value={requestForm.color}
+                  onChange={(v) => setRequestForm({ ...requestForm, color: v })}
+                  placeholder="Navy"
+                />
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: 4 }}>Quantity</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={requestForm.quantity}
+                    onChange={(e) => setRequestForm({ ...requestForm, quantity: Math.max(1, Number(e.target.value) || 1) })}
+                    style={{ width: "100%", padding: 10, border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
+                  />
+                </div>
+              </div>
+              <RequestField
+                label="Budget (optional)"
+                value={requestForm.budget_range}
+                onChange={(v) => setRequestForm({ ...requestForm, budget_range: v })}
+                placeholder="$50-100 or open"
+              />
+              <RequestField
+                label="Reference link (optional)"
+                value={requestForm.reference_url}
+                onChange={(v) => setRequestForm({ ...requestForm, reference_url: v })}
+                placeholder="Paste a link from anywhere you saw it"
+              />
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: 4 }}>Notes (optional)</label>
+                <textarea
+                  value={requestForm.notes}
+                  onChange={(e) => setRequestForm({ ...requestForm, notes: e.target.value })}
+                  placeholder='e.g. "left-handed please" or "for my wife"'
+                  rows={2}
+                  style={{ width: "100%", padding: 10, border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }}
+                />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              <button
+                className="mem-btn"
+                onClick={() => setRequestForm(null)}
+                disabled={submittingRequest}
+                style={{ flex: 1 }}
+              >
+                Cancel
+              </button>
+              <button
+                className="mem-btn mem-btn-primary"
+                onClick={submitRequest}
+                disabled={submittingRequest}
+                style={{ flex: 2 }}
+              >
+                {submittingRequest ? "Sending…" : "Send request"}
+              </button>
+            </div>
+          </>
+        )}
+      </Modal>
     </>
+  );
+}
+
+function RequestField({ label, required, value, onChange, placeholder }) {
+  return (
+    <div>
+      <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: 4 }}>
+        {label}{required ? " *" : ""}
+      </label>
+      <input
+        type="text"
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder || ""}
+        style={{ width: "100%", padding: 10, border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
+      />
+    </div>
   );
 }
 
