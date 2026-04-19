@@ -52,6 +52,7 @@ const EDITABLE_COLUMNS = [
   "bay_label_singular",
   "facility_address",
   "tier_colors",
+  "max_daily_hours_per_member",
 ];
 
 // Accept #RGB, #RRGGBB, #RRGGBBAA forms. Reject anything else to keep bad
@@ -149,6 +150,14 @@ export default async function handler(req, res) {
           if (value === null) { /* allowed */ }
           else if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 168) {
             return res.status(400).json({ error: `${col} must be a number between 0 and 168` });
+          }
+        } else if (col === "max_daily_hours_per_member") {
+          // Numeric, non-negative, <= 24h/day. null = no cap (members
+          // can extend up to whatever the bay availability + tier
+          // booking_hours_end allows).
+          if (value === null) { /* allowed */ }
+          else if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 24) {
+            return res.status(400).json({ error: `${col} must be a number between 0 and 24` });
           }
         } else if (col === "bays") {
           // Array of non-empty strings. Cap each name at 30 chars and the

@@ -52,6 +52,7 @@ const EDITABLE_COLUMNS = [
   "bay_label_singular",
   "facility_address",
   "tier_colors",
+  "max_daily_hours_per_member",
 ];
 
 function isUuid(value) {
@@ -148,6 +149,11 @@ export default async function handler(req, res) {
           if (value === null) { /* allowed */ }
           else if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 168) {
             return res.status(400).json({ error: `${col} must be a number between 0 and 168` });
+          }
+        } else if (col === "max_daily_hours_per_member") {
+          if (value === null) { /* allowed */ }
+          else if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 24) {
+            return res.status(400).json({ error: `${col} must be a number between 0 and 24` });
           }
         } else if (col === "bays") {
           if (value === null) { /* allowed */ }

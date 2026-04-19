@@ -326,6 +326,11 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
         : null;
       payload.bay_label_singular = branding.bay_label_singular || null;
       payload.facility_address = branding.facility_address || null;
+      payload.max_daily_hours_per_member = (
+        branding.max_daily_hours_per_member === "" || branding.max_daily_hours_per_member == null
+          ? null
+          : Number(branding.max_daily_hours_per_member)
+      );
       // tier_colors lives as a JSON object on the row; the UI edits it
       // through a textarea (advanced) so we stash a `_tierColorsRaw`
       // string on the local branding object while editing and parse it
@@ -761,6 +766,26 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
             />
             <div className="muted" style={{ marginTop: 4 }}>
               Calendar invite location on booking confirmation emails. Members tap → directions.
+            </div>
+          </div>
+
+          <div className="mf">
+            <label>Max daily hours per member</label>
+            <input
+              type="number"
+              min="0"
+              max="24"
+              step="0.25"
+              value={branding.max_daily_hours_per_member == null ? "" : branding.max_daily_hours_per_member}
+              onChange={(e) => {
+                const v = e.target.value;
+                update("max_daily_hours_per_member", v === "" ? null : Number(v));
+              }}
+              placeholder="No limit"
+              style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)" }}
+            />
+            <div className="muted" style={{ marginTop: 4 }}>
+              Hard ceiling enforced when members extend a live booking. Distinct from monthly tier allowance. Blank = no daily cap.
             </div>
           </div>
         </div>

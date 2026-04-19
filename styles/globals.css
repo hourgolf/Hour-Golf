@@ -1182,6 +1182,52 @@ html { overflow-y: scroll; }
   font-variant-numeric: tabular-nums;
 }
 .mem2-hero-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* Extend-booking control inside the hero. Sits above the primary
+   actions row when the booking is live or imminently upcoming. The
+   button mirrors the door-code panel's contrast so it reads as
+   high-priority + always-tappable, the hint label keeps the action
+   self-explanatory without a tooltip. */
+.mem2-hero-extend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+}
+.mem2-hero-extend-btn {
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: none;
+  background: var(--bg);
+  color: var(--primary);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.12s, opacity 0.15s;
+}
+.mem2-hero-extend-btn:hover:not(:disabled) { transform: scale(0.97); }
+.mem2-hero-extend-btn:disabled { opacity: 0.55; cursor: default; }
+.mem2-hero-extend-hint {
+  font-size: 12px;
+  opacity: 0.85;
+  font-weight: 500;
+}
+.mem2-hero-extend-err {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(201, 47, 31, 0.18);
+  color: #ffe6e3;
+  font-size: 12px;
+  line-height: 1.4;
+}
 .mem2-btn-primary {
   padding: 10px 18px; border: none; border-radius: var(--radius);
   background: var(--bg); color: var(--primary);

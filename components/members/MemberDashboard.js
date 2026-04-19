@@ -44,6 +44,11 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
   const [showQR, setShowQR] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(null);
   const [cancelling, setCancelling] = useState(false);
+  // Pending state for the live-booking "+15m" extend action. Disables
+  // the button mid-flight + lets the hero render an inline error
+  // when the server rejects (conflict, daily-cap hit, tier window).
+  const [extending, setExtending] = useState(false);
+  const [extendError, setExtendError] = useState("");
   const [now, setNow] = useState(() => Date.now());
 
   // Tick once a minute so the next-booking countdown stays live without a
@@ -133,6 +138,26 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
       showToast("Failed to load dashboard data", "error");
     }
     setLoading(false);
+  }
+
+  async function handleExtend(bookingId, additionalMinutes) {
+    setExtending(true);
+    setExtendError("");
+    try {
+      const r = await fetch("/api/member-extend-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ booking_id: bookingId, additional_minutes: additionalMinutes }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Could not extend booking");
+      showToast(`+${additionalMinutes}m added — booking now ends at ${new Date(d.new_end).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`);
+      await loadData();
+    } catch (e) {
+      setExtendError(e.message);
+    }
+    setExtending(false);
   }
 
   async function handleCancel(bookingId) {
@@ -278,6 +303,28 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
                     <>🔑 We email your access code ~10 min before start.</>
                   )}
                 </div>
+              )}
+              {/* Extend control. Visible while the booking is live or
+                  within 30 min of starting (matches the server-side
+                  eligibility window). Each tap adds 15 min; the API
+                  enforces bay-conflict, tier-window, and tenant daily
+                  cap so the button can stay simple. */}
+              {(isLive || (msUntil > 0 && msUntil <= 30 * 60 * 1000)) && (
+                <div className="mem2-hero-extend">
+                  <button
+                    type="button"
+                    className="mem2-hero-extend-btn"
+                    onClick={() => handleExtend(nextBooking.booking_id, 15)}
+                    disabled={extending}
+                    aria-label="Extend booking by 15 minutes"
+                  >
+                    {extending ? "Extending…" : "+15 min"}
+                  </button>
+                  <span className="mem2-hero-extend-hint">Stretch your session</span>
+                </div>
+              )}
+              {extendError && (
+                <div className="mem2-hero-extend-err">{extendError}</div>
               )}
               <div className="mem2-hero-actions">
                 <button

@@ -60,7 +60,7 @@ Sessions group items by theme. Order within a theme: **bugs → ux → cosmetic 
 
 ### Theme: Member booking flow
 
-- [ ] [member] [medium] [feature] [P1] — **Extend booking from the dashboard hero** when a session is live (or near-live). "+15m" button repeatedly tappable; server validates against (a) the next booking on the same bay and (b) a new tenant-configurable `tenant_branding.max_daily_hours_per_member` cap. On success: PATCH bookings.booking_end + duration_hours, push access_code_jobs.code_end forward via Seam. Net new endpoint `/api/member-extend-booking`.
+- [x] [member] [medium] [feature] [P1] — Extend booking from the dashboard hero — shipped 2026-04-19. `/api/member-extend-booking` enforces bay-conflict + tier window + tenant `max_daily_hours_per_member` cap. Best-effort Seam access-code patch keeps the door code valid through the new end.
 
 
 *The path from open portal → book a bay. Highest-leverage surface.*
@@ -188,6 +188,7 @@ Items that are real but don't belong in this sprint. Revisit after member launch
 - 2026-04-19 `<next>` — [admin] TodayView shows the live Seam-issued door code per booking row (pulled from access_code_jobs status='sent') so the operator can answer "what's my code?" without opening Seam.
 - 2026-04-19 `<next>` — [admin] Settings → Operations panel: edit cancel_cutoff_hours, bays, bay_label_singular, facility_address, tier_colors without touching SQL.
 - 2026-04-19 `<next>` — [admin] TodayView "Right now" + "Up next" callouts at the top with live remaining-time and countdown chips. Per-row IN-2H-15M countdown badge replaces generic "NEXT" for upcoming bookings within 6h.
+- 2026-04-19 `<next>` — [member] Extend booking from the dashboard hero (+15m button while live or starting within 30 min). Tenant_branding.max_daily_hours_per_member added as a hard ceiling; server enforces conflict + tier window + cap; Seam access code's ends_at is patched best-effort so the door code doesn't expire mid-extension.
 
 **Decisions / removed:**
 - "Repeat last booking" chip — shipped briefly in `e37322b`, removed in next commit. No one was going to use it; just added clutter.
