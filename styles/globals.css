@@ -1431,41 +1431,12 @@ html { overflow-y: scroll; }
 }
 .mem2-hero-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
-/* Extend-booking control inside the hero. Sits above the primary
-   actions row when the booking is live or imminently upcoming. The
-   button mirrors the door-code panel's contrast so it reads as
-   high-priority + always-tappable, the hint label keeps the action
-   self-explanatory without a tooltip. */
+/* Extend-booking control inside the hero. Wraps the SlideToConfirm
+   thumb in a transparent container so it inherits the hero's primary-
+   color background. Slide-to-confirm replaces the previous tap button
+   so an accidental finger tap can't extend a session by 15 min. */
 .mem2-hero-extend {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   margin-bottom: 14px;
-  padding: 8px 14px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px dashed rgba(255, 255, 255, 0.3);
-  border-radius: 999px;
-}
-.mem2-hero-extend-btn {
-  padding: 8px 18px;
-  border-radius: 999px;
-  border: none;
-  background: var(--bg);
-  color: var(--primary);
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: transform 0.12s, opacity 0.15s;
-}
-.mem2-hero-extend-btn:hover:not(:disabled) { transform: scale(0.97); }
-.mem2-hero-extend-btn:disabled { opacity: 0.55; cursor: default; }
-.mem2-hero-extend-hint {
-  font-size: 12px;
-  opacity: 0.85;
-  font-weight: 500;
 }
 .mem2-hero-extend-err {
   margin-bottom: 12px;
@@ -1475,6 +1446,80 @@ html { overflow-y: scroll; }
   color: #ffe6e3;
   font-size: 12px;
   line-height: 1.4;
+}
+
+/* Slide-to-confirm pill — generic; instances on the hero use the
+   inverted palette below. The track is a rounded pill; the thumb
+   slides from left edge to right. touch-action: none on the thumb
+   stops the browser from hijacking horizontal drags for native
+   scroll/zoom gestures so the slide tracks the finger cleanly. */
+.slide-confirm {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px dashed rgba(255, 255, 255, 0.32);
+  border-radius: 999px;
+  overflow: hidden;
+  user-select: none;
+}
+.slide-confirm.busy {
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+.slide-confirm-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  pointer-events: none;
+}
+.slide-confirm-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bg);
+  pointer-events: none;
+  text-align: center;
+  padding: 0 16px;
+}
+.slide-confirm-thumb {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  margin: 4px;
+  padding: 0 16px 0 18px;
+  border: none;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--primary);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: grab;
+  touch-action: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  white-space: nowrap;
+}
+.slide-confirm-thumb:active { cursor: grabbing; }
+.slide-confirm-thumb:disabled { opacity: 0.7; cursor: default; }
+.slide-confirm-arrow {
+  font-size: 16px;
+  letter-spacing: -2px;
+  opacity: 0.55;
 }
 .mem2-btn-primary {
   padding: 10px 18px; border: none; border-radius: var(--radius);

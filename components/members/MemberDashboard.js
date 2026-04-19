@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { QRCodeSVG } from "qrcode.react";
 import { useBranding } from "../../hooks/useBranding";
 import { DEFAULT_CANCEL_CUTOFF_HOURS, DEFAULT_DASHBOARD_EMPTY_HEADLINE } from "../../lib/branding";
+import SlideToConfirm from "../ui/SlideToConfirm";
 import Modal from "../ui/Modal";
 import InstallPrompt from "./InstallPrompt";
 import { fT, fD, fDL } from "../../lib/format";
@@ -305,24 +306,21 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
                 </div>
               )}
               {/* Live-only action: extend the in-flight session in
-                  15-min increments. We deliberately suppress Book
-                  another / Cancel when the booking is actually
-                  happening — the only useful action mid-session is
-                  "stretch this one." Pre-start members still see
-                  Book another + Cancel below. */}
+                  15-min increments. The slide-to-confirm gesture adds
+                  intentional friction so an accidental tap can't
+                  charge a member for an extra 15 min — they have to
+                  pull the thumb right past the threshold. Same handler
+                  as the prior +15 button; only the input shape changed. */}
               {isLive ? (
                 <>
                   <div className="mem2-hero-extend">
-                    <button
-                      type="button"
-                      className="mem2-hero-extend-btn"
-                      onClick={() => handleExtend(nextBooking.booking_id, 15)}
-                      disabled={extending}
-                      aria-label="Extend booking by 15 minutes"
-                    >
-                      {extending ? "Extending…" : "+15 min"}
-                    </button>
-                    <span className="mem2-hero-extend-hint">Stretch your session</span>
+                    <SlideToConfirm
+                      label="+15 min"
+                      hint="Slide to extend"
+                      busy={extending}
+                      busyLabel="Extending…"
+                      onConfirm={() => handleExtend(nextBooking.booking_id, 15)}
+                    />
                   </div>
                   {extendError && (
                     <div className="mem2-hero-extend-err">{extendError}</div>

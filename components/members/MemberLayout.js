@@ -4,7 +4,6 @@ import useMemberAuth from "../../hooks/useMemberAuth";
 import { useBranding } from "../../hooks/useBranding";
 import { useTenantFeatures } from "../../hooks/useTenantFeatures";
 import { getLogoMaxDims } from "../../lib/branding";
-import { TIER_COLORS } from "../../lib/constants";
 import HelpDrawer from "./HelpDrawer";
 import EventPopup from "./EventPopup";
 import InstallPrompt from "./InstallPrompt";
@@ -529,13 +528,7 @@ export default function MemberLayout({ activeTab, children }) {
     );
   }
 
-  // Logged in — render layout with content. Tier badge color comes
-  // from tenant_branding.tier_colors when configured (multi-tenant
-  // readiness migration); falls back to the HG palette in TIER_COLORS,
-  // then to a neutral cream/text scheme so untyped tiers still render.
-  const tierColorsMap = branding?.tier_colors || TIER_COLORS;
-  const tierObj = tierColorsMap[member.tier] || TIER_COLORS[member.tier] || { bg: "#D1DFCB", text: "#35443B" };
-
+  // Logged in — render layout with content.
   return (
     <div className="mem-layout" style={{ position: "relative" }}>
       {/* Tenant background image (if any) is painted on body via SSR
@@ -603,13 +596,16 @@ export default function MemberLayout({ activeTab, children }) {
             })()}
           </div>
           <div style={{ textAlign: "right", justifySelf: "end" }}>
-            <div className="mem-header-name" style={{ marginBottom: 2 }}>{member.name}</div>
+            {/* Right column: name + member #. Tier badge previously
+                lived here too but it duplicated the dashboard QR/Account
+                surfaces and ate horizontal room — dropping it lets the
+                centered logo breathe. */}
+            <div className="mem-header-name">{member.name}</div>
             {member.member_number && (
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(237,243,227,0.7)", letterSpacing: 1, marginBottom: 4 }}>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(237,243,227,0.7)", letterSpacing: 1, marginTop: 2 }}>
                 MEMBER #{String(member.member_number).padStart(3, "0")}
               </div>
             )}
-            <span className="mem-tier-badge" style={{ background: tierObj.bg, color: tierObj.text }}>{member.tier}</span>
           </div>
         </div>
       </header>
