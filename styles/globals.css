@@ -308,6 +308,28 @@ html { overflow-y: scroll; }
 .slot-i { flex: 1; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
 .slot-c { font-family: var(--font-body); font-size: var(--font-size); font-weight: 500; }
 .slot-m { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+/* Pro Shop > Browse top strip — pairs the member-discount badge with
+   the "Request an item" CTA so both are above the fold. Replaces the
+   bottom request panel that members were missing. */
+.shop-top-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  background: var(--primary-bg);
+  border-radius: var(--radius);
+}
+.shop-top-strip-info { font-size: 13px; line-height: 1.4; }
+.shop-top-strip-cta { display: flex; align-items: center; gap: 10px; }
+.shop-top-strip-cta-label { font-size: 12px; color: var(--text-muted); }
+@media (max-width: 600px) {
+  .shop-top-strip { padding: 12px 14px; gap: 10px; }
+  .shop-top-strip-cta { width: 100%; justify-content: space-between; }
+}
+
 /* Tier-chip filter row on the Customers view. Replaces the old
    dropdown so the operator can filter with one tap and see counts
    per segment without opening a menu. */
@@ -746,7 +768,20 @@ html { overflow-y: scroll; }
 .mem-btn-sm.mem-btn-accent { background: var(--primary); color: var(--bg); border: none; padding: 6px 14px; border-radius: var(--radius); font-family: var(--font-display); font-size: 12px; font-weight: 700; }
 .mem-btn-sm.mem-btn-accent:hover { transform: scale(0.97); }
 
-.mem-header { background: var(--primary); color: var(--bg); padding: 20px 0 14px; border-bottom: none; }
+/* Sticky wrapper around the member portal header + nav. Keeps both
+   pinned to the top of the viewport while the body scrolls — major
+   "feels like a real app" win without needing a bottom-tab redesign.
+   The header itself absorbs the iOS safe-area inset so the status
+   bar doesn't overlap the logo on installed PWAs. */
+.mem-stickytop {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--primary);
+  box-shadow: 0 4px 12px rgba(53, 68, 59, 0.18);
+}
+
+.mem-header { background: var(--primary); color: var(--bg); padding: calc(20px + env(safe-area-inset-top, 0px)) 0 14px; border-bottom: none; }
 .mem-header-inner { display: flex; justify-content: space-between; align-items: center; max-width: 960px; margin: 0 auto; padding: 0 24px; }
 .mem-header-right { display: flex; align-items: center; gap: 12px; }
 .mem-header-logo { height: 58px; }

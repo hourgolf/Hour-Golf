@@ -10,15 +10,15 @@ import EventPopup from "./EventPopup";
 import InstallPrompt from "./InstallPrompt";
 
 // Each nav item optionally gates on a feature flag. Items with no
-// `feature` field always render. Billing covers subscription
-// management + punch pass purchase + payment method setup, so hide
-// it when stripe_enabled is off (renders a dead-end page otherwise).
+// `feature` field always render. Billing was previously its own tab
+// but the row was overflowing on narrow viewports — it now lives as
+// a prominent card at the top of the Account page, and /members/billing
+// stays reachable via direct link / emails / that card.
 const NAV_ITEMS = [
   { key: "dashboard", label: "Home", href: "/members/dashboard" },
-  { key: "book", label: "Book Time", href: "/members/book" },
+  { key: "book", label: "Book", href: "/members/book" },
   { key: "events", label: "Events", href: "/members/events", feature: "events" },
-  { key: "shop", label: "Pro Shop", href: "/members/shop", feature: "pro_shop" },
-  { key: "billing", label: "Billing", href: "/members/billing", feature: "stripe_enabled" },
+  { key: "shop", label: "Shop", href: "/members/shop", feature: "pro_shop" },
   { key: "account", label: "Account", href: "/members/account" },
 ];
 
@@ -542,6 +542,12 @@ export default function MemberLayout({ activeTab, children }) {
           injection in _document.js using tenant_branding.background_image_url.
           No additional <img> needed here. */}
 
+      {/* Sticky stack — header + tab nav stay pinned to the top of the
+          viewport while the body scrolls beneath. The biggest single
+          change toward the portal "feeling like an app". Safe-area-
+          inset on the wrapper so the iOS status-bar inset doesn't push
+          the header off-screen on installed PWAs. */}
+      <div className="mem-stickytop">
       {/* Header */}
       <header className="mem-header" style={{ position: "relative", zIndex: 1 }}>
         <div className="mem-header-inner" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center" }}>
@@ -618,6 +624,7 @@ export default function MemberLayout({ activeTab, children }) {
           ))}
         </div>
       </nav>
+      </div>
 
       {/* Content */}
       <main className="mem-content" style={{ position: "relative", zIndex: 1 }}>

@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
 import DatePicker from "../DatePicker";
+import { useTenantFeatures } from "../../hooks/useTenantFeatures";
 
 // Birthday picker bounds: anyone older than 1900 is unrealistic; max is
 // "today" minus 18 years (signup enforces 18+, and edits should stay
@@ -15,6 +17,9 @@ function birthdayMaxIso() {
 }
 
 export default function MemberAccount({ member, tierConfig, refresh, showToast, onLogout }) {
+  const router = useRouter();
+  const { isEnabled: isFeatureEnabled } = useTenantFeatures();
+  const billingEnabled = isFeatureEnabled("stripe_enabled");
   const [name, setName] = useState(member.name || "");
   const [phone, setPhone] = useState(member.phone || "");
   const [birthday, setBirthday] = useState("");
@@ -157,6 +162,34 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast, 
 
   return (
     <>
+      {/* Billing & Payments — moved here from its own nav tab so the
+          persistent header row stays uncrowded. /members/billing still
+          works as a direct route (used by old emails / shared links);
+          this card is the in-app entry point. */}
+      {billingEnabled && (
+        <div
+          className="mem-section"
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <div className="mem-section-head" style={{ marginBottom: 6, borderBottom: "none", paddingBottom: 0 }}>
+              Billing & Payments
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.4 }}>
+              Manage your subscription, payment method, punch passes, and view receipts.
+            </div>
+          </div>
+          <button
+            type="button"
+            className="mem-btn mem-btn-primary"
+            onClick={() => router.push("/members/billing")}
+            style={{ padding: "10px 20px" }}
+          >
+            Open Billing
+          </button>
+        </div>
+      )}
+
       {/* Profile Section */}
       <div className="mem-section">
         <div className="mem-section-head">Profile</div>

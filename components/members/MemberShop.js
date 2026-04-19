@@ -315,12 +315,35 @@ export default function MemberShop({ member, tierConfig, showToast }) {
       {/* ── BROWSE ── */}
       {tab === "browse" && (
         <>
-          {discountPct > 0 && (
-            <div style={{ background: "var(--primary-bg)", borderRadius: "var(--radius)", padding: "10px 16px", marginBottom: 16, textAlign: "center", fontSize: 13 }}>
-              <strong style={{ color: "var(--primary)" }}>{discountPct}% Member Discount</strong>
-              <span style={{ color: "var(--text-muted)" }}> applied to all items</span>
+          {/* Combined header strip: member-discount badge + "request an
+              item" CTA in a single row. The request prompt used to live
+              at the bottom of the grid and was easy to miss; pairing it
+              with the discount banner up top keeps both visible without
+              scrolling and removes the duplicate panel below. */}
+          <div className="shop-top-strip">
+            {discountPct > 0 ? (
+              <div className="shop-top-strip-info">
+                <strong style={{ color: "var(--primary)" }}>{discountPct}% Member Discount</strong>
+                <span style={{ color: "var(--text-muted)" }}> applied to all items</span>
+              </div>
+            ) : (
+              <div className="shop-top-strip-info" style={{ color: "var(--text-muted)" }}>
+                Member-only pricing on every item.
+              </div>
+            )}
+            <div className="shop-top-strip-cta">
+              <span className="shop-top-strip-cta-label">
+                Don't see what you want?
+              </span>
+              <button
+                className="mem-btn mem-btn-primary"
+                onClick={openRequestForm}
+                style={{ fontSize: 12, padding: "7px 14px" }}
+              >
+                Request an item
+              </button>
             </div>
-          )}
+          </div>
 
           {limitedItems.length > 0 && (
             <>
@@ -343,21 +366,6 @@ export default function MemberShop({ member, tierConfig, showToast }) {
           {items.length === 0 && (
             <div className="mem-section" style={{ textAlign: "center", padding: 40, color: "var(--text-muted)" }}>No items available right now. Check back soon!</div>
           )}
-
-          {/* Item-request CTA — invites members to ask for something
-              not currently stocked. Lands the request on the admin's
-              inbox + shows up in their own Requests tab. */}
-          <div style={{ marginTop: 24, padding: "16px 18px", background: "var(--primary-bg)", border: "1px dashed var(--primary)", borderRadius: 12 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: "var(--primary)" }}>
-              Can't find what you're looking for?
-            </div>
-            <div style={{ fontSize: 13, color: "var(--text)", marginBottom: 10 }}>
-              Tell us what you want and we'll bring it in for you.
-            </div>
-            <button className="mem-btn mem-btn-primary" onClick={openRequestForm} style={{ fontSize: 13 }}>
-              Request an item
-            </button>
-          </div>
         </>
       )}
 
