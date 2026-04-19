@@ -339,25 +339,27 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
                 <div
                   key={ev.id}
                   className="mem-list-item"
-                  style={{ flexDirection: "column", alignItems: "stretch", gap: 4, cursor: "pointer" }}
+                  style={{ alignItems: "flex-start", gap: 12, cursor: "pointer" }}
                   onClick={() => router.push(`/members/events/${ev.id}`)}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <span className="mem-purchase-tag" style={tagStyle}>{tag}</span>
-                      <strong style={{ marginLeft: 8 }}>{ev.title}</strong>
-                    </div>
+                  {/* Left column: title (top) + subtitle (below). */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <strong style={{ display: "block", lineHeight: 1.25 }}>{ev.title}</strong>
+                    {ev.subtitle && (
+                      <div className="mem-list-sub" style={{ fontSize: 12, marginTop: 2 }}>
+                        {ev.subtitle}
+                      </div>
+                    )}
+                  </div>
+                  {/* Right column: status badge (top) + date (below). */}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+                    <span className="mem-purchase-tag" style={tagStyle}>{tag}</span>
                     {start && (
-                      <span className="mem-list-sub" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
+                      <span className="mem-list-sub" style={{ fontSize: 11, whiteSpace: "nowrap" }}>
                         {fD(start)} &middot; {fT(start)}
                       </span>
                     )}
                   </div>
-                  {ev.subtitle && (
-                    <div className="mem-list-sub" style={{ fontSize: 12 }}>
-                      {ev.subtitle}
-                    </div>
-                  )}
                 </div>
               );
             })}
