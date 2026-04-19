@@ -93,6 +93,17 @@ export default async function handler(req, res) {
           card_last_4: o.card_last_4 || null,
           card_brand: o.card_brand || null,
           stripe_payment_intent_id: o.stripe_payment_intent_id || null,
+          // Shipping context — set on the first row of the order; we
+          // promote any non-null shipping/tracking fields onto the
+          // group below so the order UI can render them once.
+          delivery_method: o.delivery_method || "pickup",
+          shipping_address: o.shipping_address || null,
+          shipping_amount: o.shipping_amount || null,
+          shipping_carrier: o.shipping_carrier || null,
+          shipping_service: o.shipping_service || null,
+          tracking_number: o.tracking_number || null,
+          tracking_url: o.tracking_url || null,
+          label_url: o.label_url || null,
         };
         groups.set(k, g);
       }
@@ -113,10 +124,15 @@ export default async function handler(req, res) {
       if (o.created_at && (!g.created_at || o.created_at < g.created_at)) {
         g.created_at = o.created_at;
       }
-      // Promote any receipt fields the first row didn't have but a later
-      // row in the same group carries (shouldn't happen with today's
-      // checkout flow but covers future edits).
-      for (const field of ["receipt_url", "receipt_number", "payment_method", "card_last_4", "card_brand"]) {
+      // Promote any receipt or shipping fields the first row didn't
+      // have but a later row in the same group carries. shipping_*
+      // and label/tracking are normally only on row[0] but covering
+      // both is robust against schema drift.
+      for (const field of [
+        "receipt_url", "receipt_number", "payment_method", "card_last_4", "card_brand",
+        "shipping_address", "shipping_amount", "shipping_carrier", "shipping_service",
+        "tracking_number", "tracking_url", "label_url",
+      ]) {
         if (!g[field] && o[field]) g[field] = o[field];
       }
     }

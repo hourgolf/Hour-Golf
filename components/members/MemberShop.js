@@ -420,11 +420,15 @@ export default function MemberShop({ member, tierConfig, showToast }) {
             const items = o.items || [];
             const discountPct = items.find((it) => Number(it.discount_pct || 0) > 0)?.discount_pct || 0;
             const statusLabel = (items[0]?.status || "confirmed").toUpperCase().replace("_", " ");
+            const isShipped = o.delivery_method === "ship";
             return (
               <div key={o.id} className="mem-section" style={{ marginBottom: 12, padding: "14px 16px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
-                  <div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     <span className="mem-purchase-tag">In-app</span>
+                    {isShipped && (
+                      <span className="mem-purchase-tag" style={{ background: "var(--primary)", color: "var(--bg)" }}>Shipped</span>
+                    )}
                   </div>
                   <span className="badge" style={{ background: STATUS_COLORS[items[0]?.status] || "var(--text-muted)", color: "#EDF3E3", fontSize: 9 }}>
                     {statusLabel}
@@ -458,6 +462,42 @@ export default function MemberShop({ member, tierConfig, showToast }) {
                       <a href={o.receipt_url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
                         View receipt &rarr;
                       </a>
+                    )}
+                  </div>
+                )}
+
+                {/* Shipping detail row — only on shipped orders. */}
+                {isShipped && (o.tracking_number || o.shipping_carrier || o.shipping_address) && (
+                  <div style={{ marginTop: 6, padding: "8px 10px", background: "var(--primary-bg)", borderRadius: 8, fontSize: 12, lineHeight: 1.5 }}>
+                    {o.shipping_carrier && (
+                      <div>
+                        <strong>Shipping:</strong> {o.shipping_carrier}
+                        {o.shipping_service ? ` ${o.shipping_service}` : ""}
+                      </div>
+                    )}
+                    {o.tracking_number && (
+                      <div>
+                        <strong>Tracking:</strong>{" "}
+                        {o.tracking_url ? (
+                          <a href={o.tracking_url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+                            {o.tracking_number} &rarr;
+                          </a>
+                        ) : (
+                          <span style={{ fontFamily: "var(--font-mono)" }}>{o.tracking_number}</span>
+                        )}
+                      </div>
+                    )}
+                    {!o.tracking_number && (
+                      <div style={{ color: "var(--text-muted)" }}>
+                        Label is being prepared. Tracking will appear here shortly.
+                      </div>
+                    )}
+                    {o.shipping_address && (
+                      <div style={{ color: "var(--text-muted)", marginTop: 2 }}>
+                        Ship to {o.shipping_address.street1}
+                        {o.shipping_address.street2 ? `, ${o.shipping_address.street2}` : ""}
+                        , {o.shipping_address.city}, {o.shipping_address.state} {o.shipping_address.zip}
+                      </div>
                     )}
                   </div>
                 )}
