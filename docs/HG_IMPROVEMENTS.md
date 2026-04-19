@@ -181,6 +181,8 @@ Items that are real but don't belong in this sprint. Revisit after member launch
 - 2026-04-19 `<next>` — [member] Email: booking confirmation has Add-to-Calendar links (Google + Apple/Outlook .ics) + specific access-code timing copy
 - 2026-04-19 `<next>` — [member] Email: subject lines tightened ("Booked: Sun, Apr 19 at 5:30 PM · Bay 1" instead of generic "Booking Confirmed ✅")
 - 2026-04-19 `<next>` — [shared] Multi-tenant readiness: cancel_cutoff_hours, bays, bay_label_singular, facility_address, tier_colors all moved to tenant_branding; HG seeded with prior hardcoded values. Member dashboard, booking page, help drawer, cancel API, and email copy all read from tenant config now.
+- 2026-04-19 `<next>` — [admin] Admin Today/Week/Reports/BookingForm + Badge all refactored to use tenant bays + bay noun + tier colors. Week-grid + member-availability-grid columns are now dynamic (adapt to N bays).
+- 2026-04-19 `<next>` — [admin] TodayView shows the live Seam-issued door code per booking row (pulled from access_code_jobs status='sent') so the operator can answer "what's my code?" without opening Seam.
 
 **Decisions / removed:**
 - "Repeat last booking" chip — shipped briefly in `e37322b`, removed in next commit. No one was going to use it; just added clutter.

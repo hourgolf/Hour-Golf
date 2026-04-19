@@ -7,6 +7,10 @@ export function useData(apiKey, connected) {
   const [tierCfg, setTierCfg] = useState([]);
   const [usage, setUsage] = useState([]);
   const [payments, setPayments] = useState([]);
+  // Active Seam-issued door codes. Populated from access_code_jobs
+  // where status='sent'; surfaced on the admin TodayView so the
+  // operator can see the code each member got without opening Seam.
+  const [accessCodes, setAccessCodes] = useState([]);
   const [saving, setSaving] = useState(false);
   const apiKeyRef = useRef(apiKey);
 
@@ -20,6 +24,7 @@ export function useData(apiKey, connected) {
     setTierCfg(data.tierCfg);
     setUsage(data.usage);
     setPayments(data.payments);
+    if (Array.isArray(data.accessCodes)) setAccessCodes(data.accessCodes);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -38,14 +43,18 @@ export function useData(apiKey, connected) {
       (typeof window !== "undefined" && window.__TENANT_ID__) || "";
     const tenantQ = tid ? `tenant_id=eq.${encodeURIComponent(tid)}&` : "";
     try {
-      const [members, bookings, tierCfg, usage, payments] = await Promise.all([
+      const [members, bookings, tierCfg, usage, payments, accessCodes] = await Promise.all([
         supa(key, "members", `?${tenantQ}order=name`),
         supa(key, "bookings", `?${tenantQ}order=booking_start.desc&limit=5000`),
         supa(key, "tier_config", `?${tenantQ}order=display_order`),
         supa(key, "monthly_usage", `?${tenantQ}order=billing_month.desc,overage_charge.desc`),
         supa(key, "payments", `?${tenantQ}order=created_at.desc`).catch(() => []),
+        // Issued door codes — non-fatal if RLS blocks or table empty.
+        // TodayView falls back to a "—" placeholder when a booking
+        // doesn't have a matching sent-status job in this list.
+        supa(key, "access_code_jobs", `?${tenantQ}status=eq.sent&order=booking_start.desc&limit=500`).catch(() => []),
       ]);
-      setAll({ members, bookings, tierCfg, usage, payments });
+      setAll({ members, bookings, tierCfg, usage, payments, accessCodes });
     } catch (e) {
       console.error("Refresh failed:", e);
     }
@@ -64,9 +73,9 @@ export function useData(apiKey, connected) {
   }, [connected, refresh]);
 
   return {
-    members, bookings, tierCfg, usage, payments,
+    members, bookings, tierCfg, usage, payments, accessCodes,
     saving, setSaving,
     setAll, refresh,
-    setMembers, setBookings, setTierCfg, setUsage, setPayments,
+    setMembers, setBookings, setTierCfg, setUsage, setPayments, setAccessCodes,
   };
 }

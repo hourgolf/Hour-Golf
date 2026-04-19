@@ -1,8 +1,12 @@
 import { useMemo, Fragment } from "react";
-import { BAYS, TZ } from "../../lib/constants";
+import { TZ } from "../../lib/constants";
 import { fT, lds, tds } from "../../lib/format";
+import { useBranding } from "../../hooks/useBranding";
+import { resolveBays } from "../../lib/branding";
 
 export default function WeekView({ bookings, weekOff, setWeekOff, onSelectMember, onSelectDate }) {
+  const branding = useBranding();
+  const BAYS = useMemo(() => resolveBays(branding), [branding]);
 
   const activeBk = useMemo(
     () => bookings.filter((b) => b.booking_status !== "Cancelled"),
@@ -45,7 +49,7 @@ export default function WeekView({ bookings, weekOff, setWeekOff, onSelectMember
       });
     });
     return r;
-  }, [monthDays, activeBk]);
+  }, [monthDays, activeBk, BAYS]);
 
   const today = tds();
 
@@ -66,7 +70,14 @@ export default function WeekView({ bookings, weekOff, setWeekOff, onSelectMember
         </div>
       </div>
 
-      <div className="wk-grid">
+      {/* gridTemplateColumns is inlined so the calendar adapts to
+          tenants with more (or fewer) bays than HG's 2 — the global
+          .wk-grid CSS rule defaults to "112px 1fr 1fr" which only
+          renders correctly for 2 bays. */}
+      <div
+        className="wk-grid"
+        style={{ gridTemplateColumns: `112px ${BAYS.map(() => "1fr").join(" ")}` }}
+      >
         <div className="wk-h">Day</div>
         {BAYS.map((b) => (
           <div key={b} className="wk-h">{b}</div>

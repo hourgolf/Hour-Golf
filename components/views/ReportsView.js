@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
-import { TIERS, TIER_COLORS, BAYS, TZ } from "../../lib/constants";
+import { TIERS, TIER_COLORS, TZ } from "../../lib/constants";
 import { mL, hrs, dlr } from "../../lib/format";
+import { useBranding } from "../../hooks/useBranding";
+import { resolveBays } from "../../lib/branding";
 import Badge from "../ui/Badge";
 
 /* ── helpers ────────────────────────────────────── */
@@ -39,6 +41,12 @@ const SECTIONS = [
 
 /* ══════════════════════════════════════════════════ */
 export default function ReportsView({ members, bookings, tierCfg, payments }) {
+  const branding = useBranding();
+  // Per-tenant bay list drives the by-bay breakdown + capacity math.
+  // BAYS.length used to be a hardcoded 2; now it adapts so a tenant
+  // with 4 sims gets accurate utilization numbers.
+  const BAYS = useMemo(() => resolveBays(branding), [branding]);
+
   const [section, setSection] = useState("revenue");
   const [selMonth, setSelMonth] = useState(null); // null = "All Time"
 
@@ -227,7 +235,7 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
     const bkTrend = sortedBkMonths.map((k) => ({ month: k, label: monthLabelShort(k), count: bkByMonth[k] }));
 
     return { avgUtil, heat, maxHeat, byBay, cancRate, cancelled, totalBk, bkTrend, utilDays, availPerDay };
-  }, [activeBk, allBk, filteredBk, filteredAllBk, selMonth]);
+  }, [activeBk, allBk, filteredBk, filteredAllBk, selMonth, BAYS]);
 
   /* ── MEMBERS data ───────────────────────────────── */
   const memStats = useMemo(() => {

@@ -1,16 +1,22 @@
-import { useState, useEffect } from "react";
-import { BAYS } from "../../lib/constants";
+import { useState, useEffect, useMemo } from "react";
 import { tds } from "../../lib/format";
+import { useBranding } from "../../hooks/useBranding";
+import { resolveBays, resolveBayLabel } from "../../lib/branding";
 import Modal from "../ui/Modal";
 
 export default function BookingForm({ open, onClose, onSave, booking, customers, presetEmail }) {
+  const branding = useBranding();
+  const BAYS = useMemo(() => resolveBays(branding), [branding]);
+  const bayLabel = resolveBayLabel(branding);
+  const defaultBay = BAYS[0] || "Bay 1";
+
   const isEdit = !!booking;
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("10:00");
   const [endTime, setEndTime] = useState("11:00");
-  const [bay, setBay] = useState("Bay 1");
+  const [bay, setBay] = useState(defaultBay);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -22,7 +28,7 @@ export default function BookingForm({ open, onClose, onSave, booking, customers,
       setDate(s.toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }));
       setStartTime(s.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "America/Los_Angeles" }));
       setEndTime(e.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "America/Los_Angeles" }));
-      setBay(booking.bay || "Bay 1");
+      setBay(booking.bay || defaultBay);
     } else if (open) {
       setEmail(presetEmail || "");
       setName("");
@@ -33,7 +39,7 @@ export default function BookingForm({ open, onClose, onSave, booking, customers,
       setDate(tds());
       setStartTime("10:00");
       setEndTime("11:00");
-      setBay("Bay 1");
+      setBay(defaultBay);
     }
   }, [open, booking, presetEmail, customers]);
 
@@ -113,7 +119,7 @@ export default function BookingForm({ open, onClose, onSave, booking, customers,
         </div>
       )}
       <div className="mf">
-        <label>Bay</label>
+        <label>{bayLabel}</label>
         <select value={bay} onChange={(e) => setBay(e.target.value)}>
           {BAYS.map((b) => <option key={b}>{b}</option>)}
         </select>

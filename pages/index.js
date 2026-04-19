@@ -37,7 +37,7 @@ export default function Dashboard() {
 
   // Data
   const data = useData(apiKey, connected);
-  const { members, bookings, tierCfg, usage, payments, saving, setSaving, refresh } = data;
+  const { members, bookings, tierCfg, usage, payments, accessCodes, saving, setSaving, refresh } = data;
 
   // Settings (cloud-synced when connected, localStorage when not)
   const { settings, updateSetting } = useSettings({ user, apiKey, connected });
@@ -362,6 +362,7 @@ export default function Dashboard() {
         <TodayView
           bookings={bookings}
           members={members}
+          accessCodes={accessCodes}
           bayFilter={bayFilter}
           setBayFilter={setBayFilter}
           onEdit={setEditBk}

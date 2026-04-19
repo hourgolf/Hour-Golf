@@ -1,22 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
-import { BAYS as DEFAULT_BAYS, TZ } from "../../lib/constants";
+import { TZ } from "../../lib/constants";
 import { fT, fDL } from "../../lib/format";
 import { useBranding } from "../../hooks/useBranding";
+import { resolveBays, resolveBayLabel } from "../../lib/branding";
 import DatePicker from "../DatePicker";
-
-// Resolve the active list of bookable resources for this tenant. Reads
-// branding.bays first (per-tenant override seeded by the multi-tenant
-// readiness migration); falls back to the legacy two-bay HG default
-// in lib/constants. Filters non-string entries defensively in case a
-// tenant row stores something malformed.
-function resolveBays(branding) {
-  const fromBranding = branding?.bays;
-  if (Array.isArray(fromBranding) && fromBranding.length > 0) {
-    return fromBranding.filter((b) => typeof b === "string" && b.length > 0);
-  }
-  return DEFAULT_BAYS;
-}
 
 function buildHours(startHour, endHour) {
   const hours = [];
@@ -46,7 +34,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
   // tenants using "Court", "Sim", etc. get their noun in the section
   // headers below.
   const BAYS = useMemo(() => resolveBays(branding), [branding]);
-  const bayLabel = branding?.bay_label_singular || "Bay";
+  const bayLabel = resolveBayLabel(branding);
   const bayLabelLower = bayLabel.toLowerCase();
 
   const bookStart = Number(tierConfig?.booking_hours_start ?? (isNonMember ? 10 : 0));
@@ -496,7 +484,17 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
         <div className="mem-section-head" style={{ marginTop: 4 }}>
           Availability
         </div>
-        <div className="mem-avail-grid">
+        {/* gridTemplateColumns inlined so the grid adapts to whatever
+            bays the tenant has configured. Default CSS rule assumes 2
+            bays (80px + 1fr + 1fr); this lets a 4-bay tenant render
+            cleanly without a second media-query block. The 80/60/50
+            time-column widths from globals.css still apply at
+            different breakpoints because we don't override the column
+            type, only the count. */}
+        <div
+          className="mem-avail-grid"
+          style={{ gridTemplateColumns: `80px ${BAYS.map(() => "1fr").join(" ")}` }}
+        >
           <div className="mem-avail-hdr">Time</div>
           {BAYS.map((b) => <div key={b} className="mem-avail-hdr">{b}</div>)}
           {ALL_HOURS.filter((h, i) => i < ALL_HOURS.length - 1 && !(isToday && h < currentTime)).map((h) => {
