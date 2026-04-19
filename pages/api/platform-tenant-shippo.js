@@ -4,6 +4,7 @@
 // /api/platform-tenant-square: same write-only secret pattern,
 // masked summary response, cache invalidation.
 
+import crypto from "crypto";
 import { verifyPlatformAdmin } from "../../lib/platform-auth";
 import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
 import { invalidateShippoConfig } from "../../lib/shippo-config";
@@ -24,7 +25,10 @@ function publicProjection(row) {
   return {
     enabled: !!row.enabled,
     api_key: maskSecret(row.api_key),
-    tracking_webhook_secret: maskSecret(row.tracking_webhook_secret),
+    // Webhook token is shown in plaintext — it's the URL secret, not
+    // a signing key, and the admin needs the full string to paste into
+    // Shippo's webhook URL.
+    tracking_webhook_secret: row.tracking_webhook_secret || null,
     origin_name: row.origin_name || "",
     origin_company: row.origin_company || "",
     origin_street1: row.origin_street1 || "",
@@ -103,6 +107,14 @@ export default async function handler(req, res) {
       update.tracking_webhook_secret = t;
     }
     // Empty/missing -> keep existing.
+  }
+
+  // Convenience: server-side token generator. Admin clicks "Generate
+  // webhook URL" in the Shippo tab and we mint a 32-byte hex token,
+  // skipping the "what should I paste?" friction. Replaces any
+  // existing token; admin must update Shippo's subscription URL too.
+  if (body.regenerate_webhook_token === true) {
+    update.tracking_webhook_secret = crypto.randomBytes(32).toString("hex");
   }
 
   for (const f of ADDRESS_FIELDS) {

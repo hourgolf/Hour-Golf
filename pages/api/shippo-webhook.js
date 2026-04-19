@@ -1,51 +1,30 @@
-// /api/shippo-webhook
+// /api/shippo-webhook?token=<tenant_token>
 //
 // Receives tracking status updates from Shippo. Registered at the
-// Shippo Dashboard → Webhooks (event: track_updated). Signed with
-// an HMAC-SHA256 header (X-Shippo-Signature, hex-encoded) using the
-// secret stored in tenant_shippo_config.tracking_webhook_secret.
+// Shippo Dashboard → Webhooks (event: track_updated). Shippo doesn't
+// HMAC-sign webhooks — their recommended pattern is a hard-to-guess
+// URL, so we use a per-tenant token in the query string. The token
+// lives in tenant_shippo_config.tracking_webhook_secret and is
+// generated server-side by the platform admin UI ("Generate webhook
+// URL" button).
 //
-// Multi-tenant resolution: Shippo webhooks don't carry a tenant id,
-// so we identify the tenant by looking up the tracking number in
-// shop_orders. First-match wins — tracking numbers are globally
-// unique per carrier.
-//
-// On payload receive:
-//   1. Parse body.
-//   2. Find the shop_orders row by tracking_number.
-//   3. Validate signature against that tenant's stored secret.
-//   4. Update shipping_status + detail + timestamp on every row of
-//      the purchase (all rows sharing the stripe_payment_intent_id).
-//   5. If status transitions to "delivered" and we haven't notified
-//      yet, send a delivery email to the member.
+// Auth model:
+//   1. Read ?token=<...> from the URL.
+//   2. Look up the tenant whose tracking_webhook_secret matches
+//      (service-role bypasses RLS for this lookup).
+//   3. If no match → 401.
+//   4. Otherwise, parse + dispatch the tracking update.
+// We also validate the tracking_number resolves to a shop_orders row
+// in that tenant before writing — defense in depth against a leaked
+// token getting used to spam status updates against unrelated orders.
 
-import crypto from "crypto";
 import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
-import { loadShippoConfig } from "../../lib/shippo-config";
 import { sendShipmentDeliveredEmail } from "../../lib/email";
 
-// Raw bytes for HMAC verification. bodyParser must be OFF.
-export const config = { api: { bodyParser: false } };
+// We don't sign-verify so bodyParser default is fine, but explicit
+// JSON parsing keeps behavior consistent with other webhooks.
+export const config = { api: { bodyParser: true } };
 
-async function getRawBody(req) {
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
-  return Buffer.concat(chunks);
-}
-
-function verifySignature(secret, rawBody, headerValue) {
-  if (!secret || !headerValue) return false;
-  const expected = crypto
-    .createHmac("sha256", secret)
-    .update(rawBody)
-    .digest("hex");
-  const a = Buffer.from(expected);
-  const b = Buffer.from(String(headerValue).trim());
-  if (a.length !== b.length) return false;
-  try { return crypto.timingSafeEqual(a, b); } catch { return false; }
-}
-
-// Map Shippo's tracking_status.status values to our lowercased enum.
 function normalizeStatus(shippoStatus) {
   const s = String(shippoStatus || "").toUpperCase();
   if (s === "DELIVERED") return "delivered";
@@ -66,15 +45,33 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Server configuration error" });
   }
 
-  const rawBody = await getRawBody(req);
-  let body;
-  try { body = JSON.parse(rawBody.toString("utf8")); }
-  catch { return res.status(400).json({ error: "Malformed JSON body" }); }
+  const token = String(req.query.token || "").trim();
+  if (!token || token.length < 16) {
+    // Don't leak whether tokens are required — opaque 401.
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 
-  // The "track_updated" event payload shape (simplified):
+  // Resolve tenant by token. PostgREST returns an array; filter is
+  // exact-match.
+  const cfgResp = await fetch(
+    `${SUPABASE_URL}/rest/v1/tenant_shippo_config?tracking_webhook_secret=eq.${encodeURIComponent(token)}&select=tenant_id`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+  );
+  if (!cfgResp.ok) {
+    console.error(`shippo-webhook: tenant lookup ${cfgResp.status}`);
+    return res.status(500).json({ error: "Lookup failed" });
+  }
+  const cfgs = await cfgResp.json();
+  if (cfgs.length === 0) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const tenantId = cfgs[0].tenant_id;
+
+  // Shippo's track_updated payload shape:
   //   { event: "track_updated", data: { tracking_number, tracking_status: {...}, ... } }
-  // Older shapes deliver at the top level. We accept either.
-  const data = body?.data || body;
+  // Older shapes deliver fields at the top level. Handle both.
+  const body = req.body || {};
+  const data = body.data || body;
   const trackingNumber = data?.tracking_number;
   if (!trackingNumber) return res.status(400).json({ error: "Missing tracking_number" });
 
@@ -83,14 +80,11 @@ export default async function handler(req, res) {
   const statusDetail = ts.status_details || "";
   const statusDate = ts.status_date || null;
 
-  // Resolve tenant by looking up the tracking number across orders.
-  // We need tenant first so we can load the right webhook secret
-  // before verifying — chicken-and-egg, resolved by looking up via
-  // service role (which bypasses RLS). Privacy-safe because we only
-  // return the tenant id and the member email we already need to
-  // email.
+  // Look up the order, scoped to the resolved tenant. If the token is
+  // valid but the tracking number isn't ours, treat it as ignored
+  // (200, no retry storm).
   const orderResp = await fetch(
-    `${SUPABASE_URL}/rest/v1/shop_orders?tracking_number=eq.${encodeURIComponent(trackingNumber)}&select=id,tenant_id,member_email,stripe_payment_intent_id,shipping_status,shipping_carrier,shipping_service,shipping_address,total&limit=1`,
+    `${SUPABASE_URL}/rest/v1/shop_orders?tenant_id=eq.${tenantId}&tracking_number=eq.${encodeURIComponent(trackingNumber)}&select=id,member_email,stripe_payment_intent_id,shipping_status,shipping_carrier,shipping_service&limit=1`,
     { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
   );
   if (!orderResp.ok) {
@@ -100,20 +94,8 @@ export default async function handler(req, res) {
   const orderRows = await orderResp.json();
   const firstRow = orderRows[0];
   if (!firstRow) {
-    // Unknown tracking number — could be a label we didn't generate.
-    // 200 so Shippo doesn't retry forever.
-    console.log(`shippo-webhook: no order found for tracking ${trackingNumber}`);
+    console.log(`shippo-webhook: tenant ${tenantId} no order for tracking ${trackingNumber}`);
     return res.status(200).json({ ignored: true });
-  }
-
-  const tenantId = firstRow.tenant_id;
-  const cfg = await loadShippoConfig(tenantId);
-  const secret = cfg?.tracking_webhook_secret;
-
-  const headerValue = req.headers["x-shippo-signature"] || req.headers["x-shippo-signature-v1"];
-  if (!verifySignature(secret, rawBody, headerValue)) {
-    console.error(`shippo-webhook: signature verification failed for tenant ${tenantId}`);
-    return res.status(400).json({ error: "Invalid signature" });
   }
 
   const newStatus = normalizeStatus(statusRaw);
@@ -144,9 +126,6 @@ export default async function handler(req, res) {
 
   console.log(`shippo-webhook: tenant ${tenantId} tracking ${trackingNumber} → ${newStatus}`);
 
-  // Send delivered email on transition into "delivered". We key off
-  // prevStatus so a re-delivery of the same webhook doesn't double-
-  // email. If prevStatus was already "delivered", skip.
   if (newStatus === "delivered" && prevStatus !== "delivered") {
     try {
       await sendShipmentDeliveredEmail({

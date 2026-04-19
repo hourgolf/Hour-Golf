@@ -1045,7 +1045,7 @@ function ShippoTab({ detail, apiKey }) {
   const [loading, setLoading] = useState(true);
   const [enabled, setEnabled] = useState(false);
   const [tokenInput, setTokenInput] = useState("");
-  const [webhookSecretInput, setWebhookSecretInput] = useState("");
+  const [generatingWebhookToken, setGeneratingWebhookToken] = useState(false);
   // Origin address — flat fields so the form is straightforward.
   const [origin, setOrigin] = useState({
     name: "", company: "",
@@ -1100,7 +1100,6 @@ function ShippoTab({ detail, apiKey }) {
     setStatus("");
     const payload = { tenant_id: tenantId, enabled };
     if (tokenInput.trim()) payload.api_key = tokenInput.trim();
-    if (webhookSecretInput.trim()) payload.tracking_webhook_secret = webhookSecretInput.trim();
     payload.origin_name = origin.name;
     payload.origin_company = origin.company;
     payload.origin_street1 = origin.street1;
@@ -1121,7 +1120,6 @@ function ShippoTab({ detail, apiKey }) {
       if (!r.ok) throw new Error(d.detail || d.error || "Save failed");
       setCfg(d);
       setTokenInput("");
-      setWebhookSecretInput("");
       setStatus("Saved. Cache invalidated — next rate quote uses new values.");
     } catch (e) {
       setErr(e.message);
@@ -1173,12 +1171,14 @@ function ShippoTab({ detail, apiKey }) {
             onChange={setTokenInput}
           />
 
-          <KeyRow
-            label="Tracking webhook secret"
-            existing={cfg?.tracking_webhook_secret}
-            placeholder="From Shippo Dashboard → Webhooks"
-            value={webhookSecretInput}
-            onChange={setWebhookSecretInput}
+          <ShippoWebhookUrl
+            tenantSlug={detail?.tenant?.slug}
+            cfg={cfg}
+            apiKey={apiKey}
+            tenantId={tenantId}
+            onChanged={(updated) => setCfg(updated)}
+            generating={generatingWebhookToken}
+            setGenerating={setGeneratingWebhookToken}
           />
 
           <div style={{ marginTop: 8, fontWeight: 700, fontSize: 12, color: "var(--p-text)" }}>Origin address (where labels ship from)</div>
@@ -1229,6 +1229,89 @@ function ShippoInput({ label, value, onChange, placeholder, wide }) {
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder || ""}
       />
+    </div>
+  );
+}
+
+function ShippoWebhookUrl({ tenantSlug, cfg, apiKey, tenantId, onChanged, generating, setGenerating }) {
+  const token = cfg?.tracking_webhook_secret || "";
+  const fullUrl = token && tenantSlug
+    ? `https://${tenantSlug}.ourlee.co/api/shippo-webhook?token=${token}`
+    : "";
+
+  async function generateToken() {
+    if (!confirm(token
+      ? "Replace the existing webhook URL? You'll need to update the URL in Shippo's dashboard too — the old URL will stop working."
+      : "Generate a tracking webhook URL for Shippo?"
+    )) return;
+    setGenerating(true);
+    try {
+      const r = await fetch("/api/platform-tenant-shippo", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ tenant_id: tenantId, regenerate_webhook_token: true }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || "Generate failed");
+      onChanged(d);
+    } catch (e) {
+      alert(e.message);
+    }
+    setGenerating(false);
+  }
+
+  function copyUrl() {
+    if (!fullUrl) return;
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(fullUrl);
+    }
+  }
+
+  return (
+    <div className="p-field">
+      <label className="p-field-label">Tracking webhook URL</label>
+      <div className="p-field-hint">
+        Shippo doesn't HMAC-sign webhooks. We use a hard-to-guess URL with
+        a per-tenant token instead. Generate the URL here, then paste it
+        into <strong>Shippo Dashboard → Webhooks</strong> with event{" "}
+        <code className="p-mono">track_updated</code>.
+      </div>
+      {token ? (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "var(--p-surface, #fff)", border: "1px solid var(--p-border, #e2eddb)", borderRadius: 8, fontSize: 11, fontFamily: "ui-monospace, monospace", wordBreak: "break-all" }}>
+            <span style={{ flex: 1 }}>{fullUrl}</span>
+            <button
+              className="p-btn"
+              onClick={copyUrl}
+              type="button"
+              style={{ fontSize: 11, padding: "4px 10px", flexShrink: 0 }}
+            >
+              Copy
+            </button>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <button
+              className="p-btn"
+              onClick={generateToken}
+              disabled={generating}
+              type="button"
+              style={{ fontSize: 11 }}
+            >
+              {generating ? "Generating…" : "Regenerate URL"}
+            </button>
+          </div>
+        </>
+      ) : (
+        <button
+          className="p-btn p-btn--primary"
+          onClick={generateToken}
+          disabled={generating}
+          type="button"
+          style={{ fontSize: 12 }}
+        >
+          {generating ? "Generating…" : "Generate webhook URL"}
+        </button>
+      )}
     </div>
   );
 }
