@@ -124,9 +124,11 @@ Templates to audit (from `lib/email.js`):
 
 *Surfaces still hardcoded to HG that block clean tenant onboarding.*
 
-- [ ] [shared] [medium] [feature] [P2] — Tenant-configurable cancel cutoff (`tenant_settings.cancel_cutoff_hours`). Currently hardcoded at 6h in MemberDashboard.
-- [ ] [shared] [medium] [feature] [P2] — Tenant-configurable bay noun (`tenant_settings.bay_label`). Squash courts? Sim lounges? Swim lanes?
-- [ ] [shared] [medium] [feature] [P3] — Per-tenant tier coloring — `TIER_COLORS` is HG-baked. Move into `tenant_branding` or a dedicated tier table.
+- [x] [shared] [medium] [feature] [P2] — Tenant-configurable cancel cutoff — shipped 2026-04-19 (`tenant_branding.cancel_cutoff_hours`).
+- [x] [shared] [medium] [feature] [P2] — Tenant-configurable bay noun + bay list — shipped 2026-04-19 (`tenant_branding.bays` + `bay_label_singular`).
+- [x] [shared] [medium] [feature] [P3] — Per-tenant tier coloring — shipped 2026-04-19 (`tenant_branding.tier_colors` JSONB).
+- [x] [shared] [small] [feature] [P2] — Facility address on calendar invites — shipped 2026-04-19 (`tenant_branding.facility_address`).
+- [ ] [shared] [small] [feature] [P3] — Admin views (TodayView, WeekView, ReportsView, BookingForm) still import `BAYS` from `lib/constants` — refactor to read from branding for full multi-tenant readiness on the operator side.
 
 ### Theme: Loyalty / subscriptions / punch passes
 
