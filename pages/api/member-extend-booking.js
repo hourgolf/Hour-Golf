@@ -91,16 +91,18 @@ export default async function handler(req, res) {
     const oldEnd = new Date(booking.booking_end);
     const start = new Date(booking.booking_start);
 
-    // Only allow extension while the booking is live OR within ~30 min
-    // of starting. This stops members from extending tomorrow's
-    // booking via the "+15m" button by accident.
+    // Only allow extension while the booking is actually in flight
+    // (booking_start <= now < booking_end). The dashboard hero hides
+    // the +15m button until the session starts, so a request outside
+    // this window is either a stale tab or a direct API hit — reject
+    // with a clear message rather than silently extending.
     const minsUntilStart = (start - now) / 60000;
     const minsUntilEnd = (oldEnd - now) / 60000;
     if (minsUntilEnd <= 0) {
       return res.status(400).json({ error: "This booking has already ended." });
     }
-    if (minsUntilStart > 30) {
-      return res.status(400).json({ error: "Extensions are only available while a booking is live or starting soon." });
+    if (minsUntilStart > 0) {
+      return res.status(400).json({ error: "Extensions become available once the session starts." });
     }
 
     const newEnd = new Date(oldEnd.getTime() + addMin * 60_000);

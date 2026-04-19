@@ -304,51 +304,55 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
                   )}
                 </div>
               )}
-              {/* Extend control. Visible while the booking is live or
-                  within 30 min of starting (matches the server-side
-                  eligibility window). Each tap adds 15 min; the API
-                  enforces bay-conflict, tier-window, and tenant daily
-                  cap so the button can stay simple. */}
-              {(isLive || (msUntil > 0 && msUntil <= 30 * 60 * 1000)) && (
-                <div className="mem2-hero-extend">
+              {/* Live-only action: extend the in-flight session in
+                  15-min increments. We deliberately suppress Book
+                  another / Cancel when the booking is actually
+                  happening — the only useful action mid-session is
+                  "stretch this one." Pre-start members still see
+                  Book another + Cancel below. */}
+              {isLive ? (
+                <>
+                  <div className="mem2-hero-extend">
+                    <button
+                      type="button"
+                      className="mem2-hero-extend-btn"
+                      onClick={() => handleExtend(nextBooking.booking_id, 15)}
+                      disabled={extending}
+                      aria-label="Extend booking by 15 minutes"
+                    >
+                      {extending ? "Extending…" : "+15 min"}
+                    </button>
+                    <span className="mem2-hero-extend-hint">Stretch your session</span>
+                  </div>
+                  {extendError && (
+                    <div className="mem2-hero-extend-err">{extendError}</div>
+                  )}
+                </>
+              ) : (
+                <div className="mem2-hero-actions">
                   <button
-                    type="button"
-                    className="mem2-hero-extend-btn"
-                    onClick={() => handleExtend(nextBooking.booking_id, 15)}
-                    disabled={extending}
-                    aria-label="Extend booking by 15 minutes"
+                    className="mem2-btn-primary"
+                    onClick={() => router.push("/members/book")}
                   >
-                    {extending ? "Extending…" : "+15 min"}
+                    Book another
                   </button>
-                  <span className="mem2-hero-extend-hint">Stretch your session</span>
+                  {canCancel ? (
+                    <button
+                      className="mem2-btn-ghost"
+                      onClick={() => setCancelConfirm(nextBooking.booking_id)}
+                      disabled={cancelling}
+                    >
+                      Cancel
+                    </button>
+                  ) : supportContact ? (
+                    <a className="mem2-btn-ghost" href={supportContact.href}>
+                      Contact us to cancel
+                    </a>
+                  ) : (
+                    <span className="mem2-btn-ghost disabled">Contact us to cancel</span>
+                  )}
                 </div>
               )}
-              {extendError && (
-                <div className="mem2-hero-extend-err">{extendError}</div>
-              )}
-              <div className="mem2-hero-actions">
-                <button
-                  className="mem2-btn-primary"
-                  onClick={() => router.push("/members/book")}
-                >
-                  Book another
-                </button>
-                {canCancel ? (
-                  <button
-                    className="mem2-btn-ghost"
-                    onClick={() => setCancelConfirm(nextBooking.booking_id)}
-                    disabled={cancelling}
-                  >
-                    Cancel
-                  </button>
-                ) : supportContact ? (
-                  <a className="mem2-btn-ghost" href={supportContact.href}>
-                    Contact us to cancel
-                  </a>
-                ) : (
-                  <span className="mem2-btn-ghost disabled">Contact us to cancel</span>
-                )}
-              </div>
               {cancelConfirm === nextBooking.booking_id && (
                 <div className="mem-cancel-confirm" style={{ marginTop: 12 }}>
                   <span>Cancel this booking?</span>
