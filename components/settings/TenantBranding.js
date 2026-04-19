@@ -331,6 +331,7 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
           ? null
           : Number(branding.max_daily_hours_per_member)
       );
+      payload.dashboard_empty_headline = branding.dashboard_empty_headline || null;
       // tier_colors lives as a JSON object on the row; the UI edits it
       // through a textarea (advanced) so we stash a `_tierColorsRaw`
       // string on the local branding object while editing and parse it
@@ -786,6 +787,21 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
             />
             <div className="muted" style={{ marginTop: 4 }}>
               Hard ceiling enforced when members extend a live booking. Distinct from monthly tier allowance. Blank = no daily cap.
+            </div>
+          </div>
+
+          <div className="mf">
+            <label>Dashboard empty headline</label>
+            <input
+              type="text"
+              value={branding.dashboard_empty_headline || ""}
+              onChange={(e) => update("dashboard_empty_headline", e.target.value)}
+              placeholder="Ready to play?"
+              maxLength={80}
+              style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)" }}
+            />
+            <div className="muted" style={{ marginTop: 4 }}>
+              Shown on the member home tab when there are no upcoming bookings. Match your venue's voice — "Ready to swing?" / "Ready to court?" / "Ready to game?". Blank = "Ready to play?".
             </div>
           </div>
         </div>

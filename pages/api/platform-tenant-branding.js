@@ -53,6 +53,7 @@ const EDITABLE_COLUMNS = [
   "facility_address",
   "tier_colors",
   "max_daily_hours_per_member",
+  "dashboard_empty_headline",
 ];
 
 function isUuid(value) {
@@ -154,6 +155,11 @@ export default async function handler(req, res) {
           if (value === null) { /* allowed */ }
           else if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 24) {
             return res.status(400).json({ error: `${col} must be a number between 0 and 24` });
+          }
+        } else if (col === "dashboard_empty_headline") {
+          if (value === null) { /* allowed */ }
+          else if (typeof value !== "string" || value.length > 80) {
+            return res.status(400).json({ error: `${col} must be a string up to 80 chars` });
           }
         } else if (col === "bays") {
           if (value === null) { /* allowed */ }

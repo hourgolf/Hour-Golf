@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
 import { QRCodeSVG } from "qrcode.react";
 import { useBranding } from "../../hooks/useBranding";
-import { DEFAULT_CANCEL_CUTOFF_HOURS } from "../../lib/branding";
+import { DEFAULT_CANCEL_CUTOFF_HOURS, DEFAULT_DASHBOARD_EMPTY_HEADLINE } from "../../lib/branding";
 import Modal from "../ui/Modal";
 import InstallPrompt from "./InstallPrompt";
 import { fT, fD, fDL } from "../../lib/format";
@@ -381,7 +381,7 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
         <div className="mem2-hero empty">
           <div className="mem2-hero-eyebrow">No bookings yet</div>
           <div className="mem2-hero-when" style={{ fontSize: 18 }}>
-            Ready to swing?
+            {branding?.dashboard_empty_headline || DEFAULT_DASHBOARD_EMPTY_HEADLINE}
           </div>
           <div className="mem2-hero-meta">Pick a {(branding?.bay_label_singular || "bay").toLowerCase()} and a time — takes about 20 seconds.</div>
           <div className="mem2-hero-actions">

@@ -48,11 +48,17 @@ export default async function handler(req, res) {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
 
-    // Upcoming confirmed bookings
+    // Upcoming + currently-live confirmed bookings.
+    //
+    // Filter on booking_end (not booking_start) so a session that has
+    // already started but hasn't ended yet still comes back. Filtering
+    // on booking_start dropped live bookings from the response and
+    // made the dashboard hero fall back to the empty "Ready to ..."
+    // state on reload mid-session.
     let upcoming = [];
     try {
       upcoming = await fetch(
-        `${SUPABASE_URL}/rest/v1/bookings?customer_email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}&booking_status=eq.Confirmed&booking_start=gte.${now.toISOString()}&order=booking_start.asc&limit=20`,
+        `${SUPABASE_URL}/rest/v1/bookings?customer_email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}&booking_status=eq.Confirmed&booking_end=gte.${now.toISOString()}&order=booking_start.asc&limit=20`,
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       ).then((r) => r.json());
     } catch (_) { upcoming = []; }
