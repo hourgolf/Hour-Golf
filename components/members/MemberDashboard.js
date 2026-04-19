@@ -67,19 +67,21 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
         .then((items) => { if (Array.isArray(items)) setNews(items); })
         .catch(() => {});
       // In-transit shipments — pulls the unified purchases feed and
-      // keeps only in_app shipped orders that haven't been delivered
-      // / picked up yet. Until we wire Shippo tracking webhooks for
-      // real-time delivery status, "in transit" = status='confirmed'
-      // with a tracking number set.
+      // keeps in-app shipped orders that have a label but haven't
+      // been delivered yet. shipping_status comes from the Shippo
+      // tracking webhook; delivered + returned + failure orders are
+      // auto-filtered out.
       fetch("/api/member-purchases?limit=20", { credentials: "include" })
         .then((sr) => sr.ok ? sr.json() : null)
         .then((d) => {
           if (!d?.purchases) return;
+          const terminal = new Set(["delivered", "returned", "failure"]);
           const inTransit = d.purchases.filter((p) =>
             p.kind === "in_app"
             && p.delivery_method === "ship"
             && p.tracking_number
             && (!p.status || p.status === "confirmed")
+            && !terminal.has(p.shipping_status || "")
           );
           setShipments(inTransit);
         })
@@ -405,6 +407,15 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
               const itemsLabel = (s.items || []).length === 1
                 ? s.items[0].item_title
                 : `${(s.items || []).length} items`;
+              const statusPill = (() => {
+                const st = s.shipping_status || "label_created";
+                if (st === "label_created") return { label: "Label created", bg: "#ddd480", color: "#35443B" };
+                if (st === "pre_transit")   return { label: "Pre-transit",   bg: "#ddd480", color: "#35443B" };
+                if (st === "transit")       return { label: "In transit",    bg: "var(--primary)", color: "var(--bg)" };
+                if (st === "returned")      return { label: "Returned",      bg: "var(--red)", color: "#fff" };
+                if (st === "failure")       return { label: "Issue",         bg: "var(--red)", color: "#fff" };
+                return { label: "Shipped", bg: "var(--primary)", color: "var(--bg)" };
+              })();
               return (
                 <div
                   key={s.id}
@@ -414,9 +425,14 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 2 }}>
-                      <span className="mem-purchase-tag" style={{ background: "var(--primary)", color: "var(--bg)" }}>In transit</span>
+                      <span className="mem-purchase-tag" style={{ background: statusPill.bg, color: statusPill.color }}>{statusPill.label}</span>
                       <strong style={{ fontSize: 14 }}>{itemsLabel}</strong>
                     </div>
+                    {s.shipping_status_detail && (
+                      <div className="mem-list-sub" style={{ fontSize: 12, fontStyle: "italic" }}>
+                        {s.shipping_status_detail}
+                      </div>
+                    )}
                     {(s.shipping_carrier || s.shipping_service) && (
                       <div className="mem-list-sub" style={{ fontSize: 12 }}>
                         {s.shipping_carrier} {s.shipping_service}

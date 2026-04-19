@@ -713,6 +713,9 @@ export default async function handler(req, res) {
             tracking_number: label?.tracking_number || null,
             tracking_url: label?.tracking_url || null,
             label_url: label?.label_url || null,
+            shipping_status: label?.tracking_number ? "label_created" : null,
+            shipping_status_detail: label?.tracking_number ? "Label created, awaiting carrier pickup." : null,
+            shipping_status_updated_at: label?.tracking_number ? new Date().toISOString() : null,
           }),
         });
         // Increment quantity_claimed

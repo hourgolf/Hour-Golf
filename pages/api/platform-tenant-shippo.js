@@ -24,6 +24,7 @@ function publicProjection(row) {
   return {
     enabled: !!row.enabled,
     api_key: maskSecret(row.api_key),
+    tracking_webhook_secret: maskSecret(row.tracking_webhook_secret),
     origin_name: row.origin_name || "",
     origin_company: row.origin_company || "",
     origin_street1: row.origin_street1 || "",
@@ -88,6 +89,18 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "api_key length out of range" });
       }
       update.api_key = t;
+    }
+    // Empty/missing -> keep existing.
+  }
+
+  if ("tracking_webhook_secret" in body) {
+    const v = body.tracking_webhook_secret;
+    if (typeof v === "string" && v.trim().length > 0) {
+      const t = v.trim();
+      if (t.length < 10 || t.length > 500) {
+        return res.status(400).json({ error: "tracking_webhook_secret length out of range" });
+      }
+      update.tracking_webhook_secret = t;
     }
     // Empty/missing -> keep existing.
   }

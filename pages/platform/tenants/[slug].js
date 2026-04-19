@@ -1045,6 +1045,7 @@ function ShippoTab({ detail, apiKey }) {
   const [loading, setLoading] = useState(true);
   const [enabled, setEnabled] = useState(false);
   const [tokenInput, setTokenInput] = useState("");
+  const [webhookSecretInput, setWebhookSecretInput] = useState("");
   // Origin address — flat fields so the form is straightforward.
   const [origin, setOrigin] = useState({
     name: "", company: "",
@@ -1099,6 +1100,7 @@ function ShippoTab({ detail, apiKey }) {
     setStatus("");
     const payload = { tenant_id: tenantId, enabled };
     if (tokenInput.trim()) payload.api_key = tokenInput.trim();
+    if (webhookSecretInput.trim()) payload.tracking_webhook_secret = webhookSecretInput.trim();
     payload.origin_name = origin.name;
     payload.origin_company = origin.company;
     payload.origin_street1 = origin.street1;
@@ -1119,6 +1121,7 @@ function ShippoTab({ detail, apiKey }) {
       if (!r.ok) throw new Error(d.detail || d.error || "Save failed");
       setCfg(d);
       setTokenInput("");
+      setWebhookSecretInput("");
       setStatus("Saved. Cache invalidated — next rate quote uses new values.");
     } catch (e) {
       setErr(e.message);
@@ -1168,6 +1171,14 @@ function ShippoTab({ detail, apiKey }) {
             placeholder="shippo_live_… or shippo_test_…"
             value={tokenInput}
             onChange={setTokenInput}
+          />
+
+          <KeyRow
+            label="Tracking webhook secret"
+            existing={cfg?.tracking_webhook_secret}
+            placeholder="From Shippo Dashboard → Webhooks"
+            value={webhookSecretInput}
+            onChange={setWebhookSecretInput}
           />
 
           <div style={{ marginTop: 8, fontWeight: 700, fontSize: 12, color: "var(--p-text)" }}>Origin address (where labels ship from)</div>

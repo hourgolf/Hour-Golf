@@ -104,6 +104,9 @@ export default async function handler(req, res) {
           tracking_number: o.tracking_number || null,
           tracking_url: o.tracking_url || null,
           label_url: o.label_url || null,
+          shipping_status: o.shipping_status || null,
+          shipping_status_detail: o.shipping_status_detail || null,
+          shipping_status_updated_at: o.shipping_status_updated_at || null,
         };
         groups.set(k, g);
       }
@@ -132,6 +135,7 @@ export default async function handler(req, res) {
         "receipt_url", "receipt_number", "payment_method", "card_last_4", "card_brand",
         "shipping_address", "shipping_amount", "shipping_carrier", "shipping_service",
         "tracking_number", "tracking_url", "label_url",
+        "shipping_status", "shipping_status_detail", "shipping_status_updated_at",
       ]) {
         if (!g[field] && o[field]) g[field] = o[field];
       }

@@ -469,6 +469,26 @@ export default function MemberShop({ member, tierConfig, showToast }) {
                 {/* Shipping detail row — only on shipped orders. */}
                 {isShipped && (o.tracking_number || o.shipping_carrier || o.shipping_address) && (
                   <div style={{ marginTop: 6, padding: "8px 10px", background: "var(--primary-bg)", borderRadius: 8, fontSize: 12, lineHeight: 1.5 }}>
+                    {o.shipping_status && (
+                      <div>
+                        <strong>Status:</strong>{" "}
+                        {(() => {
+                          const st = o.shipping_status;
+                          if (st === "delivered")     return <span style={{ color: "#4C8D73", fontWeight: 700 }}>Delivered 🎉</span>;
+                          if (st === "transit")       return <span style={{ fontWeight: 600 }}>In transit</span>;
+                          if (st === "pre_transit")   return <span style={{ fontWeight: 600 }}>Pre-transit</span>;
+                          if (st === "label_created") return <span style={{ color: "var(--text-muted)" }}>Label created, awaiting pickup</span>;
+                          if (st === "returned")      return <span style={{ color: "var(--red)", fontWeight: 700 }}>Returned</span>;
+                          if (st === "failure")       return <span style={{ color: "var(--red)", fontWeight: 700 }}>Delivery issue — please contact us</span>;
+                          return <span>{st}</span>;
+                        })()}
+                      </div>
+                    )}
+                    {o.shipping_status_detail && (
+                      <div style={{ color: "var(--text-muted)", fontStyle: "italic" }}>
+                        {o.shipping_status_detail}
+                      </div>
+                    )}
                     {o.shipping_carrier && (
                       <div>
                         <strong>Shipping:</strong> {o.shipping_carrier}
