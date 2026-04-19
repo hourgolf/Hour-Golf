@@ -311,6 +311,41 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
       payload.support_phone = branding.support_phone || null;
       payload.facility_hours = branding.facility_hours || null;
       payload.backup_access_code = branding.backup_access_code || null;
+      // Operations panel — multi-tenant readiness fields. Each is
+      // nullable; the underlying consumers fall back to platform
+      // defaults (DEFAULT_BAYS, DEFAULT_CANCEL_CUTOFF_HOURS, etc.)
+      // when null, so blanking a field reverts to defaults rather
+      // than breaking anything.
+      payload.cancel_cutoff_hours = (
+        branding.cancel_cutoff_hours === "" || branding.cancel_cutoff_hours == null
+          ? null
+          : Number(branding.cancel_cutoff_hours)
+      );
+      payload.bays = Array.isArray(branding.bays) && branding.bays.length > 0
+        ? branding.bays.map((b) => String(b).trim()).filter(Boolean)
+        : null;
+      payload.bay_label_singular = branding.bay_label_singular || null;
+      payload.facility_address = branding.facility_address || null;
+      // tier_colors lives as a JSON object on the row; the UI edits it
+      // through a textarea (advanced) so we stash a `_tierColorsRaw`
+      // string on the local branding object while editing and parse it
+      // back to JSON here on save. Empty / unparseable string → null
+      // (revert to fallback palette).
+      if (branding._tierColorsRaw !== undefined) {
+        const raw = String(branding._tierColorsRaw || "").trim();
+        if (raw === "") {
+          payload.tier_colors = null;
+        } else {
+          try {
+            const parsed = JSON.parse(raw);
+            payload.tier_colors = parsed;
+          } catch (_) {
+            throw new Error("Tier colors JSON is not valid. Fix or clear the field.");
+          }
+        }
+      } else {
+        payload.tier_colors = branding.tier_colors || null;
+      }
 
       // Platform-mode PATCH requires the target tenant_id in the body
       // (tenant-admin mode resolves from subdomain, no extra field).
@@ -643,6 +678,108 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
           />
           <div className="muted" style={{ marginTop: 4 }}>
             Only relevant when Access Codes is enabled. Shown to members as a fallback in the troubleshooting flow if their Seam code fails. Leave blank if you don&rsquo;t have one.
+          </div>
+        </div>
+      </div>
+
+      {/* Operations — multi-tenant policy + naming. Each field falls
+          back to a platform default when blank so a tenant who hasn't
+          customized still gets sensible behavior. */}
+      <div>
+        <h4 style={{ fontFamily: "var(--font-display)", fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, color: "var(--text-muted)", marginBottom: 10 }}>
+          Operations
+        </h4>
+        <p className="muted" style={{ fontSize: 12, marginTop: -4, marginBottom: 14 }}>
+          What members see and how the booking flow behaves. Leave a field blank to use the platform default.
+        </p>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+          <div className="mf">
+            <label>{(branding.bay_label_singular || "Bay")} list</label>
+            <input
+              type="text"
+              value={Array.isArray(branding.bays) ? branding.bays.join(", ") : (branding.bays || "")}
+              onChange={(e) => {
+                const parts = e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+                update("bays", parts.length > 0 ? parts : null);
+              }}
+              placeholder="Bay 1, Bay 2"
+              style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)" }}
+            />
+            <div className="muted" style={{ marginTop: 4 }}>
+              Comma-separated list of bookable resources. Drives the booking grid + admin Today/Week views.
+            </div>
+          </div>
+
+          <div className="mf">
+            <label>Resource noun (singular)</label>
+            <input
+              type="text"
+              value={branding.bay_label_singular || ""}
+              onChange={(e) => update("bay_label_singular", e.target.value)}
+              placeholder="Bay"
+              maxLength={30}
+              style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)" }}
+            />
+            <div className="muted" style={{ marginTop: 4 }}>
+              "Bay", "Court", "Sim", "Lane". Used in copy across member + admin surfaces.
+            </div>
+          </div>
+
+          <div className="mf">
+            <label>Cancel cutoff (hours)</label>
+            <input
+              type="number"
+              min="0"
+              max="168"
+              step="0.5"
+              value={branding.cancel_cutoff_hours == null ? "" : branding.cancel_cutoff_hours}
+              onChange={(e) => {
+                const v = e.target.value;
+                update("cancel_cutoff_hours", v === "" ? null : Number(v));
+              }}
+              placeholder="6"
+              style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)" }}
+            />
+            <div className="muted" style={{ marginTop: 4 }}>
+              How far in advance members can self-cancel. Server + UI + email copy all read this. Blank = platform default (6).
+            </div>
+          </div>
+
+          <div className="mf">
+            <label>Facility address</label>
+            <input
+              type="text"
+              value={branding.facility_address || ""}
+              onChange={(e) => update("facility_address", e.target.value)}
+              placeholder="101 Main St, Portland, OR"
+              maxLength={300}
+              style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)" }}
+            />
+            <div className="muted" style={{ marginTop: 4 }}>
+              Calendar invite location on booking confirmation emails. Members tap → directions.
+            </div>
+          </div>
+        </div>
+
+        <div className="mf" style={{ marginTop: 14 }}>
+          <label>Tier colors (advanced — JSON)</label>
+          <textarea
+            value={
+              branding._tierColorsRaw !== undefined
+                ? branding._tierColorsRaw
+                : (branding.tier_colors ? JSON.stringify(branding.tier_colors, null, 2) : "")
+            }
+            onChange={(e) => update("_tierColorsRaw", e.target.value)}
+            placeholder='{ "Patron": { "bg": "#D1DFCB", "text": "#35443B" } }'
+            rows={6}
+            style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 4, fontFamily: "var(--font-mono)", fontSize: 12, background: "var(--surface)", color: "var(--text)" }}
+          />
+          <div className="muted" style={{ marginTop: 4 }}>
+            Per-tier badge styling. Object map: <code>{`{ "TierName": { "bg": "#hex", "text": "#hex" } }`}</code>. Blank → fallback to platform default palette.
           </div>
         </div>
       </div>

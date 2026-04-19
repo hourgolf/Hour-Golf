@@ -46,6 +46,12 @@ const EDITABLE_COLUMNS = [
   "font_display_url",
   "font_body_family",
   "welcome_message",
+  // Multi-tenant readiness fields (migration 20260419000000).
+  "cancel_cutoff_hours",
+  "bays",
+  "bay_label_singular",
+  "facility_address",
+  "tier_colors",
 ];
 
 function isUuid(value) {
@@ -137,6 +143,55 @@ export default async function handler(req, res) {
             : 120;
           if (typeof value === "string" && value.length > max) {
             return res.status(400).json({ error: `${col} too long (max ${max} chars)` });
+          }
+        } else if (col === "cancel_cutoff_hours") {
+          if (value === null) { /* allowed */ }
+          else if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 168) {
+            return res.status(400).json({ error: `${col} must be a number between 0 and 168` });
+          }
+        } else if (col === "bays") {
+          if (value === null) { /* allowed */ }
+          else if (!Array.isArray(value)) {
+            return res.status(400).json({ error: `${col} must be an array` });
+          } else {
+            if (value.length > 20) return res.status(400).json({ error: `${col} too many entries (max 20)` });
+            for (const b of value) {
+              if (typeof b !== "string" || b.length === 0 || b.length > 30) {
+                return res.status(400).json({ error: `${col} entries must be non-empty strings up to 30 chars` });
+              }
+            }
+          }
+        } else if (col === "bay_label_singular") {
+          if (value === null) { /* allowed */ }
+          else if (typeof value !== "string" || value.length === 0 || value.length > 30) {
+            return res.status(400).json({ error: `${col} must be a non-empty string up to 30 chars` });
+          }
+        } else if (col === "facility_address") {
+          if (value === null) { /* allowed */ }
+          else if (typeof value !== "string" || value.length > 300) {
+            return res.status(400).json({ error: `${col} must be a string up to 300 chars` });
+          }
+        } else if (col === "tier_colors") {
+          if (value === null) { /* allowed */ }
+          else if (typeof value !== "object" || Array.isArray(value)) {
+            return res.status(400).json({ error: `${col} must be an object` });
+          } else {
+            const keys = Object.keys(value);
+            if (keys.length > 20) return res.status(400).json({ error: `${col} too many tiers (max 20)` });
+            for (const tier of keys) {
+              if (typeof tier !== "string" || tier.length === 0 || tier.length > 50) {
+                return res.status(400).json({ error: `${col} tier names must be non-empty strings up to 50 chars` });
+              }
+              const entry = value[tier];
+              if (!entry || typeof entry !== "object") {
+                return res.status(400).json({ error: `${col}.${tier} must be an object with bg + text` });
+              }
+              for (const k of ["bg", "text"]) {
+                if (!isValidHex(entry[k])) {
+                  return res.status(400).json({ error: `${col}.${tier}.${k} must be a valid hex color` });
+                }
+              }
+            }
           }
         }
 
