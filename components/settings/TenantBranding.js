@@ -321,9 +321,20 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
           ? null
           : Number(branding.cancel_cutoff_hours)
       );
-      payload.bays = Array.isArray(branding.bays) && branding.bays.length > 0
-        ? branding.bays.map((b) => String(b).trim()).filter(Boolean)
-        : null;
+      // Bays edits use a raw-text buffer (_baysRaw) while typing so a
+      // trailing comma isn't stripped mid-keystroke. Parse on save: split,
+      // trim, drop empties → array; empty input → null (revert to default).
+      if (branding._baysRaw !== undefined) {
+        const parts = String(branding._baysRaw || "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        payload.bays = parts.length > 0 ? parts : null;
+      } else {
+        payload.bays = Array.isArray(branding.bays) && branding.bays.length > 0
+          ? branding.bays.map((b) => String(b).trim()).filter(Boolean)
+          : null;
+      }
       payload.bay_label_singular = branding.bay_label_singular || null;
       payload.facility_address = branding.facility_address || null;
       payload.max_daily_hours_per_member = (
@@ -704,14 +715,12 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
             <label>{(branding.bay_label_singular || "Bay")} list</label>
             <input
               type="text"
-              value={Array.isArray(branding.bays) ? branding.bays.join(", ") : (branding.bays || "")}
-              onChange={(e) => {
-                const parts = e.target.value
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean);
-                update("bays", parts.length > 0 ? parts : null);
-              }}
+              value={
+                branding._baysRaw !== undefined
+                  ? branding._baysRaw
+                  : (Array.isArray(branding.bays) ? branding.bays.join(", ") : (branding.bays || ""))
+              }
+              onChange={(e) => update("_baysRaw", e.target.value)}
               placeholder="Bay 1, Bay 2"
               style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--surface)", color: "var(--text)" }}
             />
