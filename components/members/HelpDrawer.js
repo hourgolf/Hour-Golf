@@ -17,6 +17,15 @@ function buildFaqCategories(branding, { accessCodesEnabled } = {}) {
   const supportEmail = branding?.support_email;
   const supportPhone = branding?.support_phone;
   const venueName = branding?.app_name || "us";
+  // Multi-tenant readiness: bay noun + cancel cutoff come from
+  // tenant_branding so a tenant running courts/sims doesn't ship FAQ
+  // copy talking about "bays" or hardcoded 6-hour windows.
+  const bayLabel = branding?.bay_label_singular || "Bay";
+  const bayLower = bayLabel.toLowerCase();
+  const cutoffHours = Number(branding?.cancel_cutoff_hours ?? 6);
+  const cutoffPhrase = cutoffHours > 0
+    ? `${cutoffHours} hour${cutoffHours === 1 ? "" : "s"}`
+    : "any time";
 
   // Visiting category adapts to the access_codes feature flag. When on,
   // it's the familiar "Access & Door Codes" grouping with the smart-
@@ -47,8 +56,8 @@ function buildFaqCategories(branding, { accessCodesEnabled } = {}) {
     icon: "\uD83D\uDCC5",
     items: [
       {
-        q: "How do I book a bay?",
-        a: "Go to the \u201CBook a Bay\u201D tab, pick your date, bay, and time slot, then confirm. You\u2019ll get an email confirmation.",
+        q: `How do I book a ${bayLower}?`,
+        a: `Go to the \u201CBook Time\u201D tab, pick your date, ${bayLower}, and time slot, then confirm. You\u2019ll get an email confirmation.`,
       },
       {
         q: "How far in advance can I book?",
@@ -56,11 +65,15 @@ function buildFaqCategories(branding, { accessCodesEnabled } = {}) {
       },
       {
         q: "How do I cancel a booking?",
-        a: "Go to your Dashboard and find the booking under \u201CUpcoming Bookings.\u201D Click \u201CCancel\u201D \u2014 cancellations must be made at least 6 hours before your start time.",
+        a: cutoffHours > 0
+          ? `Go to your Dashboard and find the booking under \u201CUpcoming Bookings.\u201D Click \u201CCancel\u201D \u2014 cancellations must be made at least ${cutoffPhrase} before your start time.`
+          : `Go to your Dashboard and find the booking under \u201CUpcoming Bookings.\u201D Click \u201CCancel\u201D \u2014 you can cancel ${cutoffPhrase} before your start time.`,
       },
       {
         q: "What\u2019s the cancellation policy?",
-        a: "You can cancel free of charge up to 6 hours before your booking. Late cancellations or no-shows may be charged. Contact us if you have an emergency.",
+        a: cutoffHours > 0
+          ? `You can cancel free of charge up to ${cutoffPhrase} before your booking. Late cancellations or no-shows may be charged. Contact us if you have an emergency.`
+          : `You can cancel ${cutoffPhrase} before your booking. Contact us if you have an emergency.`,
       },
       {
         q: "Can I modify a booking?",

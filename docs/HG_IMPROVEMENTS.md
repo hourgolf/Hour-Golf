@@ -178,6 +178,7 @@ Items that are real but don't belong in this sprint. Revisit after member launch
 - 2026-04-19 `<next>` — [member] Email: "View dashboard / billing / orders / book a bay" CTA buttons added to every member-facing template
 - 2026-04-19 `<next>` — [member] Email: booking confirmation has Add-to-Calendar links (Google + Apple/Outlook .ics) + specific access-code timing copy
 - 2026-04-19 `<next>` — [member] Email: subject lines tightened ("Booked: Sun, Apr 19 at 5:30 PM · Bay 1" instead of generic "Booking Confirmed ✅")
+- 2026-04-19 `<next>` — [shared] Multi-tenant readiness: cancel_cutoff_hours, bays, bay_label_singular, facility_address, tier_colors all moved to tenant_branding; HG seeded with prior hardcoded values. Member dashboard, booking page, help drawer, cancel API, and email copy all read from tenant config now.
 
 **Decisions / removed:**
 - "Repeat last booking" chip — shipped briefly in `e37322b`, removed in next commit. No one was going to use it; just added clutter.

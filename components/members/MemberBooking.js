@@ -1,9 +1,22 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
-import { BAYS, TZ } from "../../lib/constants";
+import { BAYS as DEFAULT_BAYS, TZ } from "../../lib/constants";
 import { fT, fDL } from "../../lib/format";
 import { useBranding } from "../../hooks/useBranding";
 import DatePicker from "../DatePicker";
+
+// Resolve the active list of bookable resources for this tenant. Reads
+// branding.bays first (per-tenant override seeded by the multi-tenant
+// readiness migration); falls back to the legacy two-bay HG default
+// in lib/constants. Filters non-string entries defensively in case a
+// tenant row stores something malformed.
+function resolveBays(branding) {
+  const fromBranding = branding?.bays;
+  if (Array.isArray(fromBranding) && fromBranding.length > 0) {
+    return fromBranding.filter((b) => typeof b === "string" && b.length > 0);
+  }
+  return DEFAULT_BAYS;
+}
 
 function buildHours(startHour, endHour) {
   const hours = [];
@@ -28,6 +41,13 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
   const isNonMember = member.tier === "Non-Member";
   const hasCard = member.hasPaymentMethod;
   const branding = useBranding();
+  // Per-tenant bay list + label noun. Default to "Bay" so the existing
+  // copy ("Book a Bay", "Confirm booking") reads correctly for HG. New
+  // tenants using "Court", "Sim", etc. get their noun in the section
+  // headers below.
+  const BAYS = useMemo(() => resolveBays(branding), [branding]);
+  const bayLabel = branding?.bay_label_singular || "Bay";
+  const bayLabelLower = bayLabel.toLowerCase();
 
   const bookStart = Number(tierConfig?.booking_hours_start ?? (isNonMember ? 10 : 0));
   const bookEnd = Number(tierConfig?.booking_hours_end ?? (isNonMember ? 20 : 24));
@@ -46,7 +66,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
   const defaultEnd = ALL_HOURS.length > 4 ? ALL_HOURS[4] : ALL_HOURS[ALL_HOURS.length - 1] || "11:00";
   const [bookStartTime, setBookStartTime] = useState(defaultStart);
   const [bookEndTime, setBookEndTime] = useState(defaultEnd);
-  const [bookBay, setBookBay] = useState("Bay 1");
+  const [bookBay, setBookBay] = useState(BAYS[0] || "Bay 1");
   const [availability, setAvailability] = useState([]);
   const [booking, setBooking] = useState(false);
   const [bookMsg, setBookMsg] = useState("");
@@ -55,7 +75,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
   // Quick-book sheet state — opened by tapping an availability cell.
   // Keeps its own bay/start/end/terms so the top form isn't clobbered.
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [sheetBay, setSheetBay] = useState("Bay 1");
+  const [sheetBay, setSheetBay] = useState(BAYS[0] || "Bay 1");
   const [sheetStart, setSheetStart] = useState(defaultStart);
   const [sheetEnd, setSheetEnd] = useState(defaultEnd);
   const [sheetTerms, setSheetTerms] = useState(false);
@@ -188,7 +208,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
       setBookStartTime(HOURS[0] || defaultStart);
       setBookEndTime(HOURS[4] || HOURS[HOURS.length - 1] || defaultEnd);
     }
-    setBookBay("Bay 1");
+    setBookBay(BAYS[0] || "Bay 1");
     setBookSuccess(null);
   }
 
@@ -211,7 +231,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
   // bookable slot (which HOURS already filters to "now" for today).
   function openSheetFresh() {
     const firstHour = HOURS.length > 0 ? HOURS[0] : defaultStart;
-    openSheet("Bay 1", firstHour);
+    openSheet(BAYS[0] || "Bay 1", firstHour);
   }
 
   function closeSheet() {
@@ -342,7 +362,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
           drive everything from the availability grid + sheet, which has
           presets, chips, and a clearer summary. */}
       <div className="mem-section mem-book-inline">
-        <div className="mem-section-head">Book a Bay</div>
+        <div className="mem-section-head">Book a {bayLabel}</div>
 
         {bookSuccess ? (
           (() => {
@@ -395,7 +415,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
             </div>
           )}
           <div className="mem-form-row">
-            <label>Bay</label>
+            <label>{bayLabel}</label>
             <select value={bookBay} onChange={(e) => setBookBay(e.target.value)}>
               {BAYS.map((b) => <option key={b}>{b}</option>)}
             </select>
@@ -537,7 +557,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
               </div>
 
               <div className="mem-sheet-section">
-                <div className="mem-sheet-label">Bay</div>
+                <div className="mem-sheet-label">{bayLabel}</div>
                 <div className="mem-sheet-chips">
                   {BAYS.map((b) => (
                     <button

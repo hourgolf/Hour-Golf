@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { QRCodeSVG } from "qrcode.react";
 import { TIER_COLORS } from "../../lib/constants";
 import { useBranding } from "../../hooks/useBranding";
+import { DEFAULT_CANCEL_CUTOFF_HOURS } from "../../lib/branding";
 import Modal from "../ui/Modal";
 import InstallPrompt from "./InstallPrompt";
 import { fT, fD, fDL } from "../../lib/format";
@@ -167,9 +168,18 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
 
   const fmt = (n) => Number(n || 0).toFixed(1);
 
-  // Tier color for the inline pill — still pulls from TIER_COLORS, which
-  // bakes in HG's palette. Per-tenant tier coloring is queued as a follow-up.
-  const tierObj = TIER_COLORS[member.tier] || { bg: "var(--primary-bg)", text: "var(--primary)" };
+  // Tier color for the inline pill. Tenants can define per-tier colors
+  // in tenant_branding.tier_colors; falls back to the HG palette in
+  // TIER_COLORS, then to a primary-bg/primary scheme so any unmapped
+  // tier on a freshly-onboarded tenant still renders something branded.
+  const tierColorsMap = branding?.tier_colors || TIER_COLORS;
+  const tierObj = tierColorsMap[member.tier] || TIER_COLORS[member.tier] || { bg: "var(--primary-bg)", text: "var(--primary)" };
+
+  // Cancel-cutoff window comes from tenant policy. UI hides the inline
+  // Cancel button inside this window; server-side member-cancel.js
+  // enforces the same value so the button-disabled UX matches the API
+  // response.
+  const cancelCutoffHours = Number(branding?.cancel_cutoff_hours ?? DEFAULT_CANCEL_CUTOFF_HOURS);
 
   // For the "Contact us to cancel" link inside the cancel-window. We prefer
   // email over phone so members get a written paper trail; falls back to
@@ -252,7 +262,7 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
           const msUntil = startMs - now;
           const hoursUntil = msUntil / 3600000;
           const isLive = msUntil <= 0 && e.getTime() > now;
-          const canCancel = hoursUntil > 6;
+          const canCancel = hoursUntil > cancelCutoffHours;
           return (
             <div className={`mem2-hero ${isLive ? "live" : ""}`}>
               <div className="mem2-hero-head">
@@ -330,13 +340,13 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
           <div className="mem2-hero-when" style={{ fontSize: 18 }}>
             Ready to swing?
           </div>
-          <div className="mem2-hero-meta">Pick a bay and a time — takes about 20 seconds.</div>
+          <div className="mem2-hero-meta">Pick a {(branding?.bay_label_singular || "bay").toLowerCase()} and a time — takes about 20 seconds.</div>
           <div className="mem2-hero-actions">
             <button
               className="mem2-btn-primary"
               onClick={() => router.push("/members/book?new=1")}
             >
-              Book a bay
+              Book a {(branding?.bay_label_singular || "bay").toLowerCase()}
             </button>
           </div>
         </div>
@@ -562,7 +572,7 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
                 const s = new Date(b.booking_start);
                 const e = new Date(b.booking_end);
                 const hoursUntil = (s.getTime() - now) / 3600000;
-                const canCancel = hoursUntil > 6;
+                const canCancel = hoursUntil > cancelCutoffHours;
                 return (
                   <div key={b.booking_id} className="mem-list-item" style={{ flexDirection: "column", alignItems: "stretch" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

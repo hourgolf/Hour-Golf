@@ -529,8 +529,12 @@ export default function MemberLayout({ activeTab, children }) {
     );
   }
 
-  // Logged in — render layout with content
-  const tierObj = TIER_COLORS[member.tier] || { bg: "#D1DFCB", text: "#35443B" };
+  // Logged in — render layout with content. Tier badge color comes
+  // from tenant_branding.tier_colors when configured (multi-tenant
+  // readiness migration); falls back to the HG palette in TIER_COLORS,
+  // then to a neutral cream/text scheme so untyped tiers still render.
+  const tierColorsMap = branding?.tier_colors || TIER_COLORS;
+  const tierObj = tierColorsMap[member.tier] || TIER_COLORS[member.tier] || { bg: "#D1DFCB", text: "#35443B" };
 
   return (
     <div className="mem-layout" style={{ position: "relative" }}>

@@ -2,6 +2,7 @@ import { SUPABASE_URL, getServiceKey, getTenantId, getRequestOrigin } from "../.
 import { getSessionWithMember } from "../../lib/member-session";
 import { sendCancellationEmail } from "../../lib/email";
 import { loadSeamConfig } from "../../lib/seam-config";
+import { loadBranding, DEFAULT_CANCEL_CUTOFF_HOURS } from "../../lib/branding";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -44,11 +45,16 @@ export default async function handler(req, res) {
 
     const booking = bookings[0];
 
-    // 6-hour rule: members can only cancel MORE than 6 hours before start
+    // Cancel-cutoff rule: members can only cancel further out than the
+    // tenant's configured cutoff window. Pulled from tenant_branding so
+    // the policy matches whatever members see in the UI + email copy.
+    // Falls back to the platform default when null.
+    const branding = await loadBranding(tenantId);
+    const cutoffHours = Number(branding?.cancel_cutoff_hours ?? DEFAULT_CANCEL_CUTOFF_HOURS);
     const hoursUntil = (new Date(booking.booking_start) - new Date()) / 3600000;
-    if (hoursUntil <= 6) {
+    if (hoursUntil <= cutoffHours) {
       return res.status(403).json({
-        error: "Bookings within 6 hours of start time can only be cancelled by staff. Please contact us.",
+        error: `Bookings within ${cutoffHours} hour${cutoffHours === 1 ? "" : "s"} of start time can only be cancelled by staff. Please contact us.`,
       });
     }
 
