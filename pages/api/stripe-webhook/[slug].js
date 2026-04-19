@@ -9,7 +9,7 @@
 // /api/stripe-webhook (HG-only, env-var secret) stays live during the
 // observation window, then is deleted in Phase 7C-3.
 
-import { SUPABASE_URL, getServiceKey } from "../../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getRequestOrigin } from "../../../lib/api-helpers";
 import { getStripeClient, loadStripeConfig } from "../../../lib/stripe-config";
 import { handleStripeEvent, getRawBody } from "../../../lib/stripe-webhook-handler";
 
@@ -93,7 +93,7 @@ export default async function handler(req, res) {
   // 4. Dispatch to the shared handler. Any processing error is logged and
   //    we still 200 so Stripe doesn't mark this as a delivery failure.
   try {
-    await handleStripeEvent({ event, stripe, tenantId, serviceKey });
+    await handleStripeEvent({ event, stripe, tenantId, serviceKey, portalUrl: getRequestOrigin(req) });
   } catch (e) {
     console.error(`stripe-webhook[${slug}] processing error for ${event.type}:`, e);
   }

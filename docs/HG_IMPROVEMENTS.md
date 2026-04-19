@@ -172,6 +172,12 @@ Items that are real but don't belong in this sprint. Revisit after member launch
 - 2026-04-19 `e37322b` — [member] Booking: tappable "Need to change something?" link in sheet
 - 2026-04-19 `e37322b` — [mobile] Booking: hide inline form on mobile (sheet-only path)
 - 2026-04-19 `e37322b` — [member] Booking: sticky day-bar above the availability grid
+- 2026-04-19 `35b1ece` — [mobile] Booking: DatePicker popover anchors to right edge on small viewports (no more horizontal overflow)
+- 2026-04-19 `<next>` — [shared] Email: shared `renderEmailLayout()` helper — every template now uses it; removed ~200 lines of inline-style duplication
+- 2026-04-19 `<next>` — [shared] Email: tenant logo + brand colors + plaintext fallback + preheader on every transactional email
+- 2026-04-19 `<next>` — [member] Email: "View dashboard / billing / orders / book a bay" CTA buttons added to every member-facing template
+- 2026-04-19 `<next>` — [member] Email: booking confirmation has Add-to-Calendar links (Google + Apple/Outlook .ics) + specific access-code timing copy
+- 2026-04-19 `<next>` — [member] Email: subject lines tightened ("Booked: Sun, Apr 19 at 5:30 PM · Bay 1" instead of generic "Booking Confirmed ✅")
 
 **Decisions / removed:**
 - "Repeat last booking" chip — shipped briefly in `e37322b`, removed in next commit. No one was going to use it; just added clutter.

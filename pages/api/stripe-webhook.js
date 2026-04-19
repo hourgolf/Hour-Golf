@@ -16,7 +16,7 @@
 // Safe to remove once Stripe dashboard points at /api/stripe-webhook/hourgolf.
 
 import Stripe from "stripe";
-import { getServiceKey } from "../../lib/api-helpers";
+import { getServiceKey, getRequestOrigin } from "../../lib/api-helpers";
 import { HOURGOLF_TENANT_ID } from "../../lib/constants";
 import { handleStripeEvent, getRawBody } from "../../lib/stripe-webhook-handler";
 
@@ -56,6 +56,7 @@ export default async function handler(req, res) {
       stripe,
       tenantId: HOURGOLF_TENANT_ID,
       serviceKey,
+      portalUrl: getRequestOrigin(req),
     });
   } catch (e) {
     console.error(`Webhook processing error for ${event.type}:`, e);

@@ -18,7 +18,7 @@
 // in that tenant before writing — defense in depth against a leaked
 // token getting used to spam status updates against unrelated orders.
 
-import { SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getRequestOrigin } from "../../lib/api-helpers";
 import { sendShipmentDeliveredEmail } from "../../lib/email";
 
 // We don't sign-verify so bodyParser default is fine, but explicit
@@ -134,6 +134,7 @@ export default async function handler(req, res) {
         trackingNumber,
         carrier: firstRow.shipping_carrier || null,
         service: firstRow.shipping_service || null,
+        portalUrl: getRequestOrigin(req),
       });
     } catch (e) {
       console.error(`shippo-webhook: delivered email failed for ${firstRow.member_email}:`, e.message);

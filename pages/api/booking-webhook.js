@@ -18,6 +18,7 @@
 // Original behavior: handles the insert; Supabase triggers do duration calc.
 
 import { sendBookingConfirmation } from "../../lib/email";
+import { getRequestOrigin } from "../../lib/api-helpers";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
@@ -90,6 +91,7 @@ export default async function handler(req, res) {
               bay: booked.bay,
               bookingStart: booked.booking_start,
               bookingEnd: booked.booking_end,
+              portalUrl: getRequestOrigin(req),
             });
           } catch (e) {
             console.error("Booking confirmation email failed:", e);

@@ -1,4 +1,4 @@
-import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
+import { SUPABASE_URL, getServiceKey, getTenantId, getRequestOrigin } from "../../lib/api-helpers";
 import { getSessionWithMember } from "../../lib/member-session";
 import { sendCancellationEmail } from "../../lib/email";
 import { loadSeamConfig } from "../../lib/seam-config";
@@ -135,6 +135,7 @@ export default async function handler(req, res) {
         bay: booking.bay,
         bookingStart: booking.booking_start,
         bookingEnd: booking.booking_end,
+        portalUrl: getRequestOrigin(req),
       });
     } catch (emailErr) {
       console.error("Cancellation email failed:", emailErr);

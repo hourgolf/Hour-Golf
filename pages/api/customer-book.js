@@ -1,4 +1,4 @@
-import { SUPABASE_URL, getSupabaseKey, getTenantId } from "../../lib/api-helpers";
+import { SUPABASE_URL, getSupabaseKey, getTenantId, getRequestOrigin } from "../../lib/api-helpers";
 import { sendBookingConfirmation } from "../../lib/email";
 
 const TZ = "America/Los_Angeles";
@@ -123,6 +123,7 @@ export default async function handler(req, res) {
         bay: booked.bay,
         bookingStart: booked.booking_start,
         bookingEnd: booked.booking_end,
+        portalUrl: getRequestOrigin(req),
       });
     } catch (emailErr) {
       console.error("Booking confirmation email failed:", emailErr);
