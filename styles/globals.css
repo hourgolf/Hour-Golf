@@ -503,6 +503,14 @@ html { overflow-y: scroll; }
 .hg-dp-icon { flex-shrink: 0; }
 
 .hg-dp-popover { position: absolute; top: calc(100% + 6px); left: 0; z-index: 200; width: min(92vw, 320px); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 18px 40px rgba(0,0,0,0.18); padding: 14px; animation: fadeIn 0.15s ease; }
+/* On narrow viewports anchor to the trigger's right edge so the
+   popover extends left into the visible viewport instead of off the
+   right side. The 320px / 92vw popover used to sit at left:0 of the
+   trigger, which overflowed the viewport when the picker lived in a
+   right-anchored container like the sticky day-bar. */
+@media (max-width: 600px) {
+  .hg-dp-popover { left: auto; right: 0; }
+}
 .hg-dp-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 8px; }
 .hg-dp-nav-group { display: flex; gap: 2px; }
 .hg-dp-month { font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.03em; }
@@ -1132,16 +1140,3 @@ html { overflow-y: scroll; }
 }
 .mem-book-success-actions { display: flex; gap: 10px; }
 
-/* Sheet header "Repeat last" chip. */
-.mem-sheet-repeat {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 5px 10px; border-radius: 999px;
-  background: rgba(255,255,255,0.18); color: var(--bg);
-  border: 1px solid rgba(255,255,255,0.35);
-  font-family: var(--font-display);
-  font-size: 11px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.04em;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.mem-sheet-repeat:hover { background: rgba(255,255,255,0.28); }

@@ -64,7 +64,6 @@ Sessions group items by theme. Order within a theme: **bugs → ux → cosmetic 
 
 - [ ] [mobile] [small] [ux] [P1] — Hide inline `.mem-book-form` on mobile; tap-grid + sheet only. Removes the double-pathing.
 - [ ] [member] [small] [ux] [P2] — Sticky date pill on the availability grid so date stays visible while scrolling.
-- [ ] [member] [small] [ux] [P2] — "Repeat last booking" chip in the booking-sheet header.
 - [ ] [member] [medium] [feature] [P2] — Persist Terms acceptance (set `members.terms_accepted_at` on signup; drop the per-booking checkbox). Add a `require_per_booking_consent` tenant flag for clubs whose legal counsel insists.
 - [ ] [member] [trivial] [ux] [P2] — Tappable "Need to change something?" line in the booking sheet (mailto:/tel: from branding, mirrors the dashboard pattern).
 - [ ] [member] [small] [ux] [P3] — Auto-scroll the availability grid to the next open slot near "now" on load.
@@ -168,6 +167,14 @@ Items that are real but don't belong in this sprint. Revisit after member launch
 - 2026-04-19 `e3a0672` — [shared] Status colors via CSS vars (`--status-good/warn/danger/bonus`) with HG fallbacks
 - 2026-04-19 `e3a0672` — [member] Dashboard: empty-state hero with "Book a bay" CTA when no upcoming bookings
 - 2026-04-19 `e3a0672` — [member] Dashboard: loyalty section explainer + "$X credit" wording
+- 2026-04-19 `e37322b` — [member] Booking: success panel after submit (kills post-booking red-error flash)
+- 2026-04-19 `e37322b` — [member] Booking: 7-day window hint inside the sheet
+- 2026-04-19 `e37322b` — [member] Booking: tappable "Need to change something?" link in sheet
+- 2026-04-19 `e37322b` — [mobile] Booking: hide inline form on mobile (sheet-only path)
+- 2026-04-19 `e37322b` — [member] Booking: sticky day-bar above the availability grid
+
+**Decisions / removed:**
+- "Repeat last booking" chip — shipped briefly in `e37322b`, removed in next commit. No one was going to use it; just added clutter.
 
 ---
 

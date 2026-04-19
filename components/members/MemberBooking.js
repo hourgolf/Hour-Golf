@@ -70,9 +70,6 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
   // toast — confusing).
   const [bookSuccess, setBookSuccess] = useState(null);
 
-  // Most recent past booking for the "Repeat last" chip in the sheet
-  // header. Populated lazily from /api/member-data; null hides the chip.
-  const [lastBooking, setLastBooking] = useState(null);
 
   // Filter hours: if booking today, hide times that have already passed
   const isToday = bookDate === todayStr;
@@ -90,22 +87,6 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
       .then((d) => setAvailability(d.bookings || []))
       .catch(() => setAvailability([]));
   }, [bookDate]);
-
-  // Pull the member's most recent booking once on mount so we can offer
-  // "Repeat last" in the sheet. Cheap — same /api/member-data the
-  // dashboard already uses; just here we only care about monthBookings.
-  useEffect(() => {
-    fetch("/api/member-data", { credentials: "include" })
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => {
-        if (!d?.monthBookings || d.monthBookings.length === 0) return;
-        const sorted = [...d.monthBookings].sort(
-          (a, b) => new Date(b.booking_start) - new Date(a.booking_start)
-        );
-        setLastBooking(sorted[0] || null);
-      })
-      .catch(() => {});
-  }, []);
 
   // When date changes to today and start time is in the past, auto-advance
   useEffect(() => {
@@ -340,38 +321,6 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
     ? `tel:${branding.support_phone.replace(/[^0-9+]/g, "")}`
     : null;
 
-  // "Repeat last booking" — pre-fills the sheet from the member's most
-  // recent past booking. Bay carries over verbatim; start/end clamp to
-  // today's bookable HOURS window so we don't open the sheet into a
-  // 6:30am-but-it's-now-2pm conflict. Date stays whatever the grid is
-  // showing (members hit Repeat from inside the grid context).
-  function openSheetFromLast() {
-    if (!lastBooking) return;
-    const lb = lastBooking;
-    const lbStart = new Date(lb.booking_start);
-    const lbEnd = new Date(lb.booking_end);
-    const hh = (d) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-    let s = hh(lbStart);
-    let e = hh(lbEnd);
-    // Clamp into current HOURS — if the original start has passed today,
-    // walk forward to the first bookable hour.
-    if (!HOURS.includes(s)) {
-      s = HOURS[0] || defaultStart;
-      // Match original duration when possible.
-      const dur = Math.max(1, Math.round((lbEnd - lbStart) / (15 * 60 * 1000)));
-      const sIdx = ALL_HOURS.indexOf(s);
-      const eIdx = sIdx >= 0 ? Math.min(sIdx + dur, ALL_HOURS.length - 1) : -1;
-      e = eIdx > sIdx ? ALL_HOURS[eIdx] : (HOURS[4] || HOURS[HOURS.length - 1] || defaultEnd);
-    } else if (!ALL_HOURS.includes(e) || ALL_HOURS.indexOf(e) <= ALL_HOURS.indexOf(s)) {
-      e = ALL_HOURS[Math.min(ALL_HOURS.indexOf(s) + 4, ALL_HOURS.length - 1)] || defaultEnd;
-    }
-    setSheetBay(lb.bay || "Bay 1");
-    setSheetStart(s);
-    setSheetEnd(e);
-    setSheetTerms(false);
-    setSheetMsg("");
-    setSheetOpen(true);
-  }
 
   return (
     <>
@@ -561,19 +510,7 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
           <div className="mem-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="mem-sheet-head">
               <div className="mem-sheet-title">Confirm booking</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {lastBooking && (
-                  <button
-                    type="button"
-                    className="mem-sheet-repeat"
-                    onClick={openSheetFromLast}
-                    title="Pre-fill with your last booking"
-                  >
-                    <span style={{ fontSize: 14, lineHeight: 1 }}>↻</span> Repeat last
-                  </button>
-                )}
-                <button type="button" className="mem-sheet-close" onClick={closeSheet} aria-label="Close">&times;</button>
-              </div>
+              <button type="button" className="mem-sheet-close" onClick={closeSheet} aria-label="Close">&times;</button>
             </div>
             <div className="mem-sheet-body">
               <div className="mem-sheet-summary">
