@@ -1,9 +1,30 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TZ } from "../../lib/constants";
 import { fT, fDL, lds, tds, hrs } from "../../lib/format";
 import { useBranding } from "../../hooks/useBranding";
 import { resolveBays, resolveBayLabel } from "../../lib/branding";
 import Badge from "../ui/Badge";
+
+// Tight countdown helper used by the "Right now" + "Up next" callouts.
+// Stays terse (no padding, no leading words) because it sits inside
+// chips with limited horizontal space.
+function fmtCountdown(ms) {
+  if (ms <= 0) return "starts now";
+  const totalMin = Math.floor(ms / 60000);
+  const hrsPart = Math.floor(totalMin / 60);
+  const minsPart = totalMin % 60;
+  if (hrsPart === 0) return `${minsPart}m`;
+  return `${hrsPart}h ${minsPart}m`;
+}
+
+function fmtRemaining(ms) {
+  if (ms <= 0) return "wrapping up";
+  const totalMin = Math.floor(ms / 60000);
+  const hrsPart = Math.floor(totalMin / 60);
+  const minsPart = totalMin % 60;
+  if (hrsPart === 0) return `${minsPart}m left`;
+  return `${hrsPart}h ${minsPart}m left`;
+}
 
 export default function TodayView({
   bookings, members, accessCodes,
@@ -26,7 +47,15 @@ export default function TodayView({
     return m;
   }, [accessCodes]);
 
-  const now = new Date();
+  // Tick the clock once a minute so the "Right now" remaining-time and
+  // "Up next" countdown chips stay accurate without a full data
+  // refresh. Cheaper than refreshing every booking row.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(id);
+  }, []);
+
   const today = tds();
   const viewDate = targetDate || today;
   const isToday = viewDate === today;
@@ -60,10 +89,114 @@ export default function TodayView({
     return "past";
   }
 
+  // "Right now" — every booking currently in flight. Operator's most
+  // important glance: who's on the clock, time left, what code did
+  // they get. Sorted by end-time so the soonest wrap-up is on top.
+  const liveBookings = useMemo(() => {
+    if (!isToday) return [];
+    return todayBk
+      .filter((b) => {
+        const s = new Date(b.booking_start);
+        const e = new Date(b.booking_end);
+        return now >= s && now <= e;
+      })
+      .sort((a, b) => new Date(a.booking_end) - new Date(b.booking_end));
+  }, [todayBk, now, isToday]);
+
+  // "Up next" — the next imminent booking starting within ~90 min,
+  // not already in the live list. Single row to keep the callout tight.
+  const upNext = useMemo(() => {
+    if (!isToday) return null;
+    const threshold = 90 * 60 * 1000;
+    return todayBk.find((b) => {
+      const s = new Date(b.booking_start);
+      const ms = s - now;
+      return ms > 0 && ms <= threshold;
+    }) || null;
+  }, [todayBk, now, isToday]);
+
   const displayBays = bayFilter === "all" ? BAYS : [bayFilter];
+
+  // Show callouts only when there's something live or imminent — empty
+  // state is just the regular bay lanes (no value in showing an empty
+  // "right now" panel at 5am).
+  const showCallouts = isToday && (liveBookings.length > 0 || upNext);
 
   return (
     <div className="content">
+      {showCallouts && (
+        <div className="today-callouts">
+          {liveBookings.length > 0 && (
+            <div className="today-callout today-callout-live">
+              <div className="today-callout-head">
+                <span className="today-callout-eyebrow">Right now</span>
+                <span className="today-callout-count">{liveBookings.length} on the clock</span>
+              </div>
+              <div className="today-callout-list">
+                {liveBookings.map((b) => {
+                  const e = new Date(b.booking_end);
+                  const remaining = e - now;
+                  const code = codesByBooking.get(b.booking_id);
+                  const mem = members.find((x) => x.email === b.customer_email);
+                  return (
+                    <div key={b.booking_id} className="today-callout-row">
+                      <div className="today-callout-row-main">
+                        <button
+                          type="button"
+                          className="today-callout-name"
+                          onClick={() => onSelectMember(b.customer_email)}
+                          title="Open customer detail"
+                        >
+                          {b.customer_name || b.customer_email}
+                        </button>
+                        <div className="today-callout-meta">
+                          {b.bay} · {fT(new Date(b.booking_start))}–{fT(e)}
+                          {mem && mem.tier !== "Non-Member" && <> · <Badge tier={mem.tier} /></>}
+                        </div>
+                      </div>
+                      <div className="today-callout-row-side">
+                        {code && <span className="today-callout-code">🔑 {code}</span>}
+                        <span className="today-callout-chip">{fmtRemaining(remaining)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {upNext && (
+            <div className="today-callout today-callout-next">
+              <div className="today-callout-head">
+                <span className="today-callout-eyebrow">Up next</span>
+                <span className="today-callout-count">in {fmtCountdown(new Date(upNext.booking_start) - now)}</span>
+              </div>
+              <div className="today-callout-row">
+                <div className="today-callout-row-main">
+                  <button
+                    type="button"
+                    className="today-callout-name"
+                    onClick={() => onSelectMember(upNext.customer_email)}
+                    title="Open customer detail"
+                  >
+                    {upNext.customer_name || upNext.customer_email}
+                  </button>
+                  <div className="today-callout-meta">
+                    {upNext.bay} · {fT(new Date(upNext.booking_start))}–{fT(new Date(upNext.booking_end))}
+                  </div>
+                </div>
+                <div className="today-callout-row-side">
+                  {(() => {
+                    const code = codesByBooking.get(upNext.booking_id);
+                    return code ? <span className="today-callout-code">🔑 {code}</span> : null;
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="fbar">
         <label>{bayLabel}:</label>
         <select value={bayFilter} onChange={(e) => setBayFilter(e.target.value)}>
@@ -94,6 +227,15 @@ export default function TodayView({
             const st = bkStatus(b);
             const mem = members.find((x) => x.email === b.customer_email);
             const accessCode = codesByBooking.get(b.booking_id);
+            // Seconds-until-start countdown for upcoming-today bookings.
+            // Skip for non-today views (no useful "in 3 days" copy in
+            // a per-day list) and for past/now (different status chip
+            // conveys it).
+            let countdown = null;
+            if (isToday && st === "upcoming") {
+              const ms = s - now;
+              if (ms > 0 && ms <= 6 * 60 * 60 * 1000) countdown = fmtCountdown(ms);
+            }
             return (
               <div key={b.booking_id} className={`slot ${st}`}>
                 <div className="slot-t">{fT(s)}&ndash;{fT(e)}</div>
@@ -117,7 +259,11 @@ export default function TodayView({
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     {st === "now" && <span className="badge" style={{ background: "var(--primary)", fontSize: 9 }}>NOW</span>}
-                    {st === "upcoming" && <span className="badge badge-sm" style={{ background: "var(--blue)" }}>NEXT</span>}
+                    {st === "upcoming" && (
+                      <span className="badge badge-sm" style={{ background: "var(--blue)" }}>
+                        {countdown ? `IN ${countdown.toUpperCase()}` : "NEXT"}
+                      </span>
+                    )}
                     <button className="btn" style={{ fontSize: 10 }} onClick={() => onEdit(b)}>Edit</button>
                     <button className="btn danger" style={{ fontSize: 10 }} onClick={() => onCancel(b)}>Cancel</button>
                   </div>

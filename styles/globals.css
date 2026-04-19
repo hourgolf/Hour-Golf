@@ -254,6 +254,131 @@ html { overflow-y: scroll; }
 .slot-i { flex: 1; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
 .slot-c { font-family: var(--font-body); font-size: var(--font-size); font-weight: 500; }
 .slot-m { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+/* "Right now" + "Up next" callouts at the top of the admin TodayView.
+   The operator's most-frequent question is "who's here now and who's
+   coming next?" — these answer it without scanning the bay lanes. */
+.today-callouts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.today-callout {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.today-callout-live {
+  background: var(--primary);
+  color: var(--bg);
+  border-color: var(--primary);
+}
+.today-callout-next {
+  border-left: 4px solid var(--primary);
+}
+.today-callout-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.today-callout-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.today-callout-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.today-callout-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.today-callout-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+.today-callout-row + .today-callout-row {
+  border-top: 1px solid rgba(255,255,255,0.18);
+}
+.today-callout-next .today-callout-row + .today-callout-row {
+  border-top: 1px solid var(--border);
+}
+.today-callout-row-main { flex: 1; min-width: 0; }
+.today-callout-name {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  letter-spacing: 0.02em;
+}
+.today-callout-name:hover { text-decoration: underline; }
+.today-callout-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+.today-callout-row-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.today-callout-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.22);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.today-callout-next .today-callout-chip {
+  background: var(--primary-bg);
+  color: var(--primary);
+}
+.today-callout-code {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.18);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+}
+.today-callout-next .today-callout-code {
+  background: var(--primary-bg);
+  color: var(--primary);
+}
+@media (max-width: 600px) {
+  .today-callout-row { flex-wrap: wrap; gap: 6px; }
+  .today-callout-row-side { width: 100%; justify-content: flex-end; }
+  .today-callout-name { font-size: 15px; }
+}
+
 /* Inline access-code chip on TodayView — Seam-issued codes pulled
    from access_code_jobs (status='sent') so the operator sees the
    actual door code without opening the Seam dashboard. */
