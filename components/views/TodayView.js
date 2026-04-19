@@ -30,6 +30,7 @@ export default function TodayView({
   bookings, members, accessCodes,
   bayFilter, setBayFilter,
   onEdit, onCancel, onSelectMember, targetDate,
+  onPrevDay, onNextDay, onJumpToday,
 }) {
   const branding = useBranding();
   const BAYS = useMemo(() => resolveBays(branding), [branding]);
@@ -122,8 +123,64 @@ export default function TodayView({
   // "right now" panel at 5am).
   const showCallouts = isToday && (liveBookings.length > 0 || upNext);
 
+  // Day-label for the date-nav strip. "Today" stays explicit when
+  // viewing today even if the operator just navigated back from a
+  // historic day — clearer than just "Sunday, April 19, 2026".
+  const dayLabel = isToday
+    ? "Today"
+    : new Date(viewDate + "T12:00:00").toLocaleDateString("en-US", {
+        weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: TZ,
+      });
+
   return (
     <div className="content">
+      {/* Date nav — always rendered so the operator has a single place
+          to step through days and jump back to today. Mirrored by
+          keyboard shortcuts ( [ = prev, ] = next, t = today ). */}
+      {(onPrevDay || onNextDay || onJumpToday) && (
+        <div className="today-datenav" role="group" aria-label="Day navigation">
+          <button
+            type="button"
+            className="btn"
+            onClick={onPrevDay}
+            disabled={!onPrevDay}
+            title="Previous day · [ "
+          >
+            &larr;
+          </button>
+          <div className="today-datenav-label" aria-live="polite">
+            <span className="today-datenav-day">{dayLabel}</span>
+            {!isToday && (
+              <span className="today-datenav-date">
+                {new Date(viewDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", timeZone: TZ })}
+                {" · "}
+                {new Date(viewDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: TZ })}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="btn"
+            onClick={onNextDay}
+            disabled={!onNextDay}
+            title="Next day · ] "
+          >
+            &rarr;
+          </button>
+          {!isToday && onJumpToday && (
+            <button
+              type="button"
+              className="btn primary"
+              onClick={onJumpToday}
+              title="Jump to today · t"
+              style={{ marginLeft: 6 }}
+            >
+              Today
+            </button>
+          )}
+        </div>
+      )}
+
       {showCallouts && (
         <div className="today-callouts">
           {liveBookings.length > 0 && (

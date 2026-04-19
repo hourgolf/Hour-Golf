@@ -189,6 +189,8 @@ Items that are real but don't belong in this sprint. Revisit after member launch
 - 2026-04-19 `<next>` — [admin] Settings → Operations panel: edit cancel_cutoff_hours, bays, bay_label_singular, facility_address, tier_colors without touching SQL.
 - 2026-04-19 `<next>` — [admin] TodayView "Right now" + "Up next" callouts at the top with live remaining-time and countdown chips. Per-row IN-2H-15M countdown badge replaces generic "NEXT" for upcoming bookings within 6h.
 - 2026-04-19 `<next>` — [member] Extend booking from the dashboard hero (+15m button while live or starting within 30 min). Tenant_branding.max_daily_hours_per_member added as a hard ceiling; server enforces conflict + tier window + cap; Seam access code's ends_at is patched best-effort so the door code doesn't expire mid-extension.
+- 2026-04-19 `<next>` — [admin] WeekView gains month KPI strip (bookings · hours · est revenue · utilization), per-day density chip, and a per-tenant primary-color heatmap on bay-day cells.
+- 2026-04-19 `<next>` — [admin] TodayView gets a date nav strip (Prev / Today label / Next + Today button when historic). Keyboard shortcuts: `[` prev day, `]` next day, `t` today, `w` week view (in addition to existing n/r/?/).
 
 **Decisions / removed:**
 - "Repeat last booking" chip — shipped briefly in `e37322b`, removed in next commit. No one was going to use it; just added clutter.

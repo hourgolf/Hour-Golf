@@ -254,6 +254,46 @@ html { overflow-y: scroll; }
 .slot-i { flex: 1; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
 .slot-c { font-family: var(--font-body); font-size: var(--font-size); font-weight: 500; }
 .slot-m { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+/* Date nav strip above the Today view. Always present so the operator
+   has a single, consistent place to step through days. Mirrored by
+   keyboard shortcuts: [ prev, ] next, t today. */
+.today-datenav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.today-datenav-label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-width: 0;
+}
+.today-datenav-day {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.today-datenav-date {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+@media (max-width: 600px) {
+  .today-datenav-day { font-size: 13px; }
+  .today-datenav-date { font-size: 10px; }
+}
+
 /* "Right now" + "Up next" callouts at the top of the admin TodayView.
    The operator's most-frequent question is "who's here now and who's
    coming next?" — these answer it without scanning the bay lanes. */

@@ -307,6 +307,22 @@ export default function Dashboard() {
     setSaving(false);
   }
 
+  // Date-nav helpers used by both the in-view buttons and the keyboard
+  // shortcuts ([ / ] / t). Operate on viewDate (a YYYY-MM-DD string).
+  // null means "today" — keep that representation so a viewer who just
+  // hit `t` doesn't end up showing yesterday after a midnight rollover.
+  function shiftViewDate(deltaDays) {
+    const ref = viewDate ? new Date(`${viewDate}T12:00:00`) : new Date();
+    ref.setDate(ref.getDate() + deltaDays);
+    const next = ref.toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+    setViewDate(next === tds() ? null : next);
+    setView("today");
+  }
+  function jumpToday() {
+    setViewDate(null);
+    setView("today");
+  }
+
   // Keyboard shortcuts
   useKeyboard({
     onNewBooking: useCallback(() => openAdd(), []),
@@ -315,6 +331,10 @@ export default function Dashboard() {
       setView("customers");
       setTimeout(() => { const el = document.querySelector(".search"); if (el) el.focus(); }, 100);
     }, []),
+    onJumpToday: useCallback(jumpToday, []),
+    onPrevDay: useCallback(() => shiftViewDate(-1), [viewDate]),
+    onNextDay: useCallback(() => shiftViewDate(1), [viewDate]),
+    onWeekView: useCallback(() => setView("week"), []),
   });
 
   // --- Render ---
@@ -369,6 +389,9 @@ export default function Dashboard() {
           onCancel={setCancTgt}
           onSelectMember={selectMember}
           targetDate={viewDate}
+          onPrevDay={() => shiftViewDate(-1)}
+          onNextDay={() => shiftViewDate(1)}
+          onJumpToday={jumpToday}
         />
       )}
 
