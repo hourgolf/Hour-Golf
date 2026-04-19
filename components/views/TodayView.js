@@ -31,6 +31,7 @@ export default function TodayView({
   bayFilter, setBayFilter,
   onEdit, onCancel, onSelectMember, targetDate,
   onPrevDay, onNextDay, onJumpToday,
+  onBulkCancel,
 }) {
   const branding = useBranding();
   const BAYS = useMemo(() => resolveBays(branding), [branding]);
@@ -56,6 +57,23 @@ export default function TodayView({
     const id = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(id);
   }, []);
+
+  // Multi-select state for bulk actions. Stored as a Set of booking_id
+  // strings so toggle/clear stay O(1). Cleared whenever the underlying
+  // booking set or filter changes so a stale selection from yesterday
+  // can't accidentally land on today's rows.
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  function toggleSelected(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function clearSelection() { setSelectedIds(new Set()); }
+  // Clear when the date or bay filter shifts — selections never travel
+  // across day/bay boundaries.
+  useEffect(() => { clearSelection(); }, [targetDate, bayFilter]);
 
   const today = tds();
   const viewDate = targetDate || today;
@@ -269,67 +287,133 @@ export default function TodayView({
         <div className="sum-item"><span className="sum-val">{todayBk.filter((b) => bkStatus(b) === "upcoming").length}</span><span className="sum-lbl">Upcoming</span></div>
       </div>
 
-      {displayBays.map((bay) => (
-        <div key={bay} className="bay-lane">
-          <div className="bay-label">{bay} &mdash; {fDL(new Date(viewDate + "T12:00:00"))}</div>
-          {(todayByBay[bay] || []).length === 0 && (
-            <div className="slot">
-              <div className="slot-t">&mdash;</div>
-              <div className="slot-i"><span className="muted">No bookings</span></div>
+      {displayBays.map((bay) => {
+        const laneBks = todayByBay[bay] || [];
+        const laneIds = laneBks.map((b) => b.booking_id);
+        const allLaneSelected = laneIds.length > 0 && laneIds.every((id) => selectedIds.has(id));
+        return (
+          <div key={bay} className="bay-lane">
+            <div className="bay-label" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {laneBks.length > 0 && (
+                <input
+                  type="checkbox"
+                  className="slot-check"
+                  checked={allLaneSelected}
+                  onChange={() => {
+                    setSelectedIds((prev) => {
+                      const next = new Set(prev);
+                      if (allLaneSelected) laneIds.forEach((id) => next.delete(id));
+                      else laneIds.forEach((id) => next.add(id));
+                      return next;
+                    });
+                  }}
+                  title={allLaneSelected ? `Deselect all in ${bay}` : `Select all in ${bay}`}
+                  aria-label={allLaneSelected ? `Deselect all in ${bay}` : `Select all in ${bay}`}
+                />
+              )}
+              <span>{bay} &mdash; {fDL(new Date(viewDate + "T12:00:00"))}</span>
             </div>
-          )}
-          {(todayByBay[bay] || []).map((b) => {
-            const s = new Date(b.booking_start);
-            const e = new Date(b.booking_end);
-            const st = bkStatus(b);
-            const mem = members.find((x) => x.email === b.customer_email);
-            const accessCode = codesByBooking.get(b.booking_id);
-            // Seconds-until-start countdown for upcoming-today bookings.
-            // Skip for non-today views (no useful "in 3 days" copy in
-            // a per-day list) and for past/now (different status chip
-            // conveys it).
-            let countdown = null;
-            if (isToday && st === "upcoming") {
-              const ms = s - now;
-              if (ms > 0 && ms <= 6 * 60 * 60 * 1000) countdown = fmtCountdown(ms);
-            }
-            return (
-              <div key={b.booking_id} className={`slot ${st}`}>
-                <div className="slot-t">{fT(s)}&ndash;{fT(e)}</div>
-                <div className="slot-i">
-                  <div>
-                    <div className="slot-c" style={{ cursor: "pointer" }} onClick={() => onSelectMember(b.customer_email)}>
-                      {b.customer_name}
+            {laneBks.length === 0 && (
+              <div className="slot">
+                <div className="slot-t">&mdash;</div>
+                <div className="slot-i"><span className="muted">No bookings</span></div>
+              </div>
+            )}
+            {laneBks.map((b) => {
+              const s = new Date(b.booking_start);
+              const e = new Date(b.booking_end);
+              const st = bkStatus(b);
+              const mem = members.find((x) => x.email === b.customer_email);
+              const accessCode = codesByBooking.get(b.booking_id);
+              const isSelected = selectedIds.has(b.booking_id);
+              // Seconds-until-start countdown for upcoming-today bookings.
+              // Skip for non-today views (no useful "in 3 days" copy in
+              // a per-day list) and for past/now (different status chip
+              // conveys it).
+              let countdown = null;
+              if (isToday && st === "upcoming") {
+                const ms = s - now;
+                if (ms > 0 && ms <= 6 * 60 * 60 * 1000) countdown = fmtCountdown(ms);
+              }
+              return (
+                <div key={b.booking_id} className={`slot ${st} ${isSelected ? "selected" : ""}`}>
+                  <input
+                    type="checkbox"
+                    className="slot-check"
+                    checked={isSelected}
+                    onChange={() => toggleSelected(b.booking_id)}
+                    aria-label={`Select booking for ${b.customer_name}`}
+                  />
+                  <div className="slot-t">{fT(s)}&ndash;{fT(e)}</div>
+                  <div className="slot-i">
+                    <div>
+                      <div className="slot-c" style={{ cursor: "pointer" }} onClick={() => onSelectMember(b.customer_email)}>
+                        {b.customer_name}
+                      </div>
+                      <div className="slot-m">
+                        {hrs(b.duration_hours)}{" "}
+                        {mem && mem.tier !== "Non-Member" && <Badge tier={mem.tier} />}
+                        {accessCode && (
+                          <span
+                            className="slot-code"
+                            title="Door code (Seam-issued, status='sent')"
+                          >
+                            🔑 {accessCode}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="slot-m">
-                      {hrs(b.duration_hours)}{" "}
-                      {mem && mem.tier !== "Non-Member" && <Badge tier={mem.tier} />}
-                      {accessCode && (
-                        <span
-                          className="slot-code"
-                          title="Door code (Seam-issued, status='sent')"
-                        >
-                          🔑 {accessCode}
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      {st === "now" && <span className="badge" style={{ background: "var(--primary)", fontSize: 9 }}>NOW</span>}
+                      {st === "upcoming" && (
+                        <span className="badge badge-sm" style={{ background: "var(--blue)" }}>
+                          {countdown ? `IN ${countdown.toUpperCase()}` : "NEXT"}
                         </span>
                       )}
+                      <button className="btn" style={{ fontSize: 10 }} onClick={() => onEdit(b)}>Edit</button>
+                      <button className="btn danger" style={{ fontSize: 10 }} onClick={() => onCancel(b)}>Cancel</button>
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    {st === "now" && <span className="badge" style={{ background: "var(--primary)", fontSize: 9 }}>NOW</span>}
-                    {st === "upcoming" && (
-                      <span className="badge badge-sm" style={{ background: "var(--blue)" }}>
-                        {countdown ? `IN ${countdown.toUpperCase()}` : "NEXT"}
-                      </span>
-                    )}
-                    <button className="btn" style={{ fontSize: 10 }} onClick={() => onEdit(b)}>Edit</button>
-                    <button className="btn danger" style={{ fontSize: 10 }} onClick={() => onCancel(b)}>Cancel</button>
-                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+        );
+      })}
+
+      {/* Sticky bulk action bar — shows whenever at least one booking
+          is selected. Cancel-only for now (matches the existing
+          per-row Cancel action; bulk-delete reserved for the customer
+          DetailView where it already lives). Keeps the operator's
+          most common batch action one tap away. */}
+      {selectedIds.size > 0 && onBulkCancel && (
+        <div className="bulkbar" role="region" aria-label="Bulk actions">
+          <span className="bulkbar-count">
+            {selectedIds.size} selected
+          </span>
+          <div className="bulkbar-actions">
+            <button
+              type="button"
+              className="btn"
+              onClick={clearSelection}
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              className="btn danger"
+              onClick={() => {
+                if (window.confirm(`Cancel ${selectedIds.size} booking${selectedIds.size === 1 ? "" : "s"}? This cannot be undone from here.`)) {
+                  onBulkCancel(Array.from(selectedIds));
+                  clearSelection();
+                }
+              }}
+            >
+              Cancel selected
+            </button>
+          </div>
         </div>
-      ))}
+      )}
     </div>
   );
 }

@@ -250,6 +250,60 @@ html { overflow-y: scroll; }
 .slot { display: flex; align-items: stretch; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); margin-bottom: 4px; overflow: hidden; }
 .slot.now { border-color: var(--primary); border-width: 2px; }
 .slot.past { opacity: 0.45; }
+/* Selection state for bulk-cancel multi-select. Tinted bg + thicker
+   primary border so the row stands apart from un-selected siblings
+   without competing with the .now status (which has its own
+   primary-color border). */
+.slot.selected { background: var(--primary-bg); border-color: var(--primary); }
+/* Inline checkbox column for bulk-select. Lives in the slot row + the
+   bay-lane label "select all" toggle. Primary accent color so it
+   matches the brand. */
+.slot-check {
+  width: 18px;
+  height: 18px;
+  margin: 14px 6px 14px 14px;
+  accent-color: var(--primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Sticky bulk-action bar — appears when a TodayView selection exists.
+   Anchored bottom-center so it stays in reach as the operator scrolls
+   the bay lanes; sits above the FAB stack via z-index. */
+.bulkbar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  z-index: 950;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  background: var(--text);
+  color: var(--bg);
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.32);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.bulkbar-count { font-variant-numeric: tabular-nums; }
+.bulkbar-actions { display: flex; gap: 8px; }
+.bulkbar-actions .btn {
+  background: var(--bg);
+  color: var(--text);
+  border: none;
+}
+.bulkbar-actions .btn.danger {
+  background: var(--red, #C92F1F);
+  color: #fff;
+}
+@media (max-width: 600px) {
+  .bulkbar { font-size: 11px; padding: 8px 12px; gap: 10px; }
+}
 .slot-t { width: 130px; padding: 10px 12px; font-family: var(--font-mono); font-size: 12px; font-weight: 700; background: var(--primary-bg); border-right: 0.5px solid var(--border); display: flex; align-items: center; font-variant-numeric: tabular-nums; }
 .slot-i { flex: 1; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
 .slot-c { font-family: var(--font-body); font-size: var(--font-size); font-weight: 500; }
