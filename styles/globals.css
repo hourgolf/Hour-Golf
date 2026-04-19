@@ -940,3 +940,116 @@ html { overflow-y: scroll; }
   .admin-fab-booking { bottom: 76px; font-size: 24px; }
   .admin-fab-refresh { bottom: 136px; font-size: 20px; }
 }
+
+/* ── Member Dashboard V2 (prototype) ──
+   Scoped under .mem2- so v1 styles are untouched. Status colors use
+   themable CSS vars with safe HG-derived fallbacks; tenants can override
+   --status-good / --status-warn / --status-danger / --status-bonus from
+   tenant_branding once that surface ships. */
+.mem2-greet { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.mem2-greet-text { min-width: 0; }
+.mem2-greet-hi { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--text); line-height: 1.1; }
+.mem2-greet-sub { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.mem2-tier-pill { padding: 2px 10px; border-radius: 999px; font-family: var(--font-display); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.mem2-member-no { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); letter-spacing: 1px; }
+.mem2-qr-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 14px; border-radius: 999px;
+  background: var(--surface); color: var(--primary);
+  border: 1px solid var(--border); cursor: pointer;
+  font-family: var(--font-display); font-size: 12px; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  transition: transform 0.12s, border-color 0.15s;
+}
+.mem2-qr-btn:hover { border-color: var(--primary); transform: scale(0.97); }
+.mem2-qr-btn svg { color: var(--primary); }
+
+.mem2-hero {
+  background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 75%, #000 25%));
+  color: var(--bg);
+  border-radius: var(--radius);
+  padding: 18px 18px 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 6px 20px rgba(53,68,59,0.18);
+  position: relative;
+}
+.mem2-hero.live { background: linear-gradient(135deg, var(--status-good, var(--primary)), #2f6b56); }
+.mem2-hero.empty {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px dashed var(--border);
+  box-shadow: none;
+}
+.mem2-hero-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.mem2-hero-eyebrow {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.85;
+}
+.mem2-hero-count {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+  padding: 2px 9px; border-radius: 999px;
+  background: rgba(255,255,255,0.18); color: inherit;
+}
+.mem2-hero.empty .mem2-hero-count { background: var(--primary-bg); color: var(--primary); }
+.mem2-hero-count.soon { background: var(--status-warn, #ddd480); color: #35443B; }
+.mem2-hero-when { font-family: var(--font-display); font-size: 22px; font-weight: 700; line-height: 1.15; }
+.mem2-hero-bay { font-weight: 500; opacity: 0.9; }
+.mem2-hero-date { font-size: 13px; opacity: 0.85; margin-top: 2px; margin-bottom: 10px; }
+.mem2-hero-meta { font-size: 13px; opacity: 0.92; margin-bottom: 14px; line-height: 1.4; }
+.mem2-hero-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.mem2-btn-primary {
+  padding: 10px 18px; border: none; border-radius: var(--radius);
+  background: var(--bg); color: var(--primary);
+  font-family: var(--font-display); font-size: 13px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer;
+  transition: transform 0.12s;
+}
+.mem2-hero.empty .mem2-btn-primary { background: var(--primary); color: var(--bg); }
+.mem2-btn-primary:hover { transform: scale(0.97); }
+.mem2-btn-ghost {
+  padding: 10px 16px; border: 1px solid rgba(255,255,255,0.45); border-radius: var(--radius);
+  background: transparent; color: inherit;
+  font-family: var(--font-display); font-size: 13px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer;
+  text-decoration: none; display: inline-flex; align-items: center;
+  transition: background 0.15s;
+}
+.mem2-hero.empty .mem2-btn-ghost { border-color: var(--border); color: var(--text); }
+.mem2-btn-ghost:hover { background: rgba(255,255,255,0.12); }
+.mem2-btn-ghost.disabled { opacity: 0.55; cursor: default; }
+
+.mem2-usage-pct { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text-muted); letter-spacing: 0; text-transform: none; }
+.mem2-usage-unlimited { font-size: 14px; color: var(--text); padding: 4px 0; }
+.mem2-progress {
+  position: relative;
+  height: 14px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.mem2-progress-fill { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
+.mem2-progress-overage {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 8px;
+  background: var(--status-danger, #C92F1F); border-radius: 0 999px 999px 0;
+}
+.mem2-usage-line { font-size: 13px; color: var(--text); }
+.mem2-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.mem2-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: 999px;
+  font-size: 12px; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border);
+}
+.mem2-chip.bonus { background: var(--primary-bg); color: var(--primary); border-color: transparent; }
+.mem2-chip.danger { background: var(--red-bg, rgba(201,47,31,0.08)); color: var(--status-danger, #C92F1F); border-color: transparent; }
+.mem2-chip.shop { background: rgba(221,212,128,0.18); color: #7a6d2a; border-color: transparent; }
+
+@media (max-width: 600px) {
+  .mem2-greet-hi { font-size: 18px; }
+  .mem2-qr-btn { padding: 8px 12px; font-size: 11px; }
+  .mem2-hero { padding: 16px; }
+  .mem2-hero-when { font-size: 19px; }
+  .mem2-hero-actions { gap: 8px; }
+  .mem2-btn-primary, .mem2-btn-ghost { flex: 1; padding: 11px 12px; text-align: center; justify-content: center; }
+}
