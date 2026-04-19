@@ -38,6 +38,34 @@ export default function CustomersView({
     return Object.values(m);
   }, [activeBk]);
 
+  // Per-tier counts for the KPI strip + chip badges. Builds once from
+  // the unique customer set so it matches the table the operator sees.
+  // Includes a synthetic "Non-Member" bucket for customers without a
+  // matching members row — what the existing tier filter calls "Non-Member".
+  const tierCounts = useMemo(() => {
+    const counts = { all: allCust.length, "Non-Member": 0 };
+    TIERS.forEach((t) => { counts[t] = 0; });
+    for (const c of allCust) {
+      const m = members.find((x) => x.email === c.email);
+      const t = m?.tier || "Non-Member";
+      counts[t] = (counts[t] || 0) + 1;
+    }
+    return counts;
+  }, [allCust, members]);
+
+  // Aggregate KPIs above the chip row. "Members" = anything not in the
+  // Non-Member bucket; "Non-Members" stays separate so the operator can
+  // see the paid-vs-walk-in split at a glance.
+  const summary = useMemo(() => {
+    const total = allCust.length;
+    const nonMember = tierCounts["Non-Member"] || 0;
+    return {
+      total,
+      members: Math.max(0, total - nonMember),
+      nonMembers: nonMember,
+    };
+  }, [allCust.length, tierCounts]);
+
   const filtCust = useMemo(() => {
     let l = [...allCust];
     const q = search.toLowerCase();
@@ -50,7 +78,15 @@ export default function CustomersView({
         return (c.name || "").toLowerCase().includes(q) || c.email.toLowerCase().includes(q) || (qNum && memberNum === qNum);
       });
     }
-    if (cTier !== "all") l = l.filter((c) => { const m = members.find((x) => x.email === c.email); return (m?.tier || "Non-Member") === cTier; });
+    if (cTier === "members") {
+      // Synthetic segment: every paying tier (anything not Non-Member).
+      l = l.filter((c) => {
+        const m = members.find((x) => x.email === c.email);
+        return (m?.tier || "Non-Member") !== "Non-Member";
+      });
+    } else if (cTier !== "all") {
+      l = l.filter((c) => { const m = members.find((x) => x.email === c.email); return (m?.tier || "Non-Member") === cTier; });
+    }
     if (cSort === "hours") l.sort((a, b) => b.hrs - a.hrs);
     else if (cSort === "name") l.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     else l.sort((a, b) => b.cnt - a.cnt);
@@ -76,6 +112,14 @@ export default function CustomersView({
 
   return (
     <div className="content">
+      {/* KPI strip — matches the shape used on TodayView + WeekView so
+          the at-a-glance bar reads the same across views. */}
+      <div className="summary">
+        <div className="sum-item"><span className="sum-val">{summary.total}</span><span className="sum-lbl">Customers</span></div>
+        <div className="sum-item"><span className="sum-val">{summary.members}</span><span className="sum-lbl">Members</span></div>
+        <div className="sum-item"><span className="sum-val">{summary.nonMembers}</span><span className="sum-lbl">Non-Members</span></div>
+      </div>
+
       <input
         className="search"
         type="text"
@@ -83,17 +127,49 @@ export default function CustomersView({
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
+
+      {/* Tier chip row — replaces the dropdown for one-tap filtering.
+          "All" / "Members" are quick segments above the per-tier row.
+          Each chip shows its count so the operator can size the
+          segment before clicking. */}
+      <div className="cust-chips">
+        <button
+          type="button"
+          className={`cust-chip ${cTier === "all" ? "active" : ""}`}
+          onClick={() => setCTier("all")}
+        >
+          All <span className="cust-chip-count">{tierCounts.all}</span>
+        </button>
+        <button
+          type="button"
+          className={`cust-chip ${cTier === "members" ? "active" : ""}`}
+          onClick={() => setCTier("members")}
+          title="All paying tiers (excludes Non-Member)"
+        >
+          Members <span className="cust-chip-count">{summary.members}</span>
+        </button>
+        {TIERS.map((t) => {
+          const n = tierCounts[t] || 0;
+          if (n === 0 && t !== cTier) return null;
+          return (
+            <button
+              type="button"
+              key={t}
+              className={`cust-chip ${cTier === t ? "active" : ""}`}
+              onClick={() => setCTier(t)}
+            >
+              {t} <span className="cust-chip-count">{n}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="fbar">
         <label>Sort:</label>
         <select value={cSort} onChange={(e) => setCSort(e.target.value)}>
           <option value="hours">Hours</option>
           <option value="sessions">Sessions</option>
           <option value="name">Name</option>
-        </select>
-        <label style={{ marginLeft: 12 }}>Tier:</label>
-        <select value={cTier} onChange={(e) => setCTier(e.target.value)}>
-          <option value="all">All</option>
-          {TIERS.map((t) => <option key={t}>{t}</option>)}
         </select>
         <span className="muted" style={{ marginLeft: 12 }}>{filtCust.length} results</span>
         <select

@@ -191,6 +191,8 @@ Items that are real but don't belong in this sprint. Revisit after member launch
 - 2026-04-19 `<next>` — [member] Extend booking from the dashboard hero (+15m button while live or starting within 30 min). Tenant_branding.max_daily_hours_per_member added as a hard ceiling; server enforces conflict + tier window + cap; Seam access code's ends_at is patched best-effort so the door code doesn't expire mid-extension.
 - 2026-04-19 `<next>` — [admin] WeekView gains month KPI strip (bookings · hours · est revenue · utilization), per-day density chip, and a per-tenant primary-color heatmap on bay-day cells.
 - 2026-04-19 `<next>` — [admin] TodayView gets a date nav strip (Prev / Today label / Next + Today button when historic). Keyboard shortcuts: `[` prev day, `]` next day, `t` today, `w` week view (in addition to existing n/r/?/).
+- 2026-04-19 `<next>` — [admin] TodayView bulk-cancel: per-row checkboxes + "select all in this bay" + sticky bottom bulk-action bar. Operator can cancel a batch (closures, weather, etc.) without per-row clicks.
+- 2026-04-19 `<next>` — [admin] CustomersView gets a KPI strip (Customers · Members · Non-Members) and a one-tap tier chip filter row replacing the dropdown — chips show per-segment counts, "Members" segment groups all paying tiers.
 
 **Decisions / removed:**
 - "Repeat last booking" chip — shipped briefly in `e37322b`, removed in next commit. No one was going to use it; just added clutter.

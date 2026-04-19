@@ -308,6 +308,51 @@ html { overflow-y: scroll; }
 .slot-i { flex: 1; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
 .slot-c { font-family: var(--font-body); font-size: var(--font-size); font-weight: 500; }
 .slot-m { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+/* Tier-chip filter row on the Customers view. Replaces the old
+   dropdown so the operator can filter with one tap and see counts
+   per segment without opening a menu. */
+.cust-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 6px;
+}
+.cust-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.cust-chip:hover { border-color: var(--primary); color: var(--primary); }
+.cust-chip.active {
+  background: var(--primary);
+  color: var(--bg);
+  border-color: var(--primary);
+}
+.cust-chip-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.08);
+}
+.cust-chip.active .cust-chip-count {
+  background: rgba(255,255,255,0.22);
+  color: var(--bg);
+}
+
 /* Date nav strip above the Today view. Always present so the operator
    has a single, consistent place to step through days. Mirrored by
    keyboard shortcuts: [ prev, ] next, t today. */
