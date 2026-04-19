@@ -338,10 +338,43 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: "No payment method found. Please update your card in the Billing tab." });
         }
 
+        // Sales tax via Stripe Tax. Direct PaymentIntents don't accept
+        // automatic_tax, so we call tax.calculations.create explicitly,
+        // add the tax to the charge amount, then finalize the tax
+        // transaction after the PI succeeds. Members without a usable
+        // address on their Stripe customer record fall through with no
+        // tax (logged) — better than failing the checkout.
+        let taxCalc = null;
+        let taxCents = 0;
+        try {
+          const cust = await stripe.customers.retrieve(member.stripe_customer_id);
+          const addr = cust?.address || null;
+          if (addr && addr.country && addr.postal_code) {
+            taxCalc = await stripe.tax.calculations.create({
+              currency: "usd",
+              customer_details: {
+                address: addr,
+                address_source: "billing",
+              },
+              line_items: lineItems.map((li) => ({
+                amount: Math.round(li.lineTotal * 100),
+                reference: String(li.item.id),
+              })),
+            });
+            taxCents = Number(taxCalc?.tax_amount_exclusive || 0);
+          } else {
+            console.warn(`member-shop: skipping tax for ${member.email} — no address on Stripe customer`);
+          }
+        } catch (taxErr) {
+          console.warn(`member-shop: tax calculation failed for ${member.email}, proceeding without tax:`, taxErr.message);
+        }
+
+        const totalChargeCents = cardChargeCents + taxCents;
+
         const itemNames = lineItems.map((li) => li.item.title).join(", ");
         try {
           pi = await stripe.paymentIntents.create({
-            amount: cardChargeCents,
+            amount: totalChargeCents,
             currency: "usd",
             customer: member.stripe_customer_id,
             payment_method: paymentMethod,
@@ -352,6 +385,7 @@ export default async function handler(req, res) {
               member_email: member.email,
               item_count: String(lineItems.length),
               credits_used: creditsUsed.toFixed(2),
+              tax_calculation_id: taxCalc?.id || "",
               source: "hour-golf-pro-shop",
             },
             // Expand the latest_charge so we get the public receipt_url and
@@ -364,6 +398,35 @@ export default async function handler(req, res) {
           console.error("Stripe checkout failed:", stripeErr);
           return res.status(400).json({ error: "Payment failed. Please check your card details in the Billing tab." });
         }
+
+        // Record the Tax Transaction so the merchant's Stripe Tax
+        // reports reconcile against the actual paid PaymentIntent.
+        // Best-effort — a failure here doesn't reverse the payment.
+        if (taxCalc && pi?.status === "succeeded") {
+          try {
+            const taxTx = await stripe.tax.transactions.createFromCalculation({
+              calculation: taxCalc.id,
+              reference: pi.id,
+            });
+            // Stash the tx id on the PaymentIntent metadata so future
+            // reconciliation can find it without our DB lookup.
+            await stripe.paymentIntents.update(pi.id, {
+              metadata: {
+                member_email: member.email,
+                item_count: String(lineItems.length),
+                credits_used: creditsUsed.toFixed(2),
+                tax_calculation_id: taxCalc.id,
+                tax_transaction_id: taxTx?.id || "",
+                source: "hour-golf-pro-shop",
+              },
+            });
+            // Stash for the row inserts below.
+            pi.__hg_tax_transaction_id = taxTx?.id || null;
+          } catch (txErr) {
+            console.warn("member-shop: tax transaction create failed:", txErr.message);
+          }
+        }
+        if (taxCents > 0) pi.__hg_tax_cents = taxCents;
       } else if (creditsUsed <= 0) {
         return res.status(400).json({ error: "Order total too small to process." });
       }
@@ -422,8 +485,36 @@ export default async function handler(req, res) {
       const cardLast4 = card?.last4 || null;
       const cardBrand = card?.brand ? String(card.brand).toUpperCase() : null;
 
+      // Tax stash from the PaymentIntent (set above). Spread across
+      // all rows of this purchase so per-row queries can sum them
+      // back to the order tax total.
+      const totalTaxCents = pi?.__hg_tax_cents || 0;
+      const taxTransactionId = pi?.__hg_tax_transaction_id || null;
+      // Allocate tax across line items proportional to lineTotal so
+      // the per-row tax_amount column at least reflects each row's
+      // share. Float drift is rounded to cents.
+      const grandTotalCents = lineItems.reduce((s, li) => s + Math.round(li.lineTotal * 100), 0);
+
       // 7. Create orders for each line item
-      for (const li of lineItems) {
+      for (let idx = 0; idx < lineItems.length; idx++) {
+        const li = lineItems[idx];
+        const isLast = idx === lineItems.length - 1;
+        const lineTotalCents = Math.round(li.lineTotal * 100);
+        // Distribute tax proportionally; remainder lands on the last
+        // row so the per-row sum matches the total cents Stripe
+        // charged (no off-by-one from rounding).
+        let perRowTaxCents = 0;
+        if (totalTaxCents > 0 && grandTotalCents > 0) {
+          if (isLast) {
+            const allocated = lineItems.slice(0, idx).reduce((s, prev) => {
+              const c = Math.round((prev.lineTotal * 100 / grandTotalCents) * totalTaxCents);
+              return s + c;
+            }, 0);
+            perRowTaxCents = totalTaxCents - allocated;
+          } else {
+            perRowTaxCents = Math.round((lineTotalCents / grandTotalCents) * totalTaxCents);
+          }
+        }
         await sb(key, "shop_orders", {
           method: "POST",
           body: JSON.stringify({
@@ -444,6 +535,8 @@ export default async function handler(req, res) {
             payment_method: paymentMethodKind,
             card_last_4: cardLast4,
             card_brand: cardBrand,
+            tax_amount: perRowTaxCents > 0 ? perRowTaxCents / 100 : null,
+            stripe_tax_transaction_id: idx === 0 && taxTransactionId ? taxTransactionId : null,
           }),
         });
         // Increment quantity_claimed

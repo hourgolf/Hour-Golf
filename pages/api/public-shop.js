@@ -286,6 +286,14 @@ export default async function handler(req, res) {
         customer_email: buyer.email.trim().toLowerCase(),
         success_url: `${origin}/shop?success=1&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/shop?canceled=1`,
+        // Sales tax: Stripe Tax computes from the buyer's billing
+        // address (collected by Stripe's hosted checkout) plus the
+        // merchant's Stripe Tax registrations. Tenants without
+        // Stripe Tax enabled will get a clear error from Stripe at
+        // session-create time — that's the right behavior so we
+        // don't silently undercollect.
+        automatic_tax: { enabled: true },
+        billing_address_collection: "required",
         metadata: {
           type: "guest_shop",
           tenant_id: tenantId,
@@ -309,6 +317,15 @@ export default async function handler(req, res) {
       });
     } catch (e) {
       console.error("Stripe Checkout Session create failed:", e?.message || e);
+      // Surface Stripe Tax misconfiguration cleanly so admins know to
+      // enable it in their Stripe dashboard rather than seeing a
+      // generic "could not start checkout" page.
+      if (/automatic_tax|tax/i.test(e?.message || "")) {
+        return res.status(503).json({
+          error: "Stripe Tax not configured for this tenant. Enable it in Stripe Dashboard -> Tax.",
+          detail: e.message,
+        });
+      }
       return res.status(500).json({ error: "Could not start checkout. Try again." });
     }
 
