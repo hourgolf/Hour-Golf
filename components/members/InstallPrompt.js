@@ -33,12 +33,31 @@ function getOS() {
 const DISMISS_KEY = "hg-install-dismissed-until";
 const DISMISS_DAYS = 30;
 
+// Per-session "already shown" flag — prevents the double-nag where a
+// member sees the login-variant prompt, signs in, and immediately sees
+// the dashboard banner variant in the same session. Whichever variant
+// renders first claims the flag; later mounts in the same session
+// quietly no-op. Cleared automatically when the tab closes.
+const SESSION_SHOWN_KEY = "hg-install-shown-session";
+
 function isDismissedActive() {
   if (typeof localStorage === "undefined") return false;
   try {
     const until = Number(localStorage.getItem(DISMISS_KEY) || 0);
     return until > Date.now();
   } catch { return false; }
+}
+
+function isShownThisSession() {
+  if (typeof sessionStorage === "undefined") return false;
+  try { return sessionStorage.getItem(SESSION_SHOWN_KEY) === "1"; }
+  catch { return false; }
+}
+
+function markShownThisSession() {
+  if (typeof sessionStorage === "undefined") return;
+  try { sessionStorage.setItem(SESSION_SHOWN_KEY, "1"); }
+  catch { /* quota / private mode */ }
 }
 
 function setDismissedNow() {
@@ -63,8 +82,13 @@ export default function InstallPrompt({ variant = "banner" }) {
     if (isStandalone()) return;
     // Respect a recent dismissal.
     if (isDismissedActive()) return;
+    // Don't double-nag — if any other variant of this prompt has
+    // already rendered this session (e.g. login then dashboard),
+    // stay hidden until the next session.
+    if (isShownThisSession()) return;
     setOS(getOS());
     setShow(true);
+    markShownThisSession();
   }, []);
 
   function dismiss() {

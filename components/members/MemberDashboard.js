@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
+import { QRCodeSVG } from "qrcode.react";
 import { TIER_COLORS } from "../../lib/constants";
 import { useBranding } from "../../hooks/useBranding";
 import Modal from "../ui/Modal";
@@ -412,23 +413,27 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
         )}
       </div>
 
-      {/* QR modal — image only fetched on open so the dashboard render
-          itself doesn't hit qrserver.com (and doesn't leak the member id
-          on every page view). Production-grade self-host with qrcode.react
-          is queued as a follow-up. */}
+      {/* QR modal — rendered locally via qrcode.react so we no longer
+          hit qrserver.com (which previously got the member id in a
+          query string on every modal open). Foreground color is the
+          HG --text near-black so any tenant theme still scans reliably;
+          per-tenant QR theming is queued as a follow-up. */}
       <Modal open={showQR} onClose={() => setShowQR(false)}>
         <div style={{ textAlign: "center" }}>
           <h2 style={{ marginBottom: 4 }}>In-Store Discount</h2>
           <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 16px 0" }}>
             Show this code at the register to apply your member discount.
           </p>
-          {showQR && (
-            <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qrPayload(member))}&color=4C8D73&bgcolor=FFFFFF`}
-              alt="Member QR Code"
-              style={{ width: 240, height: 240, borderRadius: 8 }}
+          <div style={{ display: "inline-block", padding: 12, background: "#fff", borderRadius: 8 }}>
+            <QRCodeSVG
+              value={qrPayload(member)}
+              size={240}
+              level="M"
+              fgColor="#35443B"
+              bgColor="#FFFFFF"
+              includeMargin={false}
             />
-          )}
+          </div>
           <div style={{ marginTop: 12, fontSize: 13, color: "var(--text-muted)" }}>
             {member.tier} — {tierConfig?.pro_shop_discount || 0}% discount
           </div>

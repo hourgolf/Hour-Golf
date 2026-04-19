@@ -62,7 +62,12 @@ Sessions group items by theme. Order within a theme: **bugs → ux → cosmetic 
 
 *The path from open portal → book a bay. Highest-leverage surface.*
 
-- [ ]
+- [ ] [mobile] [small] [ux] [P1] — Hide inline `.mem-book-form` on mobile; tap-grid + sheet only. Removes the double-pathing.
+- [ ] [member] [small] [ux] [P2] — Sticky date pill on the availability grid so date stays visible while scrolling.
+- [ ] [member] [small] [ux] [P2] — "Repeat last booking" chip in the booking-sheet header.
+- [ ] [member] [medium] [feature] [P2] — Persist Terms acceptance (set `members.terms_accepted_at` on signup; drop the per-booking checkbox). Add a `require_per_booking_consent` tenant flag for clubs whose legal counsel insists.
+- [ ] [member] [trivial] [ux] [P2] — Tappable "Need to change something?" line in the booking sheet (mailto:/tel: from branding, mirrors the dashboard pattern).
+- [ ] [member] [small] [ux] [P3] — Auto-scroll the availability grid to the next open slot near "now" on load.
 
 ### Theme: Admin Today + Calendar
 
@@ -97,7 +102,10 @@ Templates to audit (from `lib/email.js`):
 
 *Bookings + access codes are primarily mobile. Verify on real iOS + Android.*
 
-- [ ]
+- [ ] [mobile] [medium] [feature] [P2] — Bottom-tab nav on mobile (true PWA app-feel). Six items fit; rare items (Billing) collapse into Account.
+- [ ] [member] [small] [ux] [P2] — News/event popup snooze (currently only "Got it" forever-dismiss). Add "remind me tomorrow."
+- [ ] [member] [small] [ux] [P2] — Tab nav on mobile: fade gradient on the right edge so members realize Account/Billing scroll into view.
+- [ ] [member] [trivial] [cosmetic] [P3] — Header on mobile: drop member # (it lives on the QR + Account pages); keep name + tier dot only.
 
 ### Theme: PWA install + launch
 
@@ -112,6 +120,14 @@ Templates to audit (from `lib/email.js`):
 *Small reductions in clicks/time for the operator. High compounding value.*
 
 - [ ]
+
+### Theme: Multi-tenant readiness
+
+*Surfaces still hardcoded to HG that block clean tenant onboarding.*
+
+- [ ] [shared] [medium] [feature] [P2] — Tenant-configurable cancel cutoff (`tenant_settings.cancel_cutoff_hours`). Currently hardcoded at 6h in MemberDashboard.
+- [ ] [shared] [medium] [feature] [P2] — Tenant-configurable bay noun (`tenant_settings.bay_label`). Squash courts? Sim lounges? Swim lanes?
+- [ ] [shared] [medium] [feature] [P3] — Per-tenant tier coloring — `TIER_COLORS` is HG-baked. Move into `tenant_branding` or a dedicated tier table.
 
 ### Theme: Loyalty / subscriptions / punch passes
 
@@ -144,6 +160,14 @@ Items that are real but don't belong in this sprint. Revisit after member launch
 <!-- Example:
 - 2026-04-20 `abc1234` — [member] Booking confirmation shows bay number on mobile
 -->
+
+- 2026-04-19 `e3a0672` — [member] Dashboard: next-booking hero + countdown + access-code copy
+- 2026-04-19 `e3a0672` — [member] Dashboard: three redundant usage cards → single progress bar with chip row
+- 2026-04-19 `e3a0672` — [member] Dashboard: QR moved to "Show code" pill; lazy-loaded only on modal open
+- 2026-04-19 `e3a0672` — [member] Dashboard: "Contact us to cancel" becomes tappable mailto:/tel: from branding
+- 2026-04-19 `e3a0672` — [shared] Status colors via CSS vars (`--status-good/warn/danger/bonus`) with HG fallbacks
+- 2026-04-19 `e3a0672` — [member] Dashboard: empty-state hero with "Book a bay" CTA when no upcoming bookings
+- 2026-04-19 `e3a0672` — [member] Dashboard: loyalty section explainer + "$X credit" wording
 
 ---
 

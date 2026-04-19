@@ -2,11 +2,24 @@
 // Do NOT pre-cache pages or intercept navigation fetches, so members
 // always see the latest deployed version immediately after sign-in.
 
-const CACHE_NAME = "hourgolf-v3";
+// Bumping this string is the simplest trigger for the client-side
+// "update available" banner — a byte-different sw.js makes the browser
+// install a new SW, which the client (pages/_app.js) detects via
+// `updatefound` and surfaces as a reload prompt.
+const CACHE_NAME = "hourgolf-v4";
 
 self.addEventListener("install", (event) => {
   // Activate this SW as soon as possible
   self.skipWaiting();
+});
+
+// Lets the client postMessage skipWaiting if the install handler hasn't
+// already self-skipped (belt-and-suspenders for future SW versions that
+// might want to wait for explicit user consent before activating).
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("activate", (event) => {

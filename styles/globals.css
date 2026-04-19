@@ -790,8 +790,12 @@ html { overflow-y: scroll; }
 
 /* ── Help Drawer (Member Portal) ── */
 /* ── Help Drawer (Member Portal) ── */
+/* FAB stack order: book sits at the bottom (most-used action, primary
+   thumb position), help stacks above. Swapped from the older layout
+   where help was on the bottom — the previous order made the help
+   icon read as the primary action. */
 .help-fab {
-  position: fixed; bottom: 24px; right: 24px; z-index: 900;
+  position: fixed; bottom: 88px; right: 24px; z-index: 900;
   width: 60px; height: 60px; border-radius: 50%; border: none;
   background: var(--accent); color: var(--text); font-size: 28px;
   cursor: pointer; font-family: var(--font-display);
@@ -800,7 +804,7 @@ html { overflow-y: scroll; }
   display: flex; align-items: center; justify-content: center;
 }
 .book-fab {
-  position: fixed; bottom: 88px; right: 24px; z-index: 900;
+  position: fixed; bottom: 24px; right: 24px; z-index: 900;
   width: 60px; height: 60px; border-radius: 50%; border: none;
   background: var(--primary); color: var(--bg); font-size: 28px;
   cursor: pointer; font-family: var(--font-display);
@@ -933,8 +937,9 @@ html { overflow-y: scroll; }
 /* Help drawer responsive */
 @media (max-width: 600px) {
   .help-drawer { width: 100vw; height: 90vh; border-radius: var(--radius) var(--radius) 0 0; }
-  .help-fab { bottom: 16px; right: 16px; width: 54px; height: 54px; font-size: 20px; }
-  .book-fab { bottom: 76px; right: 16px; width: 54px; height: 54px; font-size: 24px; }
+  /* Mobile: same swap — book on the bottom (primary), help above. */
+  .help-fab { bottom: 76px; right: 16px; width: 54px; height: 54px; font-size: 20px; }
+  .book-fab { bottom: 16px; right: 16px; width: 54px; height: 54px; font-size: 24px; }
   .admin-fab { width: 54px; height: 54px; right: 16px; }
   .admin-fab-settings { bottom: 16px; font-size: 22px; }
   .admin-fab-booking { bottom: 76px; font-size: 24px; }
