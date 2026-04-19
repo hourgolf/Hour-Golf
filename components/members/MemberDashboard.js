@@ -26,6 +26,7 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
   const [upcoming, setUpcoming] = useState([]);
   const [monthBookings, setMonthBookings] = useState([]);
   const [myEvents, setMyEvents] = useState([]);
+  const [shipments, setShipments] = useState([]);
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cancelConfirm, setCancelConfirm] = useState(null); // booking_id being confirmed
@@ -64,6 +65,24 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
       fetch("/api/member-news?surface=dashboard", { credentials: "include" })
         .then((nr) => nr.ok ? nr.json() : null)
         .then((items) => { if (Array.isArray(items)) setNews(items); })
+        .catch(() => {});
+      // In-transit shipments — pulls the unified purchases feed and
+      // keeps only in_app shipped orders that haven't been delivered
+      // / picked up yet. Until we wire Shippo tracking webhooks for
+      // real-time delivery status, "in transit" = status='confirmed'
+      // with a tracking number set.
+      fetch("/api/member-purchases?limit=20", { credentials: "include" })
+        .then((sr) => sr.ok ? sr.json() : null)
+        .then((d) => {
+          if (!d?.purchases) return;
+          const inTransit = d.purchases.filter((p) =>
+            p.kind === "in_app"
+            && p.delivery_method === "ship"
+            && p.tracking_number
+            && (!p.status || p.status === "confirmed")
+          );
+          setShipments(inTransit);
+        })
         .catch(() => {});
       // Upcoming events the member has registered for or expressed
       // interest in. /api/member-events returns every published event
@@ -373,6 +392,66 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
           </div>
         )}
       </div>
+
+      {/* Shipments — in-transit in-app shop orders. Hidden when the
+          member has none. Tap a row to jump to the full order detail
+          on Shop > Orders. */}
+      {shipments.length > 0 && (
+        <div className="mem-section">
+          <div className="mem-section-head">Shipments</div>
+          <div className="mem-list">
+            {shipments.map((s) => {
+              const placed = s.created_at ? new Date(s.created_at) : null;
+              const itemsLabel = (s.items || []).length === 1
+                ? s.items[0].item_title
+                : `${(s.items || []).length} items`;
+              return (
+                <div
+                  key={s.id}
+                  className="mem-list-item"
+                  style={{ alignItems: "flex-start", gap: 12, cursor: "pointer" }}
+                  onClick={() => router.push("/members/shop")}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 2 }}>
+                      <span className="mem-purchase-tag" style={{ background: "var(--primary)", color: "var(--bg)" }}>In transit</span>
+                      <strong style={{ fontSize: 14 }}>{itemsLabel}</strong>
+                    </div>
+                    {(s.shipping_carrier || s.shipping_service) && (
+                      <div className="mem-list-sub" style={{ fontSize: 12 }}>
+                        {s.shipping_carrier} {s.shipping_service}
+                      </div>
+                    )}
+                    {s.tracking_number && (
+                      <div style={{ marginTop: 2, fontSize: 12 }}>
+                        <a
+                          href={s.tracking_url || undefined}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none", fontFamily: "var(--font-mono)" }}
+                        >
+                          {s.tracking_number} {s.tracking_url ? "→" : ""}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                  {placed && (
+                    <span className="mem-list-sub" style={{ fontSize: 11, whiteSpace: "nowrap" }}>
+                      Shipped {fD(placed)}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: 10, fontSize: 12, textAlign: "right" }}>
+            <a href="/members/shop" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+              View all orders &rarr;
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* Your Events — only events the member registered for or
           flagged interest in, and that haven't already ended. Hidden
