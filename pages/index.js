@@ -375,6 +375,7 @@ export default function Dashboard() {
       {view === "week" && (
         <WeekView
           bookings={bookings}
+          members={members}
           weekOff={weekOff}
           setWeekOff={setWeekOff}
           onSelectMember={selectMember}
