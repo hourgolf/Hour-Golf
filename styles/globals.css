@@ -309,18 +309,21 @@ html { overflow-y: scroll; }
 .slot-c { font-family: var(--font-body); font-size: var(--font-size); font-weight: 500; }
 .slot-m { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
 /* Pro Shop > Browse top strip — pairs the member-discount badge with
-   the "Request an item" CTA so both are above the fold. Replaces the
-   bottom request panel that members were missing. */
+   the "Request an item" CTA so both are above the fold. White surface
+   so the strip pops against tenants with painted/photographic
+   background images (the previous primary-bg tinted into the bg). */
 .shop-top-strip {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
   flex-wrap: wrap;
-  padding: 10px 16px;
+  padding: 12px 16px;
   margin-bottom: 16px;
-  background: var(--primary-bg);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(53,68,59,0.06);
 }
 .shop-top-strip-info { font-size: 13px; line-height: 1.4; }
 .shop-top-strip-cta { display: flex; align-items: center; gap: 10px; }
@@ -328,6 +331,59 @@ html { overflow-y: scroll; }
 @media (max-width: 600px) {
   .shop-top-strip { padding: 12px 14px; gap: 10px; }
   .shop-top-strip-cta { width: 100%; justify-content: space-between; }
+}
+
+/* Pro Shop sub-nav (Browse / Cart / Orders / Requests). Tighter than
+   .mem-btn so four labels fit a 360px viewport without the text
+   overflowing the rounded pill background. */
+.shop-subnav {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px;
+  box-shadow: 0 2px 8px rgba(53,68,59,0.06);
+}
+.shop-subnav-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+.shop-subnav-btn:hover { color: var(--primary); }
+.shop-subnav-btn.active {
+  background: var(--primary);
+  color: var(--bg);
+}
+.shop-subnav-badge {
+  background: var(--red, #C92F1F);
+  color: #EDF3E3;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  line-height: 1.4;
+}
+@media (max-width: 380px) {
+  .shop-subnav-btn { font-size: 11px; padding: 7px 2px; }
 }
 
 /* Tier-chip filter row on the Customers view. Replaces the old

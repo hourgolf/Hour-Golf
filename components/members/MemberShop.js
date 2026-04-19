@@ -302,14 +302,37 @@ export default function MemberShop({ member, tierConfig, showToast }) {
 
   return (
     <>
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        <button className={`mem-btn ${tab === "browse" ? "mem-btn-primary" : ""}`} onClick={() => setTab("browse")} style={{ flex: 1, minWidth: 70 }}>Browse</button>
-        <button className={`mem-btn ${tab === "cart" ? "mem-btn-primary" : ""}`} onClick={() => { setTab("cart"); loadCart(); }} style={{ flex: 1, minWidth: 70, position: "relative" }}>
-          Cart{cartCount > 0 && <span style={{ background: "#C92F1F", color: "#EDF3E3", fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 10, marginLeft: 6 }}>{cartCount}</span>}
+      {/* Sub-nav pills. Dedicated class (not .mem-btn) because the
+          standard button padding made the four pills overflow their
+          backgrounds on narrow viewports — the text rendered visibly
+          outside the rounded bg. .shop-subnav-btn is a tighter pill
+          tuned for 4 short labels in a single row. */}
+      <div className="shop-subnav">
+        <button
+          className={`shop-subnav-btn ${tab === "browse" ? "active" : ""}`}
+          onClick={() => setTab("browse")}
+        >
+          Browse
         </button>
-        <button className={`mem-btn ${tab === "orders" ? "mem-btn-primary" : ""}`} onClick={() => setTab("orders")} style={{ flex: 1, minWidth: 70 }}>Orders</button>
-        <button className={`mem-btn ${tab === "requests" ? "mem-btn-primary" : ""}`} onClick={() => setTab("requests")} style={{ flex: 1, minWidth: 70 }}>Requests</button>
+        <button
+          className={`shop-subnav-btn ${tab === "cart" ? "active" : ""}`}
+          onClick={() => { setTab("cart"); loadCart(); }}
+        >
+          Cart
+          {cartCount > 0 && <span className="shop-subnav-badge">{cartCount}</span>}
+        </button>
+        <button
+          className={`shop-subnav-btn ${tab === "orders" ? "active" : ""}`}
+          onClick={() => setTab("orders")}
+        >
+          Orders
+        </button>
+        <button
+          className={`shop-subnav-btn ${tab === "requests" ? "active" : ""}`}
+          onClick={() => setTab("requests")}
+        >
+          Requests
+        </button>
       </div>
 
       {/* ── BROWSE ── */}
