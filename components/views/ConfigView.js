@@ -121,82 +121,118 @@ function TierEditModal({ open, onClose, tier, onSave }) {
   );
 }
 
+// Catalog of every transactional email the platform sends. Source of
+// truth: lib/email.js (templates) + lib/email-layout.js (visual
+// wrapper). This is purely informational — templates are intentionally
+// locked in code so they stay in lockstep with the data they reference
+// (booking ids, tier configs, Stripe state, etc.). What CAN be
+// customized is in the right-hand "Customize" column.
+const TRANSACTIONAL_EMAILS = [
+  {
+    key: "booking_confirmation",
+    label: "Booking confirmation",
+    trigger: "Member books a bay (or a non-member books via the public flow).",
+    recipient: "The booking customer.",
+    customize: "Logo + colors via Settings → Branding. Sender + footer via Settings → Tenant Email. Cancel-cutoff copy follows the tenant's policy field.",
+  },
+  {
+    key: "booking_cancellation",
+    label: "Booking cancelled",
+    trigger: "Member cancels a booking from their dashboard, or admin cancels.",
+    recipient: "The booking customer.",
+    customize: "Same wrapper as above. Rebook CTA button.",
+  },
+  {
+    key: "access_code",
+    label: "Access code (door code)",
+    trigger: "Cron job ~10 min before each Confirmed booking when the access_codes feature is enabled and Seam is configured. Code itself is rendered live on the dashboard hero too.",
+    recipient: "The booking customer.",
+    customize: "The pre-booking copy is part of the booking confirmation. The code itself comes from Seam — visible on /members/dashboard once issued.",
+  },
+  {
+    key: "welcome",
+    label: "Welcome (new membership)",
+    trigger: "Stripe webhook checkout.session.completed in subscription mode.",
+    recipient: "The new member.",
+    customize: "Tier name + monthly fee + included hours pulled from tier_config. CTA button lands on the member portal.",
+  },
+  {
+    key: "payment_receipt",
+    label: "Payment receipt",
+    trigger: "Stripe webhook invoice.paid (recurring + first payments).",
+    recipient: "The paying member.",
+    customize: "Amount, description, date pulled from the Stripe invoice. CTA button → /members/billing.",
+  },
+  {
+    key: "password_reset",
+    label: "Password reset",
+    trigger: "Member taps Forgot Password on /members.",
+    recipient: "The member email on file.",
+    customize: "Reset URL is single-use and expires in 1 hour.",
+  },
+  {
+    key: "shop_order",
+    label: "Pro Shop order (admin notification)",
+    trigger: "Member completes an in-app shop checkout via Stripe.",
+    recipient: "The tenant's notification inbox (Settings → Tenant Email).",
+    customize: "Item rows + totals + member discount from the order. No customer-facing receipt — Stripe sends its own.",
+  },
+  {
+    key: "shop_request_admin",
+    label: "Pro Shop request (admin notification)",
+    trigger: "Member submits a 'request an item' form on the Pro Shop.",
+    recipient: "The tenant's notification inbox.",
+    customize: "Request fields shown verbatim. Member contact info attached.",
+  },
+  {
+    key: "shop_request_ready",
+    label: "Pro Shop request ready (member notification)",
+    trigger: "Admin marks a shop request as in-stock from the Pro Shop Requests panel above.",
+    recipient: "The requesting member.",
+    customize: "Optional admin response gets surfaced in the body.",
+  },
+  {
+    key: "shipment_delivered",
+    label: "Shipment delivered",
+    trigger: "Shippo webhook reports a tracked order moved to delivered.",
+    recipient: "The order's customer.",
+    customize: "Tracking number + carrier + service rendered live; CTA → /members/shop.",
+  },
+];
+
 function EmailConfigSection({ jwt }) {
-  const [configs, setConfigs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(null);
-
-  useEffect(() => { loadConfigs(); }, []);
-
-  async function loadConfigs() {
-    setLoading(true);
-    try {
-      const SUPABASE_URL = "https://uxpkqbioxoezjmcoylkw.supabase.co";
-      const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/email_config?order=template_key.asc`, {
-        headers: { apikey: ANON_KEY, Authorization: `Bearer ${jwt || ANON_KEY}` },
-      });
-      if (r.ok) setConfigs(await r.json());
-    } catch (_) {}
-    setLoading(false);
-  }
-
-  async function updateConfig(id, field, value) {
-    setSaving(id);
-    try {
-      const SUPABASE_URL = "https://uxpkqbioxoezjmcoylkw.supabase.co";
-      const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-      await fetch(`${SUPABASE_URL}/rest/v1/email_config?id=eq.${id}`, {
-        method: "PATCH",
-        headers: {
-          apikey: ANON_KEY, Authorization: `Bearer ${jwt || ANON_KEY}`,
-          "Content-Type": "application/json", Prefer: "return=representation",
-        },
-        body: JSON.stringify({ [field]: value, updated_at: new Date().toISOString() }),
-      });
-      setConfigs((prev) => prev.map((c) => c.id === id ? { ...c, [field]: value } : c));
-    } catch (_) {}
-    setSaving(null);
-  }
-
-  if (loading) return <div style={{ padding: 12, color: "var(--text-muted)" }}>Loading email config...</div>;
-
   return (
-    <div className="tbl">
-      <div className="th">
-        <span style={{ flex: 2 }}>Email Type</span>
-        <span style={{ flex: 3 }}>Resend Template ID</span>
-        <span style={{ flex: 1, textAlign: "center" }}>Active</span>
-      </div>
-      {configs.map((c) => (
-        <div key={c.id} className="tr" style={{ alignItems: "center" }}>
-          <span style={{ flex: 2, textTransform: "capitalize" }}>
-            {c.template_key.replace(/_/g, " ")}
-          </span>
-          <span style={{ flex: 3 }}>
-            <input
-              style={{ width: "100%", padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 12, fontFamily: "inherit", background: "var(--surface)", color: "var(--text)", boxSizing: "border-box" }}
-              value={c.resend_template_id || ""}
-              placeholder="Paste Resend template ID (optional)"
-              onChange={(e) => {
-                setConfigs((prev) => prev.map((x) => x.id === c.id ? { ...x, resend_template_id: e.target.value } : x));
-              }}
-              onBlur={(e) => updateConfig(c.id, "resend_template_id", e.target.value)}
-            />
-          </span>
-          <span style={{ flex: 1, textAlign: "center" }}>
-            <input
-              type="checkbox"
-              className="chk"
-              checked={c.is_active}
-              onChange={(e) => updateConfig(c.id, "is_active", e.target.checked)}
-              style={{ width: 16, height: 16 }}
-            />
-          </span>
+    <div style={{ padding: 14, border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)" }}>
+      <p style={{ fontSize: 13, color: "var(--text)", margin: "0 0 6px" }}>
+        Every transactional email the platform sends, with what triggers it and where to customize each piece.
+      </p>
+      <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 14px" }}>
+        Template HTML lives in <code>lib/email.js</code> and shares a branded wrapper from <code>lib/email-layout.js</code>. Logo + colors come from <strong>Settings → Branding</strong>; sender address + footer come from your tenant email config; recipient inboxes for admin notifications come from the same place.
+      </p>
+
+      <div className="tbl">
+        <div className="th" style={{ display: "grid", gridTemplateColumns: "1.4fr 2fr 1fr 2fr", gap: 12 }}>
+          <span>Email</span>
+          <span>Triggered by</span>
+          <span>Sent to</span>
+          <span>Customize</span>
         </div>
-      ))}
-      <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8, padding: "0 4px" }}>
-        Design email templates in your <a href="https://resend.com/emails" target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)" }}>Resend dashboard</a>, then paste the template ID here. If no template ID is set, a default branded email will be used.
+        {TRANSACTIONAL_EMAILS.map((e) => (
+          <div
+            key={e.key}
+            className="tr"
+            style={{ display: "grid", gridTemplateColumns: "1.4fr 2fr 1fr 2fr", gap: 12, alignItems: "start", padding: "10px 12px" }}
+          >
+            <span style={{ fontWeight: 700, fontSize: 13 }}>{e.label}</span>
+            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{e.trigger}</span>
+            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{e.recipient}</span>
+            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{e.customize}</span>
+          </div>
+        ))}
+      </div>
+
+      <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 12, padding: "0 4px" }}>
+        Want the email itself reworded or restyled? That's a code change today — the templates are intentionally locked so they always match the data shape they render. Ping the dev to update the copy or add a new template.
       </p>
     </div>
   );
@@ -455,7 +491,7 @@ function BirthdayBonusSection({ jwt }) {
 
   return (
     <>
-      <div style={{ padding: 12, border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)", marginBottom: 12, maxWidth: 640 }}>
+      <div style={{ padding: 14, border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)", marginBottom: 12 }}>
         <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
           <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
             <input
@@ -683,7 +719,7 @@ function NewsSection({ jwt }) {
   return (
     <>
       {/* Editor */}
-      <div style={{ padding: 14, border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)", marginBottom: 16, maxWidth: 720 }}>
+      <div style={{ padding: 14, border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)", marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 10, color: "var(--text)" }}>
           {editingId ? "Edit news item" : "Create news item"}
         </div>
@@ -1071,91 +1107,12 @@ export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStrip
       <h2 className="section-head" style={{ marginTop: 24 }}>Pro Shop Requests</h2>
       <ShopRequestsSection jwt={jwt} />
 
-      <h2 className="section-head" style={{ marginTop: 24 }}>Members ({members.length})</h2>
-      {/* Desktop table */}
-      <div className="tbl usage-desktop">
-        <div className="th">
-          <span style={{ flex: 2 }}>Member</span>
-          <span style={{ flex: 1 }}>Tier</span>
-          <span style={{ flex: 1 }} className="text-r">Rate</span>
-          <span style={{ flex: 1 }}>Stripe</span>
-        </div>
-        {members.map((m) => (
-          <div key={m.email} className="tr">
-            <span style={{ flex: 2, cursor: "pointer" }} onClick={() => onSelectMember(m.email)}>
-              <strong>{m.name}</strong>
-              {m.member_number && (
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600, color: "var(--primary)", marginLeft: 6, letterSpacing: 0.5 }}>
-                  #{String(m.member_number).padStart(3, "0")}
-                </span>
-              )}
-              <br />
-              <span className="email-sm">{m.email}</span>
-            </span>
-            <span style={{ flex: 1 }}>
-              <TierSelect value={m.tier} onChange={(t) => onUpdateTier(m.email, t, m.name)} />
-            </span>
-            <span style={{ flex: 1 }} className="text-r tab-num">
-              {m.monthly_rate ? `$${Number(m.monthly_rate).toFixed(0)}` : "\u2014"}
-            </span>
-            <span style={{ flex: 1 }}>
-              {m.stripe_customer_id ? (
-                <span className="email-sm" title={m.stripe_customer_id}>
-                  {m.stripe_customer_id.slice(0, 14)}&hellip;
-                </span>
-              ) : (
-                <button
-                  className="btn primary"
-                  style={{ fontSize: 10 }}
-                  onClick={() => handleLink(m.email, m.name)}
-                  disabled={linking === m.email}
-                >
-                  {linking === m.email ? "\u2026" : "Link"}
-                </button>
-              )}
-            </span>
-          </div>
-        ))}
-      </div>
-      {/* Mobile cards */}
-      <div className="usage-mobile">
-        {members.map((m) => (
-          <div key={m.email} className="usage-card" onClick={() => onSelectMember(m.email)}>
-            <div className="usage-card-top">
-              <div>
-                <strong>{m.name}</strong>
-                {m.member_number && (
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600, color: "var(--primary)", marginLeft: 6, letterSpacing: 0.5 }}>
-                    #{String(m.member_number).padStart(3, "0")}
-                  </span>
-                )}
-              </div>
-              <Badge tier={m.tier} />
-            </div>
-            <div className="usage-card-stats" style={{ justifyContent: "space-between" }}>
-              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                {m.monthly_rate ? (
-                  <span className="tab-num" style={{ fontSize: 13, color: "var(--text-muted)" }}>${Number(m.monthly_rate).toFixed(0)}/mo</span>
-                ) : null}
-                {!m.stripe_customer_id && (
-                  <button
-                    className="btn primary"
-                    style={{ fontSize: 10, padding: "2px 8px" }}
-                    onClick={(e) => { e.stopPropagation(); handleLink(m.email, m.name); }}
-                    disabled={linking === m.email}
-                  >
-                    {linking === m.email ? "\u2026" : "Link Stripe"}
-                  </button>
-                )}
-              </div>
-              <div className="usage-card-stat" onClick={(e) => e.stopPropagation()}>
-                <TierSelect value={m.tier} onChange={(t) => onUpdateTier(m.email, t, m.name)} />
-                <span className="usage-card-lbl">Assign</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Members table removed — every per-member control here
+          (tier assign, Stripe link, member number, search) lives on
+          the Customers tab now. Keeping a duplicate roster on Config
+          made the page longer without adding any function. Use the
+          Customers tab for tier changes; use the Detail view for
+          per-member Stripe linking. */}
 
       <h2 className="section-head" style={{ marginTop: 24 }}>Email Settings</h2>
       <EmailConfigSection jwt={jwt} />

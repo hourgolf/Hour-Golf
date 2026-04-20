@@ -370,7 +370,7 @@ export default function Dashboard() {
         <Header
           todayCount={todayBk.length}
           todayHours={todayHours}
-          memberCount={members.length}
+          memberCount={members.filter((m) => m.tier && m.tier !== "Non-Member").length}
           onAddBooking={() => openAdd()}
           onRefresh={refresh}
           onSettings={() => setView("settings")}

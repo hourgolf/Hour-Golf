@@ -1111,10 +1111,31 @@ html { overflow-y: scroll; }
 
 .rpt-sub-head {
   font-family: var(--font-display); font-size: 14px; font-weight: 700; color: var(--text);
-  margin: 24px 0 12px; text-transform: uppercase; letter-spacing: 0.04em;
+  margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.04em;
 }
 
-.rpt-bars { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+/* Card wrapper for Reports sub-sections so bars/charts/heatmap
+   render on a white surface instead of the painted page bg. Used
+   inline by render* functions: each <h3 .rpt-sub-head> + content
+   pair gets wrapped in a .rpt-card. */
+.rpt-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+
+/* Hover state on the per-source revenue bars — subtle bg shift +
+   slight saturation lift so the operator sees what's hoverable. */
+.rpt-bar-row {
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.rpt-bar-row:hover { background: var(--primary-bg); }
+
+.rpt-bars { display: flex; flex-direction: column; gap: 4px; margin-bottom: 0; }
 .rpt-bar-row { display: flex; align-items: center; gap: 10px; }
 .rpt-bar-label {
   width: 140px; font-family: var(--font-body); font-size: 12px; font-weight: 600; color: var(--text);

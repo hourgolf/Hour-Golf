@@ -362,8 +362,12 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
 
   function Bar({ value, max, color, label, subLabel }) {
     const w = max ? Math.min((value / max) * 100, 100) : 0;
+    // Native browser tooltip on hover. The visual bar already shows
+    // value + share, but a hover tooltip makes the unrounded number
+    // available for spot-checking against Stripe / Square statements.
+    const tooltip = `${label}${subLabel ? ` — ${subLabel}` : ""}`;
     return (
-      <div className="rpt-bar-row">
+      <div className="rpt-bar-row" title={tooltip}>
         <div className="rpt-bar-label">{label}</div>
         <div className="rpt-bar-track">
           <div className="rpt-bar-fill" style={{ width: `${w}%`, background: color || "var(--primary)" }} />
@@ -486,33 +490,36 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
         {/* Revenue breakdown — actual cash by source/bucket. The
             single most useful view: how much came from where, net of
             refunds, for the active period. */}
-        <h3 className="rpt-sub-head">Revenue by Source{activeLabel}</h3>
-        {bucketRows.length === 0 ? (
-          <p className="muted">No payments in this period yet.</p>
-        ) : (
-          <div className="rpt-bars">
-            {bucketRows.map((r) => (
-              <Bar
-                key={r.name}
-                label={r.name}
-                value={r.value}
-                max={maxBucket}
-                color={BUCKET_COLORS[r.name] || "var(--primary)"}
-                subLabel={`${dlr(r.value)} (${active.total > 0 ? Math.round((r.value / active.total) * 100) : 0}%)`}
-              />
-            ))}
-          </div>
-        )}
-        {active.refunded > 0 && (
-          <p className="muted" style={{ marginTop: -8, marginBottom: 16, fontSize: 12 }}>
-            Net of {dlr(active.refunded)} in refunds (gross was {dlr(active.gross)}).
-          </p>
-        )}
+        <div className="rpt-card">
+          <h3 className="rpt-sub-head">Revenue by Source{activeLabel}</h3>
+          {bucketRows.length === 0 ? (
+            <p className="muted">No payments in this period yet.</p>
+          ) : (
+            <div className="rpt-bars">
+              {bucketRows.map((r) => (
+                <Bar
+                  key={r.name}
+                  label={r.name}
+                  value={r.value}
+                  max={maxBucket}
+                  color={BUCKET_COLORS[r.name] || "var(--primary)"}
+                  subLabel={`${dlr(r.value)} (${active.total > 0 ? Math.round((r.value / active.total) * 100) : 0}%)`}
+                />
+              ))}
+            </div>
+          )}
+          {active.refunded > 0 && (
+            <p className="muted" style={{ marginTop: 10, marginBottom: 0, fontSize: 12 }}>
+              Net of {dlr(active.refunded)} in refunds (gross was {dlr(active.gross)}).
+            </p>
+          )}
+        </div>
 
         {/* Monthly trend — stacked bars per bucket so the operator
             can see WHERE growth is coming from at a glance. Click a
             month to drill in (sets selMonth which the rest of Reports
             already respects). */}
+        <div className="rpt-card">
         <h3 className="rpt-sub-head">Monthly Revenue (Last 6 Months)</h3>
         {revenue.trend.length === 0 ? (
           <p className="muted">No data yet</p>
@@ -570,7 +577,7 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
               })}
             </div>
             {/* Legend for the stacked-bar colors. */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 4, marginBottom: 24, fontSize: 11 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 8, fontSize: 11 }}>
               {REVENUE_BUCKETS.filter((b) => (revenue.allTimeBuckets[b] || 0) > 0).map((b) => (
                 <span key={b} style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--text-muted)" }}>
                   <span style={{ width: 10, height: 10, borderRadius: 2, background: BUCKET_COLORS[b] }} />
@@ -580,25 +587,28 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
             </div>
           </>
         )}
+        </div>
 
         {/* Active subscriptions snapshot — kept but reframed as a
             forecast (what we EXPECT to bill next cycle), not as
             recognized revenue. */}
-        <h3 className="rpt-sub-head">Active Subscriptions by Tier (Forecast MRR)</h3>
-        <div className="rpt-bars">
-          {TIERS.filter((t) => t !== "Non-Member").map((t) => {
-            const maxTier = Math.max(1, ...Object.values(revenue.byTier).map((v) => v.total));
-            return (
-              <Bar
-                key={t}
-                label={`${t} (${revenue.byTier[t].count})`}
-                value={revenue.byTier[t].total}
-                max={maxTier}
-                color={(TIER_COLORS[t] || {}).bg}
-                subLabel={dlr(revenue.byTier[t].total)}
-              />
-            );
-          })}
+        <div className="rpt-card">
+          <h3 className="rpt-sub-head">Active Subscriptions by Tier (Forecast MRR)</h3>
+          <div className="rpt-bars">
+            {TIERS.filter((t) => t !== "Non-Member").map((t) => {
+              const maxTier = Math.max(1, ...Object.values(revenue.byTier).map((v) => v.total));
+              return (
+                <Bar
+                  key={t}
+                  label={`${t} (${revenue.byTier[t].count})`}
+                  value={revenue.byTier[t].total}
+                  max={maxTier}
+                  color={(TIER_COLORS[t] || {}).bg}
+                  subLabel={dlr(revenue.byTier[t].total)}
+                />
+              );
+            })}
+          </div>
         </div>
       </>
     );
@@ -626,39 +636,44 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
         </div>
 
         {/* By bay */}
-        <h3 className="rpt-sub-head">Hours by Bay{monthSuffix}</h3>
-        <div className="rpt-bars">
-          {BAYS.map((bay) => (
-            <Bar
-              key={bay}
-              label={bay}
-              value={usage.byBay[bay] || 0}
-              max={maxBay}
-              color="var(--primary)"
-              subLabel={hrs(usage.byBay[bay] || 0)}
-            />
-          ))}
+        <div className="rpt-card">
+          <h3 className="rpt-sub-head">Hours by Bay{monthSuffix}</h3>
+          <div className="rpt-bars">
+            {BAYS.map((bay) => (
+              <Bar
+                key={bay}
+                label={bay}
+                value={usage.byBay[bay] || 0}
+                max={maxBay}
+                color="var(--primary)"
+                subLabel={hrs(usage.byBay[bay] || 0)}
+              />
+            ))}
+          </div>
         </div>
 
         {/* Booking trend — clickable */}
-        <h3 className="rpt-sub-head">Monthly Bookings</h3>
-        {usage.bkTrend.length > 0 ? (
-          <div className="rpt-chart">
-            {usage.bkTrend.map((t) => (
-              <TrendCol
-                key={t.month}
-                month={t.month}
-                label={t.label}
-                height={`${(t.count / maxBk) * 100}%`}
-                onClick={() => setSelMonth(selMonth === t.month ? null : t.month)}
-              >
-                <div className="rpt-chart-amt">{t.count}</div>
-              </TrendCol>
-            ))}
-          </div>
-        ) : <p className="muted">No data yet</p>}
+        <div className="rpt-card">
+          <h3 className="rpt-sub-head">Monthly Bookings</h3>
+          {usage.bkTrend.length > 0 ? (
+            <div className="rpt-chart">
+              {usage.bkTrend.map((t) => (
+                <TrendCol
+                  key={t.month}
+                  month={t.month}
+                  label={t.label}
+                  height={`${(t.count / maxBk) * 100}%`}
+                  onClick={() => setSelMonth(selMonth === t.month ? null : t.month)}
+                >
+                  <div className="rpt-chart-amt">{t.count}</div>
+                </TrendCol>
+              ))}
+            </div>
+          ) : <p className="muted">No data yet</p>}
+        </div>
 
         {/* Heatmap */}
+        <div className="rpt-card">
         <h3 className="rpt-sub-head">Peak Hours{monthSuffix || " (All Time)"}</h3>
         <div className="rpt-heat-wrap">
           <div className="rpt-heat">
@@ -694,6 +709,7 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
             ))}
           </div>
         </div>
+        </div>
 
         {/* Utilization line chart — only when a month is selected */}
         {renderUtilLine()}
@@ -723,57 +739,63 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
         </div>
 
         {/* Tier distribution */}
-        <h3 className="rpt-sub-head">Tier Distribution</h3>
-        <div className="rpt-bars">
-          {TIERS.map((t) => (
-            <Bar
-              key={t}
-              label={t}
-              value={memStats.dist[t]}
-              max={maxDist}
-              color={(TIER_COLORS[t] || {}).bg}
-              subLabel={`${memStats.dist[t]} member${memStats.dist[t] !== 1 ? "s" : ""}`}
-            />
-          ))}
+        <div className="rpt-card">
+          <h3 className="rpt-sub-head">Tier Distribution</h3>
+          <div className="rpt-bars">
+            {TIERS.map((t) => (
+              <Bar
+                key={t}
+                label={t}
+                value={memStats.dist[t]}
+                max={maxDist}
+                color={(TIER_COLORS[t] || {}).bg}
+                subLabel={`${memStats.dist[t]} member${memStats.dist[t] !== 1 ? "s" : ""}`}
+              />
+            ))}
+          </div>
         </div>
 
         {/* New signups */}
-        <h3 className="rpt-sub-head">New Member Signups</h3>
-        {memStats.signupTrend.length > 0 ? (
-          <div className="rpt-chart">
-            {memStats.signupTrend.map((t) => (
-              <div key={t.month} className="rpt-chart-col">
-                <div className="rpt-chart-bar-wrap">
-                  <div className="rpt-chart-bar" style={{ height: `${(t.count / maxSignup) * 100}%` }} />
+        <div className="rpt-card">
+          <h3 className="rpt-sub-head">New Member Signups</h3>
+          {memStats.signupTrend.length > 0 ? (
+            <div className="rpt-chart">
+              {memStats.signupTrend.map((t) => (
+                <div key={t.month} className="rpt-chart-col">
+                  <div className="rpt-chart-bar-wrap">
+                    <div className="rpt-chart-bar" style={{ height: `${(t.count / maxSignup) * 100}%` }} />
+                  </div>
+                  <div className="rpt-chart-lbl">{t.label}</div>
+                  <div className="rpt-chart-amt">{t.count}</div>
                 </div>
-                <div className="rpt-chart-lbl">{t.label}</div>
-                <div className="rpt-chart-amt">{t.count}</div>
-              </div>
-            ))}
-          </div>
-        ) : <p className="muted">No signup data yet</p>}
+              ))}
+            </div>
+          ) : <p className="muted">No signup data yet</p>}
+        </div>
 
         {/* Top members */}
-        <h3 className="rpt-sub-head">Top Members by Hours{monthSuffix}</h3>
-        {memStats.topMembers.length > 0 ? (
-          <div className="tbl">
-            <div className="th">
-              <span style={{ flex: 2 }}>Member</span>
-              <span style={{ flex: 1 }}>Tier</span>
-              <span style={{ flex: 1 }} className="text-r">Total Hours</span>
-            </div>
-            {memStats.topMembers.map((m) => (
-              <div key={m.email} className="tr">
-                <span style={{ flex: 2 }}>
-                  <strong>{m.name}</strong><br />
-                  <span className="email-sm">{m.email}</span>
-                </span>
-                <span style={{ flex: 1 }}><Badge tier={m.tier} /></span>
-                <span style={{ flex: 1 }} className="text-r tab-num">{hrs(m.hours)}</span>
+        <div className="rpt-card">
+          <h3 className="rpt-sub-head">Top Members by Hours{monthSuffix}</h3>
+          {memStats.topMembers.length > 0 ? (
+            <div className="tbl">
+              <div className="th">
+                <span style={{ flex: 2 }}>Member</span>
+                <span style={{ flex: 1 }}>Tier</span>
+                <span style={{ flex: 1 }} className="text-r">Total Hours</span>
               </div>
-            ))}
-          </div>
-        ) : <p className="muted">No member bookings{selMonth ? " this month" : ""}</p>}
+              {memStats.topMembers.map((m) => (
+                <div key={m.email} className="tr">
+                  <span style={{ flex: 2 }}>
+                    <strong>{m.name}</strong><br />
+                    <span className="email-sm">{m.email}</span>
+                  </span>
+                  <span style={{ flex: 1 }}><Badge tier={m.tier} /></span>
+                  <span style={{ flex: 1 }} className="text-r tab-num">{hrs(m.hours)}</span>
+                </div>
+              ))}
+            </div>
+          ) : <p className="muted">No member bookings{selMonth ? " this month" : ""}</p>}
+        </div>
       </>
     );
   }
