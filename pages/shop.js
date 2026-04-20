@@ -10,6 +10,7 @@ import { useEffect, useState, useMemo } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { useBranding } from "../hooks/useBranding";
+import { optimizedImageUrl } from "../lib/branding";
 
 // Per-request render so tenant branding is fresh on every load and
 // Vercel's Edge CDN doesn't cache the wrong tenant's HTML.
@@ -245,7 +246,7 @@ export default function PublicShopPage() {
                 }}
               >
                 {it.image_url ? (
-                  <img src={it.image_url} alt="" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }} />
+                  <img src={optimizedImageUrl(it.image_url, { width: 640 })} alt="" loading="lazy" decoding="async" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }} />
                 ) : (
                   <div style={{ aspectRatio: "1", background: "var(--primary-bg)" }} />
                 )}
@@ -302,7 +303,7 @@ export default function PublicShopPage() {
             }}
           >
             {selected.image_url && (
-              <img src={selected.image_url} alt="" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 12, marginBottom: 14 }} />
+              <img src={optimizedImageUrl(selected.image_url, { width: 1080 })} alt="" loading="lazy" decoding="async" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 12, marginBottom: 14 }} />
             )}
             <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, marginBottom: 4 }}>{selected.title}</h2>
             {selected.brand && <p style={{ color: "var(--text-muted)", margin: "0 0 8px 0", fontSize: 13 }}>{selected.brand}</p>}
@@ -380,7 +381,7 @@ export default function PublicShopPage() {
                     return (
                       <div key={`${c.item_id}-${c.size || ""}-${i}`} style={{ display: "flex", gap: 10, padding: 10, border: "1px solid var(--border)", borderRadius: 12 }}>
                         {it.image_url && (
-                          <img src={it.image_url} alt="" style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
+                          <img src={optimizedImageUrl(it.image_url, { width: 128 })} alt="" loading="lazy" decoding="async" style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
                         )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 600, fontSize: 14 }}>{it.title}</div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
+import { optimizedImageUrl } from "../../lib/branding";
 
 export default function MemberEventDetail({ id, member, showToast }) {
   const router = useRouter();
@@ -149,7 +150,7 @@ export default function MemberEventDetail({ id, member, showToast }) {
 
       {/* Image */}
       {event.image_url && (
-        <img src={event.image_url} alt="" style={{
+        <img src={optimizedImageUrl(event.image_url, { width: 1080 })} alt="" loading="lazy" decoding="async" style={{
           width: "100%", maxHeight: 300, objectFit: "cover", borderRadius: "var(--radius, 15px)", marginBottom: 16,
         }} />
       )}

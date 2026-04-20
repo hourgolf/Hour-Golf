@@ -1,4 +1,5 @@
 import { useRouter } from "next/router";
+import { optimizedImageUrl } from "../../lib/branding";
 
 export default function EventPopup({ event, onDismiss }) {
   const router = useRouter();
@@ -25,7 +26,7 @@ export default function EventPopup({ event, onDismiss }) {
         boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
       }}>
         {event.image_url && (
-          <img src={event.image_url} alt="" style={{ width: "100%", height: 160, objectFit: "cover" }} />
+          <img src={optimizedImageUrl(event.image_url, { width: 828 })} alt="" loading="lazy" decoding="async" style={{ width: "100%", height: 160, objectFit: "cover" }} />
         )}
 
         <div style={{ padding: "16px 20px 20px" }}>

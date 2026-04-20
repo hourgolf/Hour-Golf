@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import useMemberAuth from "../../hooks/useMemberAuth";
 import { useBranding } from "../../hooks/useBranding";
 import { useTenantFeatures } from "../../hooks/useTenantFeatures";
-import { getLogoMaxDims } from "../../lib/branding";
+import { getLogoMaxDims, optimizedImageUrl } from "../../lib/branding";
 import HelpDrawer from "./HelpDrawer";
 import EventPopup from "./EventPopup";
 import InstallPrompt from "./InstallPrompt";
@@ -47,7 +47,7 @@ function NewsPopup({ item, onDismiss }) {
         }}
       >
         {item.image_url && (
-          <img src={item.image_url} alt="" style={{ width: "100%", maxHeight: 240, objectFit: "cover", display: "block" }} />
+          <img src={optimizedImageUrl(item.image_url, { width: 828 })} alt="" loading="lazy" decoding="async" style={{ width: "100%", maxHeight: 240, objectFit: "cover", display: "block" }} />
         )}
         <div style={{ padding: "20px 22px 18px" }}>
           <div style={{

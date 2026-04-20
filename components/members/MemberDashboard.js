@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
 import { QRCodeSVG } from "qrcode.react";
 import { useBranding } from "../../hooks/useBranding";
-import { DEFAULT_CANCEL_CUTOFF_HOURS, DEFAULT_DASHBOARD_EMPTY_HEADLINE } from "../../lib/branding";
+import { DEFAULT_CANCEL_CUTOFF_HOURS, DEFAULT_DASHBOARD_EMPTY_HEADLINE, optimizedImageUrl } from "../../lib/branding";
 import SlideToConfirm from "../ui/SlideToConfirm";
 import Modal from "../ui/Modal";
 import InstallPrompt from "./InstallPrompt";
@@ -572,7 +572,7 @@ export default function MemberDashboard({ member, tierConfig, refresh, showToast
                   }}
                 >
                   {n.image_url && (
-                    <img src={n.image_url} alt="" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
+                    <img src={optimizedImageUrl(n.image_url, { width: 128 })} alt="" loading="lazy" decoding="async" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <span style={{

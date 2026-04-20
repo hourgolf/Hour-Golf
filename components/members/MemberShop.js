@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Modal from "../ui/Modal";
+import { optimizedImageUrl } from "../../lib/branding";
 
 const STATUS_COLORS = {
   pending: "#E8A838",
@@ -490,7 +491,7 @@ export default function MemberShop({ member, tierConfig, showToast }) {
                 <div key={c.cart_id} className="mem-section" style={{ marginBottom: 10, padding: "12px 14px" }}>
                   <div style={{ display: "flex", gap: 12 }}>
                     {c.image_url ? (
-                      <img src={c.image_url} alt="" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
+                      <img src={optimizedImageUrl(c.image_url, { width: 128 })} alt="" loading="lazy" decoding="async" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
                     ) : (
                       <div style={{ width: 64, height: 64, borderRadius: 8, background: "var(--border)", flexShrink: 0 }} />
                     )}
@@ -733,7 +734,7 @@ export default function MemberShop({ member, tierConfig, showToast }) {
           <>
             {modalImages.length > 0 && (
               <div style={{ position: "relative", marginBottom: 16 }}>
-                <img src={modalImages[galleryIdx]} alt="" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8 }} />
+                <img src={optimizedImageUrl(modalImages[galleryIdx], { width: 1080 })} alt="" loading="lazy" decoding="async" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8 }} />
                 {modalImages.length > 1 && (
                   <>
                     <button onClick={() => setGalleryIdx((i) => (i - 1 + modalImages.length) % modalImages.length)} style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.4)", color: "#fff", fontSize: 16, cursor: "pointer" }}>&lsaquo;</button>
@@ -1076,7 +1077,7 @@ function ItemCard({ item, discountPct, onClick }) {
     >
       {imgUrl ? (
         <div style={{ position: "relative" }}>
-          <img src={imgUrl} alt="" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }} />
+          <img src={optimizedImageUrl(imgUrl, { width: 640 })} alt="" loading="lazy" decoding="async" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }} />
           {item.sold_out && (
             <div style={{ position: "absolute", inset: 0, background: "rgba(53,68,59,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <span style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#EDF3E3", fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Sold Out</span>
