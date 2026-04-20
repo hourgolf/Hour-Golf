@@ -1,9 +1,16 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
+import { enforceRateLimit, requireSameOrigin } from "../../lib/security";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+
+  // Block classic CSRF + throttle per IP: the unauthenticated email-write
+  // surface is the most abuse-prone endpoint on the site (signup floods
+  // create rows + send welcome emails).
+  if (!requireSameOrigin(req, res)) return;
+  if (!enforceRateLimit(req, res, { bucket: "signup", limit: 5, windowMs: 60 * 60 * 1000 })) return;
 
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });

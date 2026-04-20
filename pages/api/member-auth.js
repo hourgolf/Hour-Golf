@@ -2,9 +2,15 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { createMemberSession } from "../../lib/member-session";
+import { enforceRateLimit, requireSameOrigin } from "../../lib/security";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+
+  if (!requireSameOrigin(req, res)) return;
+  // Credential-stuffing throttle: 10 login attempts / 10 min / IP. Keeps a
+  // real user with typo fingers below the ceiling while breaking bot rigs.
+  if (!enforceRateLimit(req, res, { bucket: "login", limit: 10, windowMs: 10 * 60 * 1000 })) return;
 
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });

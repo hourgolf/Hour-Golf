@@ -31,18 +31,6 @@ export default async function handler(req, res) {
     const member = session.member;
     const cleanEmail = member.email;
 
-    // Load tier config
-    let tierConfig = null;
-    if (member.tier) {
-      try {
-        const rows = await fetch(
-          `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(member.tier)}&tenant_id=eq.${tenantId}`,
-          { headers: { apikey: key, Authorization: `Bearer ${key}` } }
-        ).then((r) => r.json());
-        tierConfig = rows[0] || null;
-      } catch (_) { /* ignore */ }
-    }
-
     // Build billing month window in Pacific time. Members live in PT;
     // a session that starts at 9pm PT on March 31 (= April 1 04:00 UTC)
     // belongs in March, not April. Bucketing by PT keeps this endpoint
@@ -53,27 +41,45 @@ export default async function handler(req, res) {
     const billingMonth = pacificMonthTag(now);
     const { startISO: monthStart, endISO: monthEnd } = pacificMonthWindow(now);
 
-    // Upcoming + currently-live confirmed bookings.
-    //
-    // Filter on booking_end (not booking_start) so a session that has
-    // already started but hasn't ended yet still comes back. Filtering
-    // on booking_start dropped live bookings from the response and
-    // made the dashboard hero fall back to the empty "Ready to ..."
-    // state on reload mid-session.
-    let upcoming = [];
-    try {
-      upcoming = await fetch(
+    // Fetch everything that depends only on the session in parallel. Previously
+    // this was four sequential awaits (tier → upcoming → access-codes →
+    // safeMonthBookings) which added ~300-800ms of needless latency on every
+    // dashboard load. The dashboard is the most-loaded surface; keep it tight.
+    const authHeaders = { apikey: key, Authorization: `Bearer ${key}` };
+    const safeJson = async (p) => { try { return await p.then((r) => r.json()); } catch (_) { return null; } };
+
+    const [tierRows, upcomingRaw, monthRaw] = await Promise.all([
+      member.tier
+        ? safeJson(fetch(
+            `${SUPABASE_URL}/rest/v1/tier_config?tier=eq.${encodeURIComponent(member.tier)}&tenant_id=eq.${tenantId}`,
+            { headers: authHeaders }
+          ))
+        : Promise.resolve(null),
+      // Upcoming + currently-live confirmed bookings. Filter on booking_end
+      // (not booking_start) so a session that has already started but hasn't
+      // ended yet still comes back. Filtering on booking_start dropped live
+      // bookings and made the dashboard hero fall back to the empty state
+      // on reload mid-session.
+      safeJson(fetch(
         `${SUPABASE_URL}/rest/v1/bookings?customer_email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}&booking_status=eq.Confirmed&booking_end=gte.${now.toISOString()}&order=booking_start.asc&limit=20`,
-        { headers: { apikey: key, Authorization: `Bearer ${key}` } }
-      ).then((r) => r.json());
-    } catch (_) { upcoming = []; }
+        { headers: authHeaders }
+      )),
+      safeJson(fetch(
+        `${SUPABASE_URL}/rest/v1/bookings?customer_email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}&booking_status=eq.Confirmed&booking_start=gte.${monthStart}&booking_start=lt.${monthEnd}&order=booking_start.asc`,
+        { headers: authHeaders }
+      )),
+    ]);
+
+    const tierConfig = Array.isArray(tierRows) ? tierRows[0] || null : null;
+    let upcoming = Array.isArray(upcomingRaw) ? upcomingRaw : [];
+    const monthBookings = Array.isArray(monthRaw) ? monthRaw : [];
 
     // Attach Seam access codes for upcoming bookings whose access-code
     // job has reached the `sent` state. Members get the code on the
     // dashboard the moment the cron run issues it (~10 min before
     // start) — saves them flipping back to email. Best-effort: failure
     // here just means the dashboard renders without the inline code.
-    if (Array.isArray(upcoming) && upcoming.length > 0) {
+    if (upcoming.length > 0) {
       try {
         const ids = upcoming
           .map((b) => b.booking_id)
@@ -82,7 +88,7 @@ export default async function handler(req, res) {
         if (ids.length > 0) {
           const codeRows = await fetch(
             `${SUPABASE_URL}/rest/v1/access_code_jobs?tenant_id=eq.${tenantId}&status=eq.sent&booking_id=in.(${ids.join(",")})&select=booking_id,access_code,code_start,code_end`,
-            { headers: { apikey: key, Authorization: `Bearer ${key}` } }
+            { headers: authHeaders }
           ).then((r) => r.json());
           const byId = new Map();
           for (const r of codeRows || []) {
@@ -97,15 +103,6 @@ export default async function handler(req, res) {
         }
       } catch (_) { /* best-effort attach */ }
     }
-
-    // This month's confirmed bookings
-    let monthBookings = [];
-    try {
-      monthBookings = await fetch(
-        `${SUPABASE_URL}/rest/v1/bookings?customer_email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}&booking_status=eq.Confirmed&booking_start=gte.${monthStart}&booking_start=lt.${monthEnd}&order=booking_start.asc`,
-        { headers: { apikey: key, Authorization: `Bearer ${key}` } }
-      ).then((r) => r.json());
-    } catch (_) { monthBookings = []; }
 
     // Tier values needed for both reconciliation and current month calc
     const includedHours = Number(tierConfig?.included_hours || 0);

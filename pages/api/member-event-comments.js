@@ -1,5 +1,6 @@
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { getSessionWithMember } from "../../lib/member-session";
+import { requireSameOrigin } from "../../lib/security";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -15,6 +16,10 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Hour Golf <onboarding@resend.dev>";
 
 export default async function handler(req, res) {
+  if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+    if (!requireSameOrigin(req, res)) return;
+  }
+
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
