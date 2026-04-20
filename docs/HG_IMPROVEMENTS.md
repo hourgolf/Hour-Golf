@@ -193,6 +193,16 @@ Items that are real but don't belong in this sprint. Revisit after member launch
 - 2026-04-19 `<next>` — [admin] TodayView gets a date nav strip (Prev / Today label / Next + Today button when historic). Keyboard shortcuts: `[` prev day, `]` next day, `t` today, `w` week view (in addition to existing n/r/?/).
 - 2026-04-19 `<next>` — [admin] TodayView bulk-cancel: per-row checkboxes + "select all in this bay" + sticky bottom bulk-action bar. Operator can cancel a batch (closures, weather, etc.) without per-row clicks.
 - 2026-04-19 `<next>` — [admin] CustomersView gets a KPI strip (Customers · Members · Non-Members) and a one-tap tier chip filter row replacing the dropdown — chips show per-segment counts, "Members" segment groups all paying tiers.
+- 2026-04-19 `ddfe8cf` — [member + API] Hero keeps live bookings on reload (`/api/member-data` filters `booking_end >= now`); tenant-customizable `dashboard_empty_headline` (migration 20260419020000).
+- 2026-04-19 `6cdcae2` — [admin] Settings bays input accepts commas via raw-text buffer pattern.
+- 2026-04-19 `cb1f81a` + `fa161d4` — [member shell + Pro Shop] Sticky header + nav, shorter "BOOK" tab label, billing rolled into Account, Pro Shop sub-nav segmented pills + white top strip.
+- 2026-04-19 `e8301c9` — [member hero] SlideToConfirm component (touch + mouse drag, 85% threshold) replaces +15 min tap; tier badge dropped from persistent header.
+- 2026-04-19 `87f09cc` — [shared, CRITICAL] All hours/usage/loyalty math switched to **Pacific-month bucketing**. monthly_usage view rebuilt (migration 20260419030000), `/api/member-data` + `/api/member-shop` loyalty + `/api/admin-loyalty` use new `pacificMonthWindow` helpers. Member loyalty now also includes Square POS spend net of refunds. Closed Matt Mahoney 3h-vs-2h discrepancy.
+- 2026-04-19 `8d94a16` — [tier sync] Stripe webhook checkout.session.completed self-heals (creates members row when missing); new `/api/admin-update-tier` endpoint upserts via service-role and reads Stripe (read-only) to link existing customer/subscription by email. One-off SQL repair: created members row #070 for Scott Casares (was orphaned via AllBooked InviteLink migration).
+- 2026-04-19 `dea2d47` — [shared] Modal renders via React Portal so it escapes the sticky-header stacking context.
+- 2026-04-19 `15540fb` — [admin Reports] Revenue rebuilt — actual cash from `payments` (Stripe + Square POS in one place), bucketed by source (Membership / Pro Shop / In-store retail / Overage / Non-member booking), net of refunds.
+- 2026-04-19 `e1dc9f6` — [member account/billing] Membership + punch passes moved to `/members/account`; profile + email + password collapsed into one block; notifications + payment method + receipts on `/members/billing`; Stripe return URLs repointed.
+- 2026-04-19 `3d29cdd` — [admin Reports + Config] White card panels on every Reports sub-section; header member count fixed (paying tiers only); per-source bar hover tooltips; Birthday Bonus + News full-width; Members table removed from Config (redundant); Email Settings replaced with transactional emails catalog.
 
 **Decisions / removed:**
 - "Repeat last booking" chip — shipped briefly in `e37322b`, removed in next commit. No one was going to use it; just added clutter.
