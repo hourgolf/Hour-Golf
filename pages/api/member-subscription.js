@@ -174,8 +174,10 @@ export default async function handler(req, res) {
         customer: stripeCustomerId,
         mode: "subscription",
         line_items: [{ price: tierCfg.stripe_price_id, quantity: 1 }],
-        success_url: `${req.headers.origin || "https://hour-golf.vercel.app"}/members/billing?subscribed=${encodeURIComponent(tier)}`,
-        cancel_url: `${req.headers.origin || "https://hour-golf.vercel.app"}/members/billing`,
+        // Returns to /members/account because Membership lives there
+        // now. /members/billing keeps payment-method + history only.
+        success_url: `${req.headers.origin || "https://hour-golf.vercel.app"}/members/account?subscribed=${encodeURIComponent(tier)}`,
+        cancel_url: `${req.headers.origin || "https://hour-golf.vercel.app"}/members/account`,
         metadata: { member_email: member.email, tier },
       });
 

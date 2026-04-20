@@ -117,8 +117,10 @@ export default async function handler(req, res) {
         },
         quantity: 1,
       }],
-      success_url: `${req.headers.origin || "https://hour-golf.vercel.app"}/members/billing?purchased=${pass.hours}`,
-      cancel_url: `${req.headers.origin || "https://hour-golf.vercel.app"}/members/billing`,
+      // Returns to /members/account because Membership + punch-pass
+      // controls live there now (used to live on /members/billing).
+      success_url: `${req.headers.origin || "https://hour-golf.vercel.app"}/members/account?purchased=${pass.hours}`,
+      cancel_url: `${req.headers.origin || "https://hour-golf.vercel.app"}/members/account`,
       metadata: {
         type: "punch_pass",
         member_email: member.email,

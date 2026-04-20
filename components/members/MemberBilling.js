@@ -1,44 +1,37 @@
 import { useState, useEffect } from "react";
 import { fD } from "../../lib/format";
 
-const PUNCH_PASSES = [
-  { hours: 1, discount: 0, label: "1 Hour" },
-  { hours: 5, discount: 0.10, label: "5 Hours", tag: "10% off" },
-  { hours: 10, discount: 0.25, label: "10 Hours", tag: "25% off" },
-];
-
+// /members/billing now owns three things: payment method on file,
+// notification preferences, and the receipt history. Membership
+// management + punch passes moved to /members/account so the surfaces
+// members touch most often (upgrade / downgrade / buy hours) are one
+// nav-tap away instead of two.
 export default function MemberBilling({ member, tierConfig, refresh, showToast }) {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [purchasing, setPurchasing] = useState(false);
   const [settingUpCard, setSettingUpCard] = useState(false);
 
-  // Subscription state
-  const [tiers, setTiers] = useState([]);
-  const [subscription, setSubscription] = useState(null);
-  const [subLoading, setSubLoading] = useState(true);
-  const [changingTier, setChangingTier] = useState(false);
-  const [cancelConfirm, setCancelConfirm] = useState(false);
-  const [upgradeConfirm, setUpgradeConfirm] = useState(null); // tier name or null
-
-  const overageRate = Number(tierConfig?.overage_rate || 60);
+  // Notification preferences — moved here from Account so the
+  // Account page can lead with membership management instead of a
+  // toggle list a member edits maybe twice a year.
+  const [prefs, setPrefs] = useState({
+    email_booking_confirmations: true,
+    email_cancellations: true,
+    email_reminders: true,
+    email_billing: true,
+  });
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const [prefsSaving, setPrefsSaving] = useState(false);
 
   useEffect(() => {
     loadBilling();
-    loadSubscription();
+    loadPreferences();
 
-    // Check for success redirects
+    // Catch the Stripe-checkout return for "add card" — only flow
+    // that still lands on /members/billing. (Subscribe + punch-pass
+    // checkouts now return to /members/account.)
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      if (params.get("subscribed")) {
-        showToast(`Welcome! You're now a ${params.get("subscribed")} member.`);
-        window.history.replaceState({}, "", "/members/billing");
-        refresh();
-      }
-      if (params.get("purchased")) {
-        showToast(`${params.get("purchased")} bonus hour${params.get("purchased") === "1" ? "" : "s"} added to your account!`);
-        window.history.replaceState({}, "", "/members/billing");
-      }
       if (params.get("card_added")) {
         showToast("Payment method added successfully!");
         window.history.replaceState({}, "", "/members/billing");
@@ -59,95 +52,39 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
     setLoading(false);
   }
 
-  async function loadSubscription() {
-    setSubLoading(true);
+  async function loadPreferences() {
     try {
-      const r = await fetch("/api/member-subscription", { credentials: "include" });
+      const r = await fetch("/api/member-preferences", { credentials: "include" });
       if (r.ok) {
         const d = await r.json();
-        setTiers(d.availableTiers || []);
-        setSubscription(d.subscription);
+        if (d.preferences) setPrefs(d.preferences);
       }
-    } catch (_) {}
-    setSubLoading(false);
+    } catch (_) { /* defaults stand */ }
+    setPrefsLoaded(true);
   }
 
-  async function handleSubscribe(tier) {
-    setChangingTier(true);
+  async function savePreferences(next) {
+    // Optimistic update — toggles feel instant; rollback on failure.
+    const prev = prefs;
+    setPrefs(next);
+    setPrefsSaving(true);
     try {
-      const r = await fetch("/api/member-subscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ tier }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Failed");
-      window.location.href = d.url;
-    } catch (e) {
-      showToast(e.message, "error");
-      setChangingTier(false);
-    }
-  }
-
-  async function handleChangeTier(tier) {
-    setChangingTier(true);
-    setUpgradeConfirm(null);
-    try {
-      const r = await fetch("/api/member-subscription", {
+      const r = await fetch("/api/member-preferences", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ tier }),
+        body: JSON.stringify({ preferences: next }),
       });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Failed");
-      showToast(`Membership updated to ${tier}!`);
-      refresh();
-      await loadSubscription();
+      if (!r.ok) throw new Error("Failed to save preferences");
     } catch (e) {
-      showToast(e.message, "error");
+      setPrefs(prev);
+      showToast("Failed to save preferences", "error");
     }
-    setChangingTier(false);
+    setPrefsSaving(false);
   }
 
-  async function handleCancelSubscription() {
-    setChangingTier(true);
-    try {
-      const r = await fetch("/api/member-subscription", {
-        method: "DELETE",
-        credentials: "include",
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Failed");
-      const cancelDate = new Date(d.cancel_at).toLocaleDateString("en-US", {
-        month: "long", day: "numeric", year: "numeric",
-      });
-      showToast(`Membership will end on ${cancelDate}`);
-      setCancelConfirm(false);
-      await loadSubscription();
-    } catch (e) {
-      showToast(e.message, "error");
-    }
-    setChangingTier(false);
-  }
-
-  async function handleBuyPunchPass(hours) {
-    setPurchasing(true);
-    try {
-      const r = await fetch("/api/punch-pass-purchase", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ hours }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Failed");
-      window.location.href = d.url;
-    } catch (err) {
-      showToast(err.message, "error");
-      setPurchasing(false);
-    }
+  function togglePref(key) {
+    savePreferences({ ...prefs, [key]: !prefs[key] });
   }
 
   async function handleSetupPayment() {
@@ -166,14 +103,7 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
     }
   }
 
-  const hasSubscription = subscription && subscription.status === "active";
-  const isCancelling = subscription?.cancel_at_period_end;
   const hasCard = member.hasPaymentMethod;
-
-  // Helper to check if a tier is an upgrade or downgrade
-  function isUpgrade(t) {
-    return Number(t.monthly_fee) > Number(tierConfig?.monthly_fee || 0);
-  }
 
   return (
     <>
@@ -211,193 +141,47 @@ export default function MemberBilling({ member, tierConfig, refresh, showToast }
         )}
       </div>
 
-      {/* Membership Section */}
+      {/* Notification preferences — toggles save optimistically. */}
       <div className="mem-section">
-        <div className="mem-section-head">Membership</div>
-
-        {subLoading ? (
-          <div className="mem-loading">Loading membership info...</div>
+        <div className="mem-section-head">Email Notifications</div>
+        {!prefsLoaded ? (
+          <div className="mem-loading">Loading preferences...</div>
         ) : (
           <>
-            {/* Current status */}
-            {hasSubscription && (
-              <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--bg, #EDF3E3)", borderRadius: 15 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                  <strong style={{ fontSize: 15 }}>{member.tier} Member</strong>
-                  <span className={`mem-sub-status ${isCancelling ? "cancelling" : "active"}`}>
-                    {isCancelling ? "Cancelling" : "Active"}
-                  </span>
-                </div>
-                {isCancelling && subscription.current_period_end && (
-                  <div style={{ fontSize: 13, color: "#8BB5A0" }}>
-                    Membership ends {new Date(subscription.current_period_end * 1000).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-                  </div>
-                )}
+            <div className="mem-toggle" onClick={() => togglePref("email_booking_confirmations")}>
+              <div>
+                <div className="mem-toggle-label">Booking Confirmations</div>
+                <div className="mem-toggle-sub">Receive an email when your booking is confirmed</div>
               </div>
-            )}
-
-            {/* Tier cards */}
-            {tiers.length > 0 && (
-              <div className="mem-tier-grid">
-                {tiers.map((t) => {
-                  const isCurrent = t.tier === member.tier;
-                  const isUnlimited = Number(t.included_hours) >= 99999;
-                  const hasStripePriceId = !!t.stripe_price_id;
-                  const up = isUpgrade(t);
-
-                  return (
-                    <div key={t.tier} className={`mem-tier-card ${isCurrent ? "current" : ""}`}>
-                      <div className="mem-tier-card-name">{t.tier}</div>
-                      <div className="mem-tier-card-price">${Number(t.monthly_fee).toFixed(0)}</div>
-                      <div className="mem-tier-card-period">/month</div>
-                      <div className="mem-tier-card-features">
-                        {isUnlimited ? "Unlimited hours" : `${t.included_hours} hours/month`}
-                        <br />${Number(t.overage_rate)}/hr overage
-                        {Number(t.pro_shop_discount) > 0 && (<><br />{t.pro_shop_discount}% pro shop discount</>)}
-                      </div>
-
-                      {isCurrent ? (
-                        <span style={{ fontSize: 12, color: "#4C8D73", fontWeight: 600 }}>Current Plan</span>
-                      ) : !hasStripePriceId ? (
-                        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Contact us</span>
-                      ) : hasSubscription ? (
-                        <button
-                          className="mem-btn mem-btn-primary"
-                          style={{ width: "100%", padding: "8px 12px", fontSize: 13 }}
-                          onClick={() => setUpgradeConfirm(t.tier)}
-                          disabled={changingTier}
-                        >
-                          {changingTier ? "..." : up ? "Upgrade" : "Downgrade"}
-                        </button>
-                      ) : (
-                        <button
-                          className="mem-btn mem-btn-primary"
-                          style={{ width: "100%", padding: "8px 12px", fontSize: 13 }}
-                          onClick={() => handleSubscribe(t.tier)}
-                          disabled={changingTier}
-                        >
-                          {changingTier ? "..." : "Subscribe"}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className={`mem-toggle-switch ${prefs.email_booking_confirmations ? "on" : ""}`} />
+            </div>
+            <div className="mem-toggle" onClick={() => togglePref("email_cancellations")}>
+              <div>
+                <div className="mem-toggle-label">Cancellation Confirmations</div>
+                <div className="mem-toggle-sub">Receive an email when you cancel a booking</div>
               </div>
-            )}
-
-            {/* Upgrade/Downgrade confirmation */}
-            {upgradeConfirm && (
-              <div style={{
-                marginTop: 12, padding: "12px 16px", borderRadius: 12,
-                background: "var(--bg, #EDF3E3)", border: "1px solid var(--border)",
-              }}>
-                {(() => {
-                  const targetTier = tiers.find((t) => t.tier === upgradeConfirm);
-                  const up = targetTier && isUpgrade(targetTier);
-                  return (
-                    <>
-                      <p style={{ margin: "0 0 8px", fontSize: 14 }}>
-                        <strong>{up ? "Upgrade" : "Downgrade"} to {upgradeConfirm}?</strong>
-                      </p>
-                      <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-muted)" }}>
-                        {up
-                          ? "The price difference will be prorated for the rest of your billing cycle. Your new rate takes effect immediately."
-                          : "You'll receive a prorated credit for the remainder of your billing cycle. Your new rate takes effect immediately."}
-                      </p>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button
-                          className="mem-btn mem-btn-primary"
-                          style={{ padding: "8px 20px", fontSize: 13 }}
-                          onClick={() => handleChangeTier(upgradeConfirm)}
-                          disabled={changingTier}
-                        >
-                          {changingTier ? "Processing..." : `Confirm ${up ? "Upgrade" : "Downgrade"}`}
-                        </button>
-                        <button
-                          className="mem-btn-sm"
-                          style={{ color: "var(--text)", border: "1px solid var(--border)" }}
-                          onClick={() => setUpgradeConfirm(null)}
-                        >
-                          Nevermind
-                        </button>
-                      </div>
-                    </>
-                  );
-                })()}
+              <div className={`mem-toggle-switch ${prefs.email_cancellations ? "on" : ""}`} />
+            </div>
+            <div className="mem-toggle" onClick={() => togglePref("email_reminders")}>
+              <div>
+                <div className="mem-toggle-label">Booking Reminders</div>
+                <div className="mem-toggle-sub">Get a reminder before your upcoming bookings</div>
               </div>
-            )}
-
-            {/* Cancel button */}
-            {hasSubscription && !isCancelling && (
-            <div style={{ marginTop: 8, textAlign: "center" }}>
-                {cancelConfirm ? (
-                  <div className="mem-cancel-confirm">
-                    <span>Cancel your membership? It will remain active until the end of your billing period.</span>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button
-                        className="mem-cancel-btn mem-cancel-yes"
-                        onClick={handleCancelSubscription}
-                        disabled={changingTier}
-                      >
-                        {changingTier ? "..." : "Yes, cancel"}
-                      </button>
-                      <button
-                        className="mem-btn-sm"
-                        style={{ color: "var(--text)", border: "1px solid var(--border)" }}
-                        onClick={() => setCancelConfirm(false)}
-                      >
-                        Keep membership
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    className="mem-cancel-btn"
-                    onClick={() => setCancelConfirm(true)}
-                    style={{ fontSize: 12 }}
-                  >
-                    Cancel Membership
-                  </button>
-                )}
+              <div className={`mem-toggle-switch ${prefs.email_reminders ? "on" : ""}`} />
+            </div>
+            <div className="mem-toggle" onClick={() => togglePref("email_billing")}>
+              <div>
+                <div className="mem-toggle-label">Billing Notifications</div>
+                <div className="mem-toggle-sub">Receive emails about payments and billing</div>
               </div>
+              <div className={`mem-toggle-switch ${prefs.email_billing ? "on" : ""}`} />
+            </div>
+            {prefsSaving && (
+              <div style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "right", marginTop: 6 }}>Saving...</div>
             )}
           </>
         )}
       </div>
-
-      {/* Punch Passes */}
-      {overageRate > 0 && (
-        <div className="mem-section">
-          <div className="mem-section-head">Buy Hour Passes</div>
-          <p style={{ fontSize: 13, opacity: 0.7, marginBottom: 12 }}>
-            Purchase extra bay hours. Unused hours carry over month to month.
-          </p>
-          <div className="mem-punch-grid">
-            {PUNCH_PASSES.map((p) => {
-              const fullPrice = p.hours * overageRate;
-              const finalPrice = fullPrice * (1 - p.discount);
-              return (
-                <button
-                  key={p.hours}
-                  className="mem-punch-card"
-                  onClick={() => handleBuyPunchPass(p.hours)}
-                  disabled={purchasing}
-                >
-                  {p.tag && <div className="mem-punch-tag">{p.tag}</div>}
-                  <div className="mem-punch-hrs">{p.label}</div>
-                  <div className="mem-punch-price">${Math.round(finalPrice)}</div>
-                  {p.discount > 0 && (
-                    <div className="mem-punch-orig">
-                      <s>${Math.round(fullPrice)}</s>
-                    </div>
-                  )}
-                  <div className="mem-punch-rate">${overageRate}/hr</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Payment History */}
       <div className="mem-section">
