@@ -89,25 +89,38 @@ export default async function handler(req, res) {
         }),
       });
 
-      // Send email notification to admin
+      // Send email notification to admin. Every member-supplied field has
+      // to be HTML-escaped — a comment body is free-text and gets rendered
+      // as HTML in the admin's inbox, which is otherwise a stored-XSS path
+      // out of the admin trust boundary.
       if (RESEND_API_KEY) {
         try {
+          const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
+            c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === '"' ? "&quot;" : "&#39;"
+          ));
+          const safeEventTitle = esc(eventTitle);
+          const safeFrom = esc(member.name || member.email);
+          const safeEmail = esc(member.email);
+          // Escape first, THEN replace the now-escaped newline with a <br>.
+          const safeComment = esc(comment_text.trim()).replace(/\n/g, "<br>");
+          const safeSubject = `New comment on "${eventTitle || ""}" from ${member.name || member.email}`
+            .replace(/[\r\n]/g, " ");
           await fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify({
               from: FROM_EMAIL,
               to: ["starter@hour.golf"],
-              subject: `New comment on "${eventTitle}" from ${member.name || member.email}`,
+              subject: safeSubject,
               html: `
                 <div style="font-family: sans-serif; max-width: 500px;">
                   <h3 style="color: #4C8D73;">New Event Comment</h3>
-                  <p><strong>Event:</strong> ${eventTitle}</p>
-                  <p><strong>From:</strong> ${member.name || member.email} (${member.email})</p>
+                  <p><strong>Event:</strong> ${safeEventTitle}</p>
+                  <p><strong>From:</strong> ${safeFrom} (${safeEmail})</p>
                   <div style="background: #f5f5f5; padding: 12px 16px; border-radius: 8px; margin: 12px 0;">
-                    <p style="margin: 0;">${comment_text.trim().replace(/\n/g, "<br>")}</p>
+                    <p style="margin: 0;">${safeComment}</p>
                   </div>
-                  <p style="font-size: 12px; color: #888;">Reply to this member at ${member.email}</p>
+                  <p style="font-size: 12px; color: #888;">Reply to this member at ${safeEmail}</p>
                 </div>
               `,
             }),

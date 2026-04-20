@@ -1,4 +1,5 @@
 import { verifyAdmin, getServiceKey, SUPABASE_URL } from "../../lib/api-helpers";
+import { validateImageUpload } from "../../lib/security";
 
 export const config = {
   api: {
@@ -23,13 +24,14 @@ export default async function handler(req, res) {
   // tenants. Old URLs remain valid because existing files aren't moved.
   const storagePath = `${tenantId}/${safe}`;
 
-  const contentType = req.headers["content-type"] || "application/octet-stream";
-
   try {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     const body = Buffer.concat(chunks);
     if (!body.length) return res.status(400).json({ error: "Empty body" });
+
+    const contentType = validateImageUpload(req, res, body);
+    if (!contentType) return;
 
     const key = getServiceKey();
     const resp = await fetch(`${SUPABASE_URL}/storage/v1/object/events/${storagePath}`, {

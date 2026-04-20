@@ -2,6 +2,7 @@
 // Browser sends raw file bytes; we verify the caller is an admin and then
 // forward to Supabase Storage using the service role key, which bypasses RLS.
 import { verifyAdmin, getServiceKey, SUPABASE_URL } from "../../lib/api-helpers";
+import { validateImageUpload } from "../../lib/security";
 
 export const config = {
   api: {
@@ -31,8 +32,6 @@ export default async function handler(req, res) {
   // existing files aren't moved — only new uploads land under the prefix.
   const storagePath = `${tenantId}/${safe}`;
 
-  const contentType = req.headers["content-type"] || "application/octet-stream";
-
   try {
     // Read raw body bytes.
     const chunks = [];
@@ -40,6 +39,12 @@ export default async function handler(req, res) {
     const body = Buffer.concat(chunks);
 
     if (!body.length) return res.status(400).json({ error: "Empty body" });
+
+    // Verify the magic bytes, then send the sniffed MIME to Storage rather
+    // than the client-supplied Content-Type. Prevents stored XSS via
+    // content-type confusion.
+    const contentType = validateImageUpload(req, res, body);
+    if (!contentType) return;
 
     const key = getServiceKey();
     const resp = await fetch(`${SUPABASE_URL}/storage/v1/object/logos/${storagePath}`, {
