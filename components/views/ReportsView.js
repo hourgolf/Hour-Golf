@@ -88,8 +88,50 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
   );
 
   /* ── REVENUE data ───────────────────────────────── */
+  //
+  // Source of truth: the `payments` table. Every Stripe charge
+  // (subscriptions, overages, non-member bookings, in-app retail) AND
+  // every Square POS sale lands there with its own row, so we can
+  // bucket by description + source instead of inventing revenue from
+  // membership counts × monthly fee. The previous calc multiplied
+  // active members by their tier fee even when payments hadn't
+  // landed, conflated overage and non-member booking with the
+  // catch-all sum-of-payments, and never counted retail at all.
+  //
+  // Net = amount_cents - refunded_cents. status='succeeded' AND
+  // status='refunded' both contribute (a fully-refunded row nets to
+  // 0 naturally; a partially-refunded row still has revenue).
+  // status='pending' and 'failed' are excluded.
+  //
+  // Buckets (heuristic on description + source):
+  //   Membership          — recurring subscription invoice
+  //   Overage             — manual overage charge
+  //   Non-member booking  — pay-per-bay charge for a non-member
+  //   Pro Shop            — in-app retail charged via Stripe
+  //   In-store retail     — Square POS sale (source='square_pos')
+  //   Other               — anything we can't classify
+  function classifyPayment(p) {
+    if (p.source === "square_pos") return "In-store retail";
+    const desc = String(p.description || "").toLowerCase();
+    if (/(membership|unlimited)/.test(desc)) return "Membership";
+    if (/^overage/.test(desc)) return "Overage";
+    if (/^bay |non[- ]?member/.test(desc)) return "Non-member booking";
+    if (/^in-store purchase/.test(desc)) return "In-store retail";
+    return "Pro Shop";
+  }
+  const REVENUE_BUCKETS = ["Membership", "Pro Shop", "In-store retail", "Overage", "Non-member booking", "Other"];
+  const BUCKET_COLORS = {
+    "Membership":         "var(--primary)",
+    "Pro Shop":           "#8BB5A0",
+    "In-store retail":    "#5C7A6B",
+    "Overage":            "#ddd480",
+    "Non-member booking": "#C9A14C",
+    "Other":              "var(--border)",
+  };
+
   const revenue = useMemo(() => {
-    // MRR by tier (always current snapshot)
+    // Forward-looking MRR snapshot (active subscriptions × tier fee).
+    // Kept as a secondary KPI distinct from actual cash.
     const byTier = {};
     TIERS.filter((t) => t !== "Non-Member").forEach((t) => {
       const count = activeMembers.filter((m) => m.tier === t).length;
@@ -98,70 +140,75 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
     });
     const mrr = Object.values(byTier).reduce((s, v) => s + v.total, 0);
 
-    // Non-member revenue by month (hours × $60)
-    const nmRevByMonth = {};
-    const memberEmails = new Set(activeMembers.map((m) => m.email));
-    activeBk.forEach((b) => {
-      if (memberEmails.has(b.customer_email)) return;
-      const k = monthKey(new Date(b.booking_start));
-      nmRevByMonth[k] = (nmRevByMonth[k] || 0) + Number(b.duration_hours || 0) * 60;
-    });
-
-    // Member revenue by month
-    const mRevByMonth = {};
-    const allMos = new Set();
-    activeBk.forEach((b) => { allMos.add(monthKey(new Date(b.booking_start))); });
-    const monthMemberHrs = {};
-    activeBk.forEach((b) => {
-      const k = monthKey(new Date(b.booking_start));
-      if (!monthMemberHrs[k]) monthMemberHrs[k] = {};
-      if (memberEmails.has(b.customer_email)) {
-        monthMemberHrs[k][b.customer_email] = true;
-      }
-    });
-    [...allMos].forEach((k) => {
-      let memRev = 0;
-      const activeInMonth = monthMemberHrs[k] || {};
-      activeMembers.forEach((m) => {
-        if (activeInMonth[m.email]) {
-          memRev += Number(tierMap[m.tier]?.monthly_fee || 0);
-        }
-      });
-      mRevByMonth[k] = memRev;
-    });
-
-    // Overage revenue by month
-    const overByMonth = {};
+    // Per-month, per-bucket actual revenue.
+    const months = new Set();
+    const byMonth = {}; // month -> { bucket -> dollars, gross, refunded }
+    let totalRefunded = 0;
     (payments || []).forEach((p) => {
-      if (p.status !== "succeeded") return;
-      const k = monthKey(new Date(p.billing_month));
-      overByMonth[k] = (overByMonth[k] || 0) + Number(p.amount_cents || 0) / 100;
+      if (p.status !== "succeeded" && p.status !== "refunded") return;
+      const dateSrc = p.billing_month || p.created_at;
+      if (!dateSrc) return;
+      const d = new Date(dateSrc);
+      if (isNaN(d)) return;
+      const k = monthKey(d);
+      const gross = Number(p.amount_cents || 0) / 100;
+      const refunded = Number(p.refunded_cents || 0) / 100;
+      // Treat status='refunded' rows with refunded_cents=0 as fully
+      // refunded (some legacy refund rows didn't update the column).
+      const effectiveRefund = (p.status === "refunded" && refunded === 0) ? gross : refunded;
+      const net = Math.max(0, gross - effectiveRefund);
+      const bucket = classifyPayment(p);
+      months.add(k);
+      if (!byMonth[k]) byMonth[k] = { gross: 0, refunded: 0 };
+      byMonth[k][bucket] = (byMonth[k][bucket] || 0) + net;
+      byMonth[k].gross += gross;
+      byMonth[k].refunded += effectiveRefund;
+      totalRefunded += effectiveRefund;
     });
 
-    // Combined monthly trend (last 6 months) — always unfiltered for navigation
-    const sortedMonths = [...allMos].sort().slice(-6);
-    const trend = sortedMonths.map((k) => ({
-      month: k,
-      label: monthLabelShort(k),
-      membership: mRevByMonth[k] || 0,
-      nonMember: nmRevByMonth[k] || 0,
-      overage: overByMonth[k] || 0,
-      total: (mRevByMonth[k] || 0) + (nmRevByMonth[k] || 0) + (overByMonth[k] || 0),
-    }));
+    // Trend: last 6 months by date desc → reversed for display.
+    const sortedMonths = [...months].sort().slice(-6);
+    const trend = sortedMonths.map((k) => {
+      const m = byMonth[k] || {};
+      const total = REVENUE_BUCKETS.reduce((s, b) => s + (m[b] || 0), 0);
+      return {
+        month: k,
+        label: monthLabelShort(k),
+        total,
+        buckets: REVENUE_BUCKETS.reduce((acc, b) => ({ ...acc, [b]: m[b] || 0 }), {}),
+        gross: m.gross || 0,
+        refunded: m.refunded || 0,
+      };
+    });
 
-    // Selected month totals for KPIs
+    // Selected-month detail.
     let selTotal = null;
     if (selMonth) {
+      const m = byMonth[selMonth] || {};
+      const total = REVENUE_BUCKETS.reduce((s, b) => s + (m[b] || 0), 0);
       selTotal = {
-        membership: mRevByMonth[selMonth] || 0,
-        nonMember: nmRevByMonth[selMonth] || 0,
-        overage: overByMonth[selMonth] || 0,
-        total: (mRevByMonth[selMonth] || 0) + (nmRevByMonth[selMonth] || 0) + (overByMonth[selMonth] || 0),
+        total,
+        buckets: REVENUE_BUCKETS.reduce((acc, b) => ({ ...acc, [b]: m[b] || 0 }), {}),
+        gross: m.gross || 0,
+        refunded: m.refunded || 0,
       };
     }
 
-    return { byTier, mrr, trend, selTotal };
-  }, [activeMembers, activeBk, tierMap, payments, selMonth]);
+    // All-time totals (for the no-month-selected KPI).
+    const allTimeBuckets = REVENUE_BUCKETS.reduce((acc, b) => ({ ...acc, [b]: 0 }), {});
+    let allTimeNet = 0;
+    Object.values(byMonth).forEach((m) => {
+      REVENUE_BUCKETS.forEach((b) => {
+        allTimeBuckets[b] += (m[b] || 0);
+        allTimeNet += (m[b] || 0);
+      });
+    });
+
+    return {
+      byTier, mrr, trend, selTotal,
+      allTimeBuckets, allTimeNet, totalRefunded,
+    };
+  }, [activeMembers, tierMap, payments, selMonth]);
 
   /* ── USAGE data ─────────────────────────────────── */
   const usage = useMemo(() => {
@@ -401,96 +448,158 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
 
   /* ── REVENUE section ────────────────────────────── */
   function renderRevenue() {
-    const maxTier = Math.max(1, ...Object.values(revenue.byTier).map((v) => v.total));
-    const maxTrend = Math.max(1, ...revenue.trend.map((t) => t.total));
+    // Active set: selected month if one is picked, else all-time.
+    const active = revenue.selTotal || {
+      total: revenue.allTimeNet,
+      buckets: revenue.allTimeBuckets,
+      gross: revenue.allTimeNet + revenue.totalRefunded,
+      refunded: revenue.totalRefunded,
+    };
+    const activeLabel = selMonth ? monthSuffix : " (All Time)";
 
-    // KPI values — switch between all-time and selected month
-    const kpiRev = revenue.selTotal ? dlr(revenue.selTotal.total) : dlr(revenue.mrr);
-    const kpiLabel = revenue.selTotal ? `Total Revenue${monthSuffix}` : "Monthly Recurring Revenue";
+    // Sort buckets desc by their value for the breakdown bars.
+    const bucketRows = REVENUE_BUCKETS
+      .map((b) => ({ name: b, value: active.buckets[b] || 0 }))
+      .filter((r) => r.value > 0)
+      .sort((a, b) => b.value - a.value);
+    const maxBucket = Math.max(1, ...bucketRows.map((r) => r.value));
 
     return (
       <>
+        {/* KPI row — actual revenue first (the number the operator
+            wants), then the secondary forecast MRR + member counts. */}
         <div className="rpt-kpis">
           <div className="rpt-kpi">
-            <div className="rpt-kpi-val">{kpiRev}</div>
-            <div className="rpt-kpi-lbl">{kpiLabel}</div>
+            <div className="rpt-kpi-val">{dlr(active.total)}</div>
+            <div className="rpt-kpi-lbl">Total Revenue{activeLabel}</div>
+          </div>
+          <div className="rpt-kpi">
+            <div className="rpt-kpi-val">{dlr(revenue.mrr)}</div>
+            <div className="rpt-kpi-lbl">Forecast MRR</div>
           </div>
           <div className="rpt-kpi">
             <div className="rpt-kpi-val">{activeMembers.length}</div>
             <div className="rpt-kpi-lbl">Paying Members</div>
           </div>
-          <div className="rpt-kpi">
-            <div className="rpt-kpi-val">{activeMembers.length ? dlr(revenue.mrr / activeMembers.length) : "$0"}</div>
-            <div className="rpt-kpi-lbl">Avg Revenue / Member</div>
+        </div>
+
+        {/* Revenue breakdown — actual cash by source/bucket. The
+            single most useful view: how much came from where, net of
+            refunds, for the active period. */}
+        <h3 className="rpt-sub-head">Revenue by Source{activeLabel}</h3>
+        {bucketRows.length === 0 ? (
+          <p className="muted">No payments in this period yet.</p>
+        ) : (
+          <div className="rpt-bars">
+            {bucketRows.map((r) => (
+              <Bar
+                key={r.name}
+                label={r.name}
+                value={r.value}
+                max={maxBucket}
+                color={BUCKET_COLORS[r.name] || "var(--primary)"}
+                subLabel={`${dlr(r.value)} (${active.total > 0 ? Math.round((r.value / active.total) * 100) : 0}%)`}
+              />
+            ))}
           </div>
-        </div>
+        )}
+        {active.refunded > 0 && (
+          <p className="muted" style={{ marginTop: -8, marginBottom: 16, fontSize: 12 }}>
+            Net of {dlr(active.refunded)} in refunds (gross was {dlr(active.gross)}).
+          </p>
+        )}
 
-        {/* Revenue by tier */}
-        <h3 className="rpt-sub-head">Revenue by Tier</h3>
-        <div className="rpt-bars">
-          {TIERS.filter((t) => t !== "Non-Member").map((t) => (
-            <Bar
-              key={t}
-              label={`${t} (${revenue.byTier[t].count})`}
-              value={revenue.byTier[t].total}
-              max={maxTier}
-              color={(TIER_COLORS[t] || {}).bg}
-              subLabel={dlr(revenue.byTier[t].total)}
-            />
-          ))}
-        </div>
-
-        {/* Monthly trend — line chart */}
-        <h3 className="rpt-sub-head">Monthly Revenue Trend</h3>
-        {revenue.trend.length > 0 ? (
+        {/* Monthly trend — stacked bars per bucket so the operator
+            can see WHERE growth is coming from at a glance. Click a
+            month to drill in (sets selMonth which the rest of Reports
+            already respects). */}
+        <h3 className="rpt-sub-head">Monthly Revenue (Last 6 Months)</h3>
+        {revenue.trend.length === 0 ? (
+          <p className="muted">No data yet</p>
+        ) : (
           <>
-            <div className="tbl" style={{ padding: 16, marginBottom: 20 }}>
-              {(() => {
-                const data = revenue.trend;
-                const maxVal = Math.max(1, ...data.map((d) => d.total));
-                const W = 640, H = 220, PL = 50, PR = 10, PT = 14, PB = 30;
-                const plotW = W - PL - PR;
-                const plotH = H - PT - PB;
-                const pts = data.map((d, i) => ({
-                  x: PL + (i / Math.max(data.length - 1, 1)) * plotW,
-                  y: PT + plotH - (d.total / maxVal) * plotH,
-                }));
-                const polyline = pts.map((p) => `${p.x},${p.y}`).join(" ");
-                const area = polyline + ` ${PL + plotW},${PT + plotH} ${PL},${PT + plotH}`;
-                const gridLines = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(maxVal * f));
+            <div className="rpt-chart">
+              {revenue.trend.map((t) => {
+                const max = Math.max(1, ...revenue.trend.map((m) => m.total));
+                const isSel = selMonth === t.month;
+                // Build the stacked bar segments — biggest bucket on bottom.
+                const segs = REVENUE_BUCKETS
+                  .filter((b) => (t.buckets[b] || 0) > 0)
+                  .sort((a, b) => (t.buckets[b] || 0) - (t.buckets[a] || 0));
                 return (
-                  <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: 700, height: "auto", display: "block" }}>
-                    {gridLines.map((v) => {
-                      const y = PT + plotH - (v / maxVal) * plotH;
-                      return (
-                        <g key={v}>
-                          <line x1={PL} y1={y} x2={PL + plotW} y2={y} stroke="var(--border)" strokeWidth="0.5" />
-                          <text x={PL - 4} y={y + 3} textAnchor="end" style={{ fontSize: 8, fontFamily: "var(--font-mono)", fill: "var(--text-muted)" }}>${(v / 1000).toFixed(1)}k</text>
-                        </g>
-                      );
-                    })}
-                    <polygon points={area} fill="rgba(76,141,115,0.12)" />
-                    <polyline points={polyline} fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-                    {pts.map((p, i) => (
-                      <g key={i} onClick={() => setSelMonth(selMonth === data[i].month ? null : data[i].month)} style={{ cursor: "pointer" }}>
-                        <circle cx={p.x} cy={p.y} r={selMonth === data[i].month ? 5 : 3.5} fill={selMonth === data[i].month ? "var(--text)" : "var(--primary)"} />
-                        <title>{data[i].label}: {dlr(data[i].total)}</title>
-                      </g>
-                    ))}
-                    {data.map((d, i) => {
-                      const x = PL + (i / Math.max(data.length - 1, 1)) * plotW;
-                      return (
-                        <text key={d.month} x={x} y={H - 6} textAnchor="middle" style={{ fontSize: 9, fontFamily: "var(--font-mono)", fontWeight: selMonth === d.month ? 700 : 600, fill: "var(--text-muted)", textTransform: "uppercase" }}>
-                          {d.label}
-                        </text>
-                      );
-                    })}
-                  </svg>
+                  <div
+                    key={t.month}
+                    className="rpt-chart-col"
+                    onClick={() => setSelMonth(isSel ? null : t.month)}
+                    style={{ cursor: "pointer", opacity: selMonth && !isSel ? 0.45 : 1, transition: "opacity 0.2s" }}
+                  >
+                    <div className="rpt-chart-bar-wrap">
+                      <div
+                        style={{
+                          width: "100%",
+                          maxWidth: 48,
+                          height: `${(t.total / max) * 100}%`,
+                          minHeight: 4,
+                          display: "flex",
+                          flexDirection: "column-reverse",
+                          borderRadius: "var(--radius) var(--radius) 0 0",
+                          overflow: "hidden",
+                          border: isSel ? "2px solid var(--text)" : "none",
+                        }}
+                        title={`${t.label}: ${dlr(t.total)}`}
+                      >
+                        {segs.map((b) => {
+                          const v = t.buckets[b] || 0;
+                          return (
+                            <div
+                              key={b}
+                              style={{
+                                height: `${(v / t.total) * 100}%`,
+                                background: BUCKET_COLORS[b] || "var(--primary)",
+                              }}
+                              title={`${b}: ${dlr(v)}`}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="rpt-chart-lbl" style={{ fontWeight: isSel ? 700 : 600 }}>{t.label}</div>
+                    <div className="rpt-chart-amt">{dlr(t.total)}</div>
+                  </div>
                 );
-              })()}
+              })}
+            </div>
+            {/* Legend for the stacked-bar colors. */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 4, marginBottom: 24, fontSize: 11 }}>
+              {REVENUE_BUCKETS.filter((b) => (revenue.allTimeBuckets[b] || 0) > 0).map((b) => (
+                <span key={b} style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--text-muted)" }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 2, background: BUCKET_COLORS[b] }} />
+                  {b}
+                </span>
+              ))}
             </div>
           </>
-        ) : <p className="muted">No data yet</p>}
+        )}
+
+        {/* Active subscriptions snapshot — kept but reframed as a
+            forecast (what we EXPECT to bill next cycle), not as
+            recognized revenue. */}
+        <h3 className="rpt-sub-head">Active Subscriptions by Tier (Forecast MRR)</h3>
+        <div className="rpt-bars">
+          {TIERS.filter((t) => t !== "Non-Member").map((t) => {
+            const maxTier = Math.max(1, ...Object.values(revenue.byTier).map((v) => v.total));
+            return (
+              <Bar
+                key={t}
+                label={`${t} (${revenue.byTier[t].count})`}
+                value={revenue.byTier[t].total}
+                max={maxTier}
+                color={(TIER_COLORS[t] || {}).bg}
+                subLabel={dlr(revenue.byTier[t].total)}
+              />
+            );
+          })}
+        </div>
       </>
     );
   }
