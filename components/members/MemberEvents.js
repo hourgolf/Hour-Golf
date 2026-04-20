@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
+import { optimizedImageUrl } from "../../lib/branding";
 
 export default function MemberEvents({ member, showToast }) {
   const router = useRouter();
@@ -58,7 +59,7 @@ export default function MemberEvents({ member, showToast }) {
             onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
           >
             {ev.image_url ? (
-              <img src={ev.image_url} alt="" style={{ width: "100%", height: 160, objectFit: "cover" }} />
+              <img src={optimizedImageUrl(ev.image_url, { width: 828 })} alt="" loading="lazy" decoding="async" style={{ width: "100%", height: 160, objectFit: "cover" }} />
             ) : (
               <div style={{
                 width: "100%", height: 160, background: "var(--border)",

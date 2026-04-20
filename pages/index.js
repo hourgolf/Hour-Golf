@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { supaPost, supaPatch, supaDelete } from "../lib/supabase";
 
 // Per-request render so Vercel's Edge CDN never caches this tenant-branded
@@ -21,15 +22,22 @@ import LoginForm from "../components/forms/LoginForm";
 import BookingForm from "../components/forms/BookingForm";
 import SyncModal from "../components/forms/SyncModal";
 import TodayView from "../components/views/TodayView";
-import WeekView from "../components/views/WeekView";
-import OverviewView from "../components/views/OverviewView";
-import CustomersView from "../components/views/CustomersView";
-import ConfigView from "../components/views/ConfigView";
-import DetailView from "../components/views/DetailView";
-import ReportsView from "../components/views/ReportsView";
-import EventsView from "../components/views/EventsView";
-import ShopAdminView from "../components/views/ShopAdminView";
-import SettingsView from "../components/views/SettingsView";
+
+// Non-default views are loaded on demand. TodayView stays eager because it
+// renders on login + /?view=today is the default landing. The other eight
+// views ship as separate chunks (saves ~1.5k LOC on the initial admin load).
+// ssr:false is safe: the parent page is getServerSideProps with no-cache and
+// every view reads from client-only auth state.
+const dynLoading = () => <div className="loading">Loading…</div>;
+const WeekView = dynamic(() => import("../components/views/WeekView"), { loading: dynLoading, ssr: false });
+const OverviewView = dynamic(() => import("../components/views/OverviewView"), { loading: dynLoading, ssr: false });
+const CustomersView = dynamic(() => import("../components/views/CustomersView"), { loading: dynLoading, ssr: false });
+const ConfigView = dynamic(() => import("../components/views/ConfigView"), { loading: dynLoading, ssr: false });
+const DetailView = dynamic(() => import("../components/views/DetailView"), { loading: dynLoading, ssr: false });
+const ReportsView = dynamic(() => import("../components/views/ReportsView"), { loading: dynLoading, ssr: false });
+const EventsView = dynamic(() => import("../components/views/EventsView"), { loading: dynLoading, ssr: false });
+const ShopAdminView = dynamic(() => import("../components/views/ShopAdminView"), { loading: dynLoading, ssr: false });
+const SettingsView = dynamic(() => import("../components/views/SettingsView"), { loading: dynLoading, ssr: false });
 
 export default function Dashboard() {
   // Auth (email/password against Supabase Auth, gated by admins table)

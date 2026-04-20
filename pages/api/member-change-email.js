@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { getSessionWithMember } from "../../lib/member-session";
+import { requireSameOrigin } from "../../lib/security";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -14,6 +15,7 @@ function parseCookies(cookieHeader) {
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+  if (!requireSameOrigin(req, res)) return;
 
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });

@@ -15,6 +15,7 @@
 
 import { verifyPlatformAdmin } from "../../lib/platform-auth";
 import { getServiceKey, SUPABASE_URL } from "../../lib/api-helpers";
+import { validateImageUpload } from "../../lib/security";
 
 export const config = {
   api: {
@@ -58,10 +59,6 @@ export default async function handler(req, res) {
   }
 
   const storagePath = `${tenantId}/${safe}`;
-  const contentType =
-    kind === "font"
-      ? "font/woff2"
-      : req.headers["content-type"] || "application/octet-stream";
 
   try {
     const chunks = [];
@@ -71,6 +68,18 @@ export default async function handler(req, res) {
 
     if (kind === "font" && body.length > 2 * 1024 * 1024) {
       return res.status(413).json({ error: "Font file too large. Keep under 2MB." });
+    }
+
+    // Fonts: trust the .woff2 extension guard + fixed MIME; we have no magic-
+    // byte sniff for woff2 here. Images: sniff the buffer and reject anything
+    // that isn't a known-safe type; this prevents serving an HTML file as an
+    // image and opening a stored-XSS path from a compromised admin account.
+    let contentType;
+    if (kind === "font") {
+      contentType = "font/woff2";
+    } else {
+      contentType = validateImageUpload(req, res, body);
+      if (!contentType) return;
     }
 
     const key = getServiceKey();

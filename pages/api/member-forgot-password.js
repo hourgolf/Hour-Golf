@@ -2,9 +2,16 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { sendPasswordResetEmail } from "../../lib/email";
+import { enforceRateLimit, requireSameOrigin } from "../../lib/security";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+
+  if (!requireSameOrigin(req, res)) return;
+  // Spam vector: hit this on an arbitrary address and we send a reset email.
+  // 3/hour per IP blocks email-bombing without inconveniencing a real user
+  // who mistyped their email a couple of times.
+  if (!enforceRateLimit(req, res, { bucket: "pwreset", limit: 3, windowMs: 60 * 60 * 1000 })) return;
 
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });

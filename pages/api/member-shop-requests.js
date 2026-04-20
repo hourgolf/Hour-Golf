@@ -9,6 +9,7 @@
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { getSessionWithMember } from "../../lib/member-session";
 import { sendShopRequestAdminNotification } from "../../lib/email";
+import { requireSameOrigin } from "../../lib/security";
 
 function parseCookies(cookieHeader) {
   const cookies = {};
@@ -26,7 +27,20 @@ const TRIMMABLE_STRING_FIELDS = [
   "member_phone",
 ];
 
+// image_url must point at our own Supabase Storage — never accept an
+// arbitrary URL supplied in the request body, since the admin UI + email
+// embed it as an <img src>. The only way to populate it is via
+// /api/member-upload-image, which returns URLs under this prefix.
+const ALLOWED_IMAGE_URL_PREFIX =
+  (process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    "https://uxpkqbioxoezjmcoylkw.supabase.co") +
+  "/storage/v1/object/public/shop/";
+
 export default async function handler(req, res) {
+  if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+    if (!requireSameOrigin(req, res)) return;
+  }
+
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
@@ -69,6 +83,21 @@ export default async function handler(req, res) {
         const s = String(body[f] || "").trim();
         row[f] = s ? s.slice(0, 2000) : null;
       }
+    }
+
+    // image_url is accepted only if it points at our own Supabase Storage
+    // shop bucket. Blocks the trivial "set image_url to an attacker's URL
+    // that the admin's inbox will render" attack.
+    if (body.image_url !== undefined) {
+      const raw = String(body.image_url || "").trim();
+      if (!raw) {
+        row.image_url = null;
+      } else if (raw.startsWith(ALLOWED_IMAGE_URL_PREFIX)) {
+        row.image_url = raw.slice(0, 2000);
+      }
+      // Silently drop anything else — frontend should never send a
+      // non-matching URL; if it does, we still save the request without
+      // the image rather than erroring the whole submission.
     }
 
     const r = await fetch(`${SUPABASE_URL}/rest/v1/shop_requests`, {

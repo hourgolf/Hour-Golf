@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Modal from "../ui/Modal";
+import { optimizedImageUrl } from "../../lib/branding";
 
 const STATUS_COLORS = {
   pending: "#E8A838",
@@ -128,7 +129,40 @@ export default function MemberShop({ member, tierConfig, showToast }) {
       reference_url: "",
       notes: "",
       member_phone: member.phone || "",
+      image_url: "",
+      uploadingImage: false,
+      uploadError: "",
     });
+  }
+
+  async function handleRequestImagePick(file) {
+    if (!file) return;
+    if (!/^image\//.test(file.type)) {
+      setRequestForm((f) => ({ ...f, uploadError: "Please pick an image file." }));
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setRequestForm((f) => ({ ...f, uploadError: "Image too large (max 5MB). Try a smaller photo." }));
+      return;
+    }
+    setRequestForm((f) => ({ ...f, uploadingImage: true, uploadError: "" }));
+    try {
+      const r = await fetch("/api/member-upload-image?purpose=shop-request", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Upload failed");
+      setRequestForm((f) => ({ ...f, image_url: d.url, uploadingImage: false, uploadError: "" }));
+    } catch (e) {
+      setRequestForm((f) => ({ ...f, uploadingImage: false, uploadError: e.message || "Upload failed" }));
+    }
+  }
+
+  function clearRequestImage() {
+    setRequestForm((f) => ({ ...f, image_url: "", uploadError: "" }));
   }
 
   async function submitRequest() {
@@ -154,6 +188,7 @@ export default function MemberShop({ member, tierConfig, showToast }) {
           notes: draft.notes?.trim() || null,
           member_phone: draft.member_phone?.trim() || null,
           member_name: member.name,
+          image_url: draft.image_url || null,
         }),
       });
       const d = await r.json();
@@ -490,7 +525,7 @@ export default function MemberShop({ member, tierConfig, showToast }) {
                 <div key={c.cart_id} className="mem-section" style={{ marginBottom: 10, padding: "12px 14px" }}>
                   <div style={{ display: "flex", gap: 12 }}>
                     {c.image_url ? (
-                      <img src={c.image_url} alt="" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
+                      <img src={optimizedImageUrl(c.image_url, { width: 128 })} alt="" loading="lazy" decoding="async" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
                     ) : (
                       <div style={{ width: 64, height: 64, borderRadius: 8, background: "var(--border)", flexShrink: 0 }} />
                     )}
@@ -733,7 +768,7 @@ export default function MemberShop({ member, tierConfig, showToast }) {
           <>
             {modalImages.length > 0 && (
               <div style={{ position: "relative", marginBottom: 16 }}>
-                <img src={modalImages[galleryIdx]} alt="" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8 }} />
+                <img src={optimizedImageUrl(modalImages[galleryIdx], { width: 1080 })} alt="" loading="lazy" decoding="async" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8 }} />
                 {modalImages.length > 1 && (
                   <>
                     <button onClick={() => setGalleryIdx((i) => (i - 1 + modalImages.length) % modalImages.length)} style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.4)", color: "#fff", fontSize: 16, cursor: "pointer" }}>&lsaquo;</button>
@@ -1005,6 +1040,13 @@ export default function MemberShop({ member, tierConfig, showToast }) {
                 onChange={(v) => setRequestForm({ ...requestForm, reference_url: v })}
                 placeholder="Paste a link from anywhere you saw it"
               />
+              <RequestPhotoField
+                imageUrl={requestForm.image_url}
+                uploading={requestForm.uploadingImage}
+                error={requestForm.uploadError}
+                onPick={handleRequestImagePick}
+                onClear={clearRequestImage}
+              />
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: 4 }}>Notes (optional)</label>
                 <textarea
@@ -1058,6 +1100,77 @@ function RequestField({ label, required, value, onChange, placeholder }) {
   );
 }
 
+// Photo upload for the Request-an-item form. One image per request.
+// The input is hidden and triggered by the button so we can style the
+// target freely; accept="image/*" + the absence of `capture` lets iOS
+// offer both "Take Photo" and "Choose from Library" — better UX than
+// forcing either one.
+function RequestPhotoField({ imageUrl, uploading, error, onPick, onClear }) {
+  return (
+    <div>
+      <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: 4 }}>
+        Photo (optional)
+      </label>
+
+      {imageUrl ? (
+        <div style={{ position: "relative", width: "100%", borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)" }}>
+          <img
+            src={imageUrl}
+            alt="Requested item"
+            style={{ width: "100%", maxHeight: 220, objectFit: "cover", display: "block" }}
+          />
+          <button
+            type="button"
+            onClick={onClear}
+            aria-label="Remove photo"
+            style={{
+              position: "absolute", top: 8, right: 8,
+              width: 32, height: 32, borderRadius: "50%",
+              background: "rgba(0,0,0,0.55)", color: "#fff",
+              border: "none", cursor: "pointer",
+              fontSize: 16, lineHeight: 1,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            ×
+          </button>
+        </div>
+      ) : (
+        <label
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            gap: 8,
+            width: "100%", padding: "14px 10px",
+            border: "1px dashed var(--border)", borderRadius: 8,
+            fontSize: 13, color: "var(--text-muted)",
+            cursor: uploading ? "default" : "pointer",
+            background: uploading ? "var(--border)" : "transparent",
+            boxSizing: "border-box",
+          }}
+        >
+          <span aria-hidden="true" style={{ fontSize: 16 }}>📷</span>
+          <span>{uploading ? "Uploading…" : "Snap or upload a photo"}</span>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = ""; // let the member re-pick the same file after clearing
+              onPick(f);
+            }}
+            disabled={uploading}
+            style={{ display: "none" }}
+          />
+        </label>
+      )}
+
+      {error && (
+        <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--danger, #C92F1F)" }}>{error}</p>
+      )}
+    </div>
+  );
+}
+
 function ItemCard({ item, discountPct, onClick }) {
   const imgUrl = item.image_urls?.length > 0 ? item.image_urls[0] : item.image_url;
   return (
@@ -1076,7 +1189,7 @@ function ItemCard({ item, discountPct, onClick }) {
     >
       {imgUrl ? (
         <div style={{ position: "relative" }}>
-          <img src={imgUrl} alt="" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }} />
+          <img src={optimizedImageUrl(imgUrl, { width: 640 })} alt="" loading="lazy" decoding="async" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }} />
           {item.sold_out && (
             <div style={{ position: "absolute", inset: 0, background: "rgba(53,68,59,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <span style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#EDF3E3", fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Sold Out</span>

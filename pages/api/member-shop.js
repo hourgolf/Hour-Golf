@@ -9,6 +9,7 @@ import { sendShopOrderNotification } from "../../lib/email";
 import { assertFeature } from "../../lib/feature-guard";
 import { getSessionWithMember } from "../../lib/member-session";
 import { pacificMonthWindow } from "../../lib/format";
+import { requireSameOrigin } from "../../lib/security";
 
 // Phase 7B-2b: per-tenant Stripe client via lib/stripe-config.
 
@@ -49,6 +50,10 @@ function sb(key, path, opts = {}) {
 }
 
 export default async function handler(req, res) {
+  if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+    if (!requireSameOrigin(req, res)) return;
+  }
+
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
