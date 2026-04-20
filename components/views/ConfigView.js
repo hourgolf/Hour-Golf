@@ -997,6 +997,24 @@ function ShopRequestsSection({ jwt }) {
                 </div>
               )}
 
+              {r.image_url && (
+                <a
+                  href={r.image_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open full size"
+                  style={{ display: "block", marginTop: 2 }}
+                >
+                  <img
+                    src={r.image_url}
+                    alt="Member photo"
+                    loading="lazy"
+                    decoding="async"
+                    style={{ maxWidth: 180, maxHeight: 180, objectFit: "cover", borderRadius: 6, border: "1px solid var(--border)" }}
+                  />
+                </a>
+              )}
+
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
                 {REQUEST_STATUSES.map((s) => (
                   <button

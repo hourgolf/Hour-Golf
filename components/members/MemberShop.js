@@ -129,7 +129,40 @@ export default function MemberShop({ member, tierConfig, showToast }) {
       reference_url: "",
       notes: "",
       member_phone: member.phone || "",
+      image_url: "",
+      uploadingImage: false,
+      uploadError: "",
     });
+  }
+
+  async function handleRequestImagePick(file) {
+    if (!file) return;
+    if (!/^image\//.test(file.type)) {
+      setRequestForm((f) => ({ ...f, uploadError: "Please pick an image file." }));
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setRequestForm((f) => ({ ...f, uploadError: "Image too large (max 5MB). Try a smaller photo." }));
+      return;
+    }
+    setRequestForm((f) => ({ ...f, uploadingImage: true, uploadError: "" }));
+    try {
+      const r = await fetch("/api/member-upload-image?purpose=shop-request", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Upload failed");
+      setRequestForm((f) => ({ ...f, image_url: d.url, uploadingImage: false, uploadError: "" }));
+    } catch (e) {
+      setRequestForm((f) => ({ ...f, uploadingImage: false, uploadError: e.message || "Upload failed" }));
+    }
+  }
+
+  function clearRequestImage() {
+    setRequestForm((f) => ({ ...f, image_url: "", uploadError: "" }));
   }
 
   async function submitRequest() {
@@ -155,6 +188,7 @@ export default function MemberShop({ member, tierConfig, showToast }) {
           notes: draft.notes?.trim() || null,
           member_phone: draft.member_phone?.trim() || null,
           member_name: member.name,
+          image_url: draft.image_url || null,
         }),
       });
       const d = await r.json();
@@ -1006,6 +1040,13 @@ export default function MemberShop({ member, tierConfig, showToast }) {
                 onChange={(v) => setRequestForm({ ...requestForm, reference_url: v })}
                 placeholder="Paste a link from anywhere you saw it"
               />
+              <RequestPhotoField
+                imageUrl={requestForm.image_url}
+                uploading={requestForm.uploadingImage}
+                error={requestForm.uploadError}
+                onPick={handleRequestImagePick}
+                onClear={clearRequestImage}
+              />
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: 4 }}>Notes (optional)</label>
                 <textarea
@@ -1055,6 +1096,77 @@ function RequestField({ label, required, value, onChange, placeholder }) {
         placeholder={placeholder || ""}
         style={{ width: "100%", padding: 10, border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
       />
+    </div>
+  );
+}
+
+// Photo upload for the Request-an-item form. One image per request.
+// The input is hidden and triggered by the button so we can style the
+// target freely; accept="image/*" + the absence of `capture` lets iOS
+// offer both "Take Photo" and "Choose from Library" — better UX than
+// forcing either one.
+function RequestPhotoField({ imageUrl, uploading, error, onPick, onClear }) {
+  return (
+    <div>
+      <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: 4 }}>
+        Photo (optional)
+      </label>
+
+      {imageUrl ? (
+        <div style={{ position: "relative", width: "100%", borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)" }}>
+          <img
+            src={imageUrl}
+            alt="Requested item"
+            style={{ width: "100%", maxHeight: 220, objectFit: "cover", display: "block" }}
+          />
+          <button
+            type="button"
+            onClick={onClear}
+            aria-label="Remove photo"
+            style={{
+              position: "absolute", top: 8, right: 8,
+              width: 32, height: 32, borderRadius: "50%",
+              background: "rgba(0,0,0,0.55)", color: "#fff",
+              border: "none", cursor: "pointer",
+              fontSize: 16, lineHeight: 1,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            ×
+          </button>
+        </div>
+      ) : (
+        <label
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            gap: 8,
+            width: "100%", padding: "14px 10px",
+            border: "1px dashed var(--border)", borderRadius: 8,
+            fontSize: 13, color: "var(--text-muted)",
+            cursor: uploading ? "default" : "pointer",
+            background: uploading ? "var(--border)" : "transparent",
+            boxSizing: "border-box",
+          }}
+        >
+          <span aria-hidden="true" style={{ fontSize: 16 }}>📷</span>
+          <span>{uploading ? "Uploading…" : "Snap or upload a photo"}</span>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = ""; // let the member re-pick the same file after clearing
+              onPick(f);
+            }}
+            disabled={uploading}
+            style={{ display: "none" }}
+          />
+        </label>
+      )}
+
+      {error && (
+        <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--danger, #C92F1F)" }}>{error}</p>
+      )}
     </div>
   );
 }
