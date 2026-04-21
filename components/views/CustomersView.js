@@ -35,8 +35,20 @@ export default function CustomersView({
       m[b.customer_email].cnt++;
       if (b.customer_name) m[b.customer_email].name = b.customer_name;
     });
+    // Seed paying members who have zero bookings in HG (e.g. members
+    // backfilled from Skedda or newly-paid subs who haven't booked yet).
+    // Without this they'd be invisible in the Customers tab — the header
+    // count would say 73 members but the list would only show those with
+    // at least one booking (caught on 2026-04-20 after Kristina + Peter
+    // were backfilled and vanished from the list).
+    members.forEach((mem) => {
+      if (!mem?.email) return;
+      if (!mem.tier || mem.tier === "Non-Member") return;
+      if (m[mem.email]) return;
+      m[mem.email] = { email: mem.email, name: mem.name || mem.email, hrs: 0, cnt: 0 };
+    });
     return Object.values(m);
-  }, [activeBk]);
+  }, [activeBk, members]);
 
   // Per-tier counts for the KPI strip + chip badges. Builds once from
   // the unique customer set so it matches the table the operator sees.
