@@ -440,7 +440,35 @@ export default function MemberLayout({ activeTab, children }) {
                   Forgot Password?
                 </button>
               </div>
-              {formError && <p className="mem-err">{formError}</p>}
+              {/* When the Sign In 404s with "No account found", don't
+                  leave the member stranded with a red error — bridge
+                  them straight into the Sign Up flow with their email
+                  pre-filled. Launch-day this catches most existing
+                  customers: they have Skedda-era bookings but no
+                  app account yet, and "Sign In" is what the /app
+                  explainer told them to do. */}
+              {formError && (() => {
+                const noAccount = /no account found/i.test(formError);
+                return (
+                  <div style={{ marginBottom: 12 }}>
+                    <p className="mem-err" style={{ marginBottom: noAccount ? 8 : 0 }}>{formError}</p>
+                    {noAccount && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMode("signup");
+                          setSignupEmail(email.trim());
+                          setFormError("");
+                        }}
+                        className="mem-btn mem-btn-primary mem-btn-full"
+                        style={{ marginTop: 4 }}
+                      >
+                        Create account with {email.trim() || "this email"} →
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
               <button
                 className="mem-btn mem-btn-primary mem-btn-full"
                 onClick={handleLogin}
@@ -451,7 +479,7 @@ export default function MemberLayout({ activeTab, children }) {
               <p style={{ marginTop: 20, fontSize: 13, color: "var(--text-muted)" }}>
                 Don&rsquo;t have an account?{" "}
                 <button
-                  onClick={() => { setMode("signup"); setFormError(""); }}
+                  onClick={() => { setMode("signup"); setSignupEmail(email.trim()); setFormError(""); }}
                   style={{ background: "none", border: "none", color: "var(--primary)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", fontSize: 13, textDecoration: "underline" }}
                 >
                   Sign up

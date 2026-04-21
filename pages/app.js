@@ -165,15 +165,20 @@ export default function AppInstallPage() {
             title="Sign in with your email"
             body={
               <>
-                Use the email address {appName} already has on file (the one
-                we send receipts to). First time in?{" "}
-                <strong>Tap "Forgot password"</strong> — you'll get a reset
-                link in seconds. New members can tap{" "}
-                <strong>Create account</strong>.
+                Use the email {appName} already has on file (the one we send
+                receipts to). Enter anything for the password your first time
+                in — the app will walk you through setting a real one once
+                you're signed in.
+                <br /><br />
+                <span style={{ fontSize: 13, opacity: 0.75 }}>
+                  New here and never booked with us? You'll see a{" "}
+                  <strong>Create account</strong> button after you try to sign
+                  in — tap that.
+                </span>
               </>
             }
             primary={primary}
-            cta={{ label: "Sign in", href: "/members" }}
+            cta={{ label: "Open the sign-in page", href: "/members" }}
           />
 
           <Step
