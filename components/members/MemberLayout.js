@@ -82,19 +82,40 @@ export default function MemberLayout({ activeTab, children }) {
   const { member, tierConfig, loading, error, login, signup, completeAccount, logout, refresh } = useMemberAuth();
   const branding = useBranding();
   const { isEnabled: isFeatureEnabled } = useTenantFeatures();
-  const [mode, setMode] = useState("login");
+  // Default mode is "login". Deep-links from the public /book or /app
+  // pages can force the signup view with ?signup=1, so a prospective
+  // member who tapped "Create account" on the landing page lands
+  // directly on the signup form rather than having to tap Sign up
+  // once more.
+  const [mode, setMode] = useState(() => {
+    if (typeof window === "undefined") return "login";
+    const qs = new URLSearchParams(window.location.search);
+    return qs.get("signup") === "1" ? "signup" : "login";
+  });
 
-  // Login fields
-  const [email, setEmail] = useState("");
+  // Login fields. Pre-fill email from ?email= (e.g. a member who
+  // tapped a direct link with their email already known).
+  const [email, setEmail] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const qs = new URLSearchParams(window.location.search);
+    return qs.get("signup") !== "1" ? (qs.get("email") || "") : "";
+  });
   const [password, setPassword] = useState("");
   // Default to checked — the no-rememberMe session was 24h and members
   // felt like deploys were logging them out (really it was daily TTL
   // expiry). 90-day session when checked, 7-day floor when unchecked.
   const [rememberMe, setRememberMe] = useState(true);
 
-  // Signup fields
+  // Signup fields. signupEmail optionally pre-fills from ?email=
+  // on the deep-link URL (set by /book, /app, etc.), so a prospective
+  // member who tapped "Create account with x@y.com" lands on a form
+  // that already knows their email.
   const [signupName, setSignupName] = useState("");
-  const [signupEmail, setSignupEmail] = useState("");
+  const [signupEmail, setSignupEmail] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const qs = new URLSearchParams(window.location.search);
+    return qs.get("signup") === "1" ? (qs.get("email") || "") : "";
+  });
   const [signupPhone, setSignupPhone] = useState("");
   const [signupBirthday, setSignupBirthday] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
