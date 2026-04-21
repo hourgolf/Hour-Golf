@@ -440,19 +440,51 @@ export default function MemberLayout({ activeTab, children }) {
                   Forgot Password?
                 </button>
               </div>
-              {/* When the Sign In 404s with "No account found", don't
-                  leave the member stranded with a red error — bridge
-                  them straight into the Sign Up flow with their email
-                  pre-filled. Launch-day this catches most existing
-                  customers: they have Skedda-era bookings but no
-                  app account yet, and "Sign In" is what the /app
-                  explainer told them to do. */}
+              {/* Bridge any login failure into a clear next step. The
+                  regex on the server's error string decides whether the
+                  primary CTA is Create-account (no row for this email on
+                  this tenant) or Forgot-password (row exists but wrong
+                  password). For the fallback "Login failed" / "Log in
+                  failed" case (generic, hit when the response shape is
+                  unexpected), we default to the Create-account bridge
+                  because that's by far the most common launch-day
+                  stumble: existing customers with Skedda-era bookings
+                  but no app account yet.
+
+                  Launch-day catch cases:
+                    - Walk-in email from old bookings, no members row on
+                      this tenant  → "No account found" → bridge offered
+                    - Existing paying member with no password set (69 of
+                      72 on HG pre-launch) → Sign In actually SUCCEEDS
+                      with any password and lands them on Complete
+                      Account, so we never reach this branch
+                    - Existing member who already set a password typed
+                      it wrong → "Incorrect password" → Forgot-password
+                      primary, Create-account fallback */}
               {formError && (() => {
-                const noAccount = /no account found/i.test(formError);
+                const txt = String(formError);
+                // "incorrect password" / "wrong password" = the account
+                // exists but the typed password is wrong. Reset-password
+                // is the right bridge. Everything else — "No account
+                // found", "Login failed", "Server error", anything
+                // network-y — treat as "probably doesn't have an app
+                // account yet" and offer Sign Up as the bridge.
+                const isWrongPw = /incorrect password|wrong password/i.test(txt);
+                const offerSignup = !isWrongPw;
                 return (
                   <div style={{ marginBottom: 12 }}>
-                    <p className="mem-err" style={{ marginBottom: noAccount ? 8 : 0 }}>{formError}</p>
-                    {noAccount && (
+                    <p className="mem-err" style={{ marginBottom: (offerSignup || isWrongPw) ? 8 : 0 }}>{txt}</p>
+                    {isWrongPw && (
+                      <button
+                        type="button"
+                        onClick={() => { setMode("forgot"); setFormError(""); setForgotEmail(email.trim()); }}
+                        className="mem-btn mem-btn-primary mem-btn-full"
+                        style={{ marginTop: 4 }}
+                      >
+                        Reset my password →
+                      </button>
+                    )}
+                    {offerSignup && (
                       <button
                         type="button"
                         onClick={() => {
@@ -460,8 +492,8 @@ export default function MemberLayout({ activeTab, children }) {
                           setSignupEmail(email.trim());
                           setFormError("");
                         }}
-                        className="mem-btn mem-btn-primary mem-btn-full"
-                        style={{ marginTop: 4 }}
+                        className={`mem-btn ${isWrongPw ? "" : "mem-btn-primary"} mem-btn-full`}
+                        style={{ marginTop: 6 }}
                       >
                         Create account with {email.trim() || "this email"} →
                       </button>
