@@ -208,6 +208,9 @@ function LaunchBroadcastSection({ jwt, members }) {
   const [dryRunInfo, setDryRunInfo] = useState(null);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState(null);
+  const [testEmail, setTestEmail] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
 
   // Quick local stats for the card: "X of Y paying members already got
   // the email". Keeps the admin oriented without a preflight round-trip.
@@ -232,6 +235,27 @@ function LaunchBroadcastSection({ jwt, members }) {
     } catch (e) {
       setResult({ error: e.message });
     }
+  }
+
+  async function runTest() {
+    setTestResult(null);
+    setTesting(true);
+    try {
+      // `to` is optional — blank sends to the admin's own email. Trim
+      // so "  me@x.com " doesn't get encoded with stray whitespace.
+      const addr = (testEmail || "").trim();
+      const qs = addr ? `?preview=1&to=${encodeURIComponent(addr)}` : "?preview=1";
+      const r = await fetch(`/api/admin-broadcast-launch${qs}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || "Test send failed");
+      setTestResult({ ok: true, to: d.to, skipped: d.skipped });
+    } catch (e) {
+      setTestResult({ error: e.message });
+    }
+    setTesting(false);
   }
 
   async function runSend() {
@@ -270,6 +294,50 @@ function LaunchBroadcastSection({ jwt, members }) {
 
       <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
         CTA link in the email: <code style={{ background: "var(--bg, #EDF3E3)", padding: "2px 6px", borderRadius: 4 }}>{installLink}</code> — also the URL to print under your physical QR codes.
+      </div>
+
+      {/* Preview-to-inbox: send one copy of the exact email to the admin
+          (or any address), so you can eyeball it in a real mail client
+          before broadcasting. Doesn't touch launch_email_sent_at — test
+          sends are invisible to the broadcast idempotency tracking. */}
+      <div style={{ padding: "12px 14px", border: "1px dashed var(--border)", borderRadius: 10, marginBottom: 14, background: "var(--surface)" }}>
+        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>See it in an inbox first</div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
+          Sends one copy of the exact email to any address so you can review the wording + layout in a real mail client. Doesn't affect the broadcast count.
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+          <input
+            type="email"
+            placeholder="Leave blank to send to your admin email"
+            value={testEmail}
+            onChange={(e) => setTestEmail(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !testing) runTest(); }}
+            style={{ flex: 1, minWidth: 220, padding: "8px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 8, fontFamily: "inherit" }}
+          />
+          <button
+            type="button"
+            className="btn"
+            onClick={runTest}
+            disabled={testing}
+          >
+            {testing ? "Sending…" : "Send test"}
+          </button>
+        </div>
+        {testResult?.ok && (
+          <div style={{ marginTop: 8, fontSize: 12, color: "var(--primary)" }}>
+            ✓ Sent to <strong>{testResult.to}</strong>. Check your inbox in ~30s.
+          </div>
+        )}
+        {testResult?.skipped && (
+          <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-muted)" }}>
+            Skipped: {testResult.reason || "unknown"}. Verify Resend is configured for this tenant.
+          </div>
+        )}
+        {testResult?.error && (
+          <div style={{ marginTop: 8, fontSize: 12, color: "var(--danger, #C92F1F)" }}>
+            {testResult.error}
+          </div>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

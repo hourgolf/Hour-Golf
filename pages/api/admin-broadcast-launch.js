@@ -11,8 +11,11 @@
 // need to re-broadcast on purpose (copy change), null the column first.
 //
 // Query params:
-//   dryRun=1   → returns the list of recipients without sending
-//   limit=N    → caps the send count this invocation (safety valve)
+//   dryRun=1      → returns the recipient list without sending
+//   preview=1     → sends ONE test copy to `to` (query or admin email).
+//                    Does NOT mark anyone's launch_email_sent_at.
+//   to=<email>    → preview target (defaults to the admin's own email)
+//   limit=N       → caps the send count this invocation (safety valve)
 
 import { SUPABASE_URL, getServiceKey, getTenantId, verifyAdmin, getRequestOrigin } from "../../lib/api-helpers";
 import { sendLaunchEmail } from "../../lib/email";
@@ -32,8 +35,40 @@ export default async function handler(req, res) {
 
   const effectiveTenantId = tenantId || getTenantId(req);
   const dryRun = req.query.dryRun === "1" || req.query.dryRun === "true";
+  const preview = req.query.preview === "1" || req.query.preview === "true";
   const limit = Math.max(1, Math.min(DEFAULT_LIMIT, Number(req.query.limit) || DEFAULT_LIMIT));
   const portalUrl = getRequestOrigin(req);
+
+  // --- Preview mode: send one copy to the admin (or a specified address),
+  // never touch anyone's launch_email_sent_at. Lets the operator see the
+  // email in their own inbox, rendered by their real mail client, before
+  // firing the broadcast. ---
+  if (preview) {
+    const previewTo =
+      (typeof req.query.to === "string" && req.query.to.trim()) ||
+      user.email ||
+      null;
+    if (!previewTo) {
+      return res.status(400).json({ error: "No preview address. Pass ?to=<email> or sign in with an email on your admin account." });
+    }
+    try {
+      const result = await sendLaunchEmail({
+        tenantId: effectiveTenantId,
+        to: previewTo,
+        customerName: user.user_metadata?.name || "Preview",
+        portalUrl,
+      });
+      if (result?.error) {
+        return res.status(502).json({ error: "Preview send failed", detail: result.detail });
+      }
+      if (result?.skipped) {
+        return res.status(200).json({ preview: true, skipped: true, reason: result.reason, to: previewTo });
+      }
+      return res.status(200).json({ preview: true, sent: 1, to: previewTo });
+    } catch (e) {
+      return res.status(500).json({ error: "Preview send failed", detail: e.message });
+    }
+  }
 
   // Pull eligible recipients: paying members in this tenant who haven't
   // been notified yet.
