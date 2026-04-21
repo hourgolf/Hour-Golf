@@ -3,6 +3,32 @@ import { TIERS } from "../../lib/constants";
 import Badge from "../ui/Badge";
 import TierSelect from "../ui/TierSelect";
 
+// Small inline chip next to the customer name when their Stripe
+// subscription is past_due or unpaid. Visible on both the desktop
+// table and mobile card list.
+function PastDueChip() {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "1px 7px",
+        marginLeft: 6,
+        borderRadius: 999,
+        background: "var(--danger, #C92F1F)",
+        color: "#EDF3E3",
+        fontSize: 9,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: 0.4,
+        verticalAlign: "middle",
+      }}
+      title="Last Stripe charge failed — member was emailed a link to update their card"
+    >
+      Past Due
+    </span>
+  );
+}
+
 function exportCSV(rows, filename) {
   const header = "Member #,Name,Email,Tier,Hours,Sessions";
   const lines = rows.map((r) =>
@@ -71,12 +97,31 @@ export default function CustomersView({
   const summary = useMemo(() => {
     const total = allCust.length;
     const nonMember = tierCounts["Non-Member"] || 0;
+    // Stripe subscription lifecycle → past_due / unpaid members need
+    // operator attention. We count both as "past due" here since the
+    // operator-side action is identical for either.
+    const pastDue = members.filter(
+      (m) => m?.subscription_status === "past_due" || m?.subscription_status === "unpaid"
+    ).length;
     return {
       total,
       members: Math.max(0, total - nonMember),
       nonMembers: nonMember,
+      pastDue,
     };
-  }, [allCust.length, tierCounts]);
+  }, [allCust.length, tierCounts, members]);
+
+  // Fast lookup of past-due status by email — used to paint a chip next
+  // to the row name. O(1) lookup keeps the row renderer cheap.
+  const pastDueEmails = useMemo(() => {
+    const s = new Set();
+    for (const m of members) {
+      if (m?.email && (m.subscription_status === "past_due" || m.subscription_status === "unpaid")) {
+        s.add(m.email);
+      }
+    }
+    return s;
+  }, [members]);
 
   const filtCust = useMemo(() => {
     let l = [...allCust];
@@ -130,6 +175,17 @@ export default function CustomersView({
         <div className="sum-item"><span className="sum-val">{summary.total}</span><span className="sum-lbl">Customers</span></div>
         <div className="sum-item"><span className="sum-val">{summary.members}</span><span className="sum-lbl">Members</span></div>
         <div className="sum-item"><span className="sum-val">{summary.nonMembers}</span><span className="sum-lbl">Non-Members</span></div>
+        {summary.pastDue > 0 && (
+          <div
+            className="sum-item"
+            style={{ cursor: "pointer" }}
+            onClick={() => setSearch("")}
+            title="Members whose last Stripe charge failed — update their card"
+          >
+            <span className="sum-val" style={{ color: "var(--danger, #C92F1F)" }}>{summary.pastDue}</span>
+            <span className="sum-lbl">Past Due</span>
+          </div>
+        )}
       </div>
 
       <input
@@ -207,6 +263,7 @@ export default function CustomersView({
         {filtCust.map((c) => {
           const m = members.find((x) => x.email === c.email);
           const tier = m?.tier || "Non-Member";
+          const isPastDue = pastDueEmails.has(c.email);
           return (
             <div key={c.email} className="tr">
               <span style={{ flex: 2, cursor: "pointer" }} onClick={() => onSelectMember(c.email)}>
@@ -216,6 +273,7 @@ export default function CustomersView({
                     #{String(m.member_number).padStart(3, "0")}
                   </span>
                 )}
+                {isPastDue && <PastDueChip />}
                 <br />
                 <span className="email-sm">{c.email}</span>
               </span>
@@ -234,6 +292,7 @@ export default function CustomersView({
         {filtCust.map((c) => {
           const m = members.find((x) => x.email === c.email);
           const tier = m?.tier || "Non-Member";
+          const isPastDue = pastDueEmails.has(c.email);
           return (
             <div key={c.email} className="usage-card" onClick={() => onSelectMember(c.email)}>
               <div className="usage-card-top">
@@ -244,6 +303,7 @@ export default function CustomersView({
                       #{String(m.member_number).padStart(3, "0")}
                     </span>
                   )}
+                  {isPastDue && <PastDueChip />}
                 </div>
                 <Badge tier={tier} />
               </div>
