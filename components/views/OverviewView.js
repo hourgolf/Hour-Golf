@@ -61,18 +61,31 @@ export default function OverviewView({
     return set;
   }, [payments]);
 
-  // Non-members computed from bookings with per-booking detail
+  // Non-members computed from bookings with per-booking detail.
+  //
+  // Important: we filter by the booking's SNAPSHOT tier (b.tier, stamped
+  // at booking creation time via a DB trigger) — not the member's current
+  // tier. This prevents a classic regression: when a paying member
+  // cancels, their historical Patron/Starter/etc. bookings stay billed
+  // at the tier they had AT THE TIME, instead of retroactively
+  // reclassifying to Non-Member and painting already-reconciled overage
+  // as fresh non-member charges at the $60/hr walk-in rate. (Will Koenig
+  // 2026-04-21: 3h Patron usage + $30 paid overage → after cancel, UI
+  // showed 3h × $60 = $180 "owed". Snapshot tier fixes this.)
   const nonMem = useMemo(() => {
     if (!actMonth) return [];
     const monthDate = new Date(actMonth);
     const yr = monthDate.getUTCFullYear();
     const mo = monthDate.getUTCMonth();
-    const memberSet = new Set(
-      members.filter((m) => m.tier && m.tier !== "Non-Member").map((m) => m.email)
-    );
     const stats = {};
     activeBk.forEach((b) => {
-      if (memberSet.has(b.customer_email)) return;
+      // Snapshot filter: only "Non-Member" bookings land here. Anything
+      // else belongs in a paid tier's bucket (handled elsewhere via
+      // monthly_usage view). Fall back to member's current tier for
+      // legacy bookings that never got stamped — though the DB backfill
+      // should have covered all of those.
+      const bookingTier = b.tier || members.find((m) => m.email === b.customer_email)?.tier || "Non-Member";
+      if (bookingTier !== "Non-Member") return;
       const bs = new Date(b.booking_start);
       if (isNaN(bs) || bs.getUTCFullYear() !== yr || bs.getUTCMonth() !== mo) return;
       if (!stats[b.customer_email]) {
