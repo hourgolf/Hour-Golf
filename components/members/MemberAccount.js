@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
 import DatePicker from "../DatePicker";
 import { useTenantFeatures } from "../../hooks/useTenantFeatures";
 
@@ -25,6 +26,7 @@ const PUNCH_PASSES = [
 ];
 
 export default function MemberAccount({ member, tierConfig, refresh, showToast, onLogout }) {
+  const router = useRouter();
   const { isEnabled: isFeatureEnabled } = useTenantFeatures();
   const billingEnabled = isFeatureEnabled("stripe_enabled");
 
@@ -431,6 +433,56 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast, 
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* Payment method + receipts — compact nav card to the billing
+          subpage. The 2026-04-18 Account restructure moved the Billing
+          tab off the nav to unbreak narrow viewports, but the link back
+          to the subpage was never surfaced on Account — leaving members
+          with no way to update their card or see receipts. This card
+          is that link. */}
+      {billingEnabled && (
+        <div className="mem-section">
+          <button
+            type="button"
+            onClick={() => router.push("/members/billing")}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              padding: "14px 16px",
+              background: "var(--bg, #EDF3E3)",
+              border: "1px solid var(--border)",
+              borderRadius: 15,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              color: "var(--text)",
+              textAlign: "left",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(53,68,59,0.08)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: "var(--surface)", border: "1px solid var(--border)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 20, flexShrink: 0,
+              }}>
+                💳
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3 }}>Payment method &amp; receipts</div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2, lineHeight: 1.4 }}>
+                  Update your card on file, view past payments, and manage billing notifications.
+                </div>
+              </div>
+            </div>
+            <span style={{ fontSize: 18, color: "var(--text-muted)", flexShrink: 0 }} aria-hidden="true">›</span>
+          </button>
         </div>
       )}
 
