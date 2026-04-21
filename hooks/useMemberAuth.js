@@ -30,6 +30,13 @@ export default function useMemberAuth() {
     setLoading(false);
   }
 
+  // login + signup both RETURN the error message directly in the result
+  // object instead of relying on the shared `error` state to flow back to
+  // callers. The shared-state pattern had a stale-closure bug: handleLogin
+  // in MemberLayout would read `error` from its render-frozen closure,
+  // which still held the previous render's value, so a freshly failed
+  // attempt would show the prior attempt's error text. Returning the
+  // message directly is race-free.
   async function login(email, password, rememberMe = false) {
     setLoading(true);
     setError("");
@@ -45,11 +52,11 @@ export default function useMemberAuth() {
       setMember(d.member);
       setTierConfig(d.tierConfig);
       setLoading(false);
-      return true;
+      return { ok: true };
     } catch (e) {
       setError(e.message);
       setLoading(false);
-      return false;
+      return { ok: false, error: e.message };
     }
   }
 
@@ -68,11 +75,11 @@ export default function useMemberAuth() {
       setMember(d.member);
       setTierConfig(d.tierConfig);
       setLoading(false);
-      return true;
+      return { ok: true };
     } catch (e) {
       setError(e.message);
       setLoading(false);
-      return false;
+      return { ok: false, error: e.message };
     }
   }
 

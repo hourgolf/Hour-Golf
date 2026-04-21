@@ -172,14 +172,16 @@ export default function MemberLayout({ activeTab, children }) {
     setTimeout(() => setToast(null), 5000);
   }
 
-  // Login handler
+  // Login handler. `login()` returns { ok, error? } — we consume the
+  // error message DIRECTLY from the return value instead of reading the
+  // shared `error` state from closure (which would be stale this render).
   async function handleLogin() {
     if (!email.trim()) return;
     setFormLoading(true);
     setFormError("");
-    const ok = await login(email.trim(), password, rememberMe);
-    if (!ok) {
-      setFormError(error || "Login failed");
+    const result = await login(email.trim(), password, rememberMe);
+    if (!result.ok) {
+      setFormError(result.error || "Login failed");
     }
     setFormLoading(false);
   }
@@ -216,15 +218,15 @@ export default function MemberLayout({ activeTab, children }) {
     }
 
     setFormLoading(true);
-    const ok = await signup({
+    const result = await signup({
       email: signupEmail.trim(),
       password: signupPassword,
       name: signupName.trim(),
       phone: signupPhone.trim(),
       birthday: signupBirthday,
     });
-    if (!ok) {
-      setFormError(error || "Signup failed");
+    if (!result.ok) {
+      setFormError(result.error || "Signup failed");
     }
     setFormLoading(false);
   }
@@ -463,28 +465,34 @@ export default function MemberLayout({ activeTab, children }) {
                       primary, Create-account fallback */}
               {formError && (() => {
                 const txt = String(formError);
-                // "incorrect password" / "wrong password" = the account
-                // exists but the typed password is wrong. Reset-password
-                // is the right bridge. Everything else — "No account
-                // found", "Login failed", "Server error", anything
-                // network-y — treat as "probably doesn't have an app
-                // account yet" and offer Sign Up as the bridge.
+                // Three classes of error, each with its own UX:
+                //   - Wrong password → red alert + Reset Password button
+                //   - No account on this tenant → warm "let's set you
+                //     up" block with the Create Account button
+                //   - Anything else (server errors, network, unknown)
+                //     → red alert + both bridges as options
                 const isWrongPw = /incorrect password|wrong password/i.test(txt);
-                const offerSignup = !isWrongPw;
-                return (
-                  <div style={{ marginBottom: 12 }}>
-                    <p className="mem-err" style={{ marginBottom: (offerSignup || isWrongPw) ? 8 : 0 }}>{txt}</p>
-                    {isWrongPw && (
-                      <button
-                        type="button"
-                        onClick={() => { setMode("forgot"); setFormError(""); setForgotEmail(email.trim()); }}
-                        className="mem-btn mem-btn-primary mem-btn-full"
-                        style={{ marginTop: 4 }}
-                      >
-                        Reset my password →
-                      </button>
-                    )}
-                    {offerSignup && (
+                const isNoAccount =
+                  /no account found|not found|doesn'?t exist/i.test(txt);
+
+                if (isNoAccount) {
+                  return (
+                    <div
+                      style={{
+                        marginBottom: 12,
+                        padding: "14px 16px",
+                        borderRadius: 12,
+                        background: "var(--bg, #EDF3E3)",
+                        border: "1px solid var(--border)",
+                        textAlign: "left",
+                      }}
+                    >
+                      <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 14 }}>
+                        Let's get you set up.
+                      </p>
+                      <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--text-muted)", lineHeight: 1.4 }}>
+                        We don't have an app account for <strong>{email.trim()}</strong> yet. Create one now — it takes under a minute, and if you're already a paying member we'll connect your membership automatically.
+                      </p>
                       <button
                         type="button"
                         onClick={() => {
@@ -492,12 +500,40 @@ export default function MemberLayout({ activeTab, children }) {
                           setSignupEmail(email.trim());
                           setFormError("");
                         }}
-                        className={`mem-btn ${isWrongPw ? "" : "mem-btn-primary"} mem-btn-full`}
-                        style={{ marginTop: 6 }}
+                        className="mem-btn mem-btn-primary mem-btn-full"
                       >
-                        Create account with {email.trim() || "this email"} →
+                        Create my account →
                       </button>
-                    )}
+                    </div>
+                  );
+                }
+
+                if (isWrongPw) {
+                  return (
+                    <div style={{ marginBottom: 12 }}>
+                      <p className="mem-err" style={{ marginBottom: 8 }}>{txt}</p>
+                      <button
+                        type="button"
+                        onClick={() => { setMode("forgot"); setFormError(""); setForgotEmail(email.trim()); }}
+                        className="mem-btn mem-btn-primary mem-btn-full"
+                      >
+                        Reset my password →
+                      </button>
+                    </div>
+                  );
+                }
+
+                // Generic fallback — give them both paths
+                return (
+                  <div style={{ marginBottom: 12 }}>
+                    <p className="mem-err" style={{ marginBottom: 8 }}>{txt}</p>
+                    <button
+                      type="button"
+                      onClick={() => { setMode("signup"); setSignupEmail(email.trim()); setFormError(""); }}
+                      className="mem-btn mem-btn-primary mem-btn-full"
+                    >
+                      Create account with {email.trim() || "this email"} →
+                    </button>
                   </div>
                 );
               })()}
