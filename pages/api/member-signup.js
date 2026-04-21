@@ -66,7 +66,10 @@ export default async function handler(req, res) {
     const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
     const expiresAt = new Date(Date.now() + NINETY_DAYS_MS).toISOString();
 
-    // Create member record
+    // Create member record. Stamp first/last app login so signup
+    // counts toward the admin adoption KPI — a brand-new member is,
+    // by definition, on the app.
+    const signupNow = new Date().toISOString();
     const memberData = {
       tenant_id: tenantId,
       email: cleanEmail,
@@ -75,9 +78,11 @@ export default async function handler(req, res) {
       birthday,
       password_hash: passwordHash,
       tier: "Non-Member",
-      terms_accepted_at: new Date().toISOString(),
+      terms_accepted_at: signupNow,
       session_token: sessionToken,
       session_expires_at: expiresAt,
+      first_app_login_at: signupNow,
+      last_app_login_at: signupNow,
     };
 
     const createResp = await fetch(`${SUPABASE_URL}/rest/v1/members`, {

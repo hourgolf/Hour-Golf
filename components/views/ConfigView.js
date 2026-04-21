@@ -200,6 +200,132 @@ const TRANSACTIONAL_EMAILS = [
   },
 ];
 
+// Launch-broadcast section — fires the one-off "The app is here" email
+// to every paying member who hasn't received it yet. Idempotent on the
+// server (filters by launch_email_sent_at IS NULL), so the button can
+// be clicked again safely after onboarding new members.
+function LaunchBroadcastSection({ jwt, members }) {
+  const [dryRunInfo, setDryRunInfo] = useState(null);
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState(null);
+
+  // Quick local stats for the card: "X of Y paying members already got
+  // the email". Keeps the admin oriented without a preflight round-trip.
+  const payingMembers = (members || []).filter(
+    (m) => m?.tier && m.tier !== "Non-Member"
+  );
+  const alreadySent = payingMembers.filter((m) => !!m.launch_email_sent_at).length;
+  const remaining = payingMembers.length - alreadySent;
+  const installLink = typeof window !== "undefined" ? `${window.location.origin}/app` : "/app";
+
+  async function runDryRun() {
+    setDryRunInfo(null);
+    setResult(null);
+    try {
+      const r = await fetch("/api/admin-broadcast-launch?dryRun=1", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || "Preview failed");
+      setDryRunInfo(d);
+    } catch (e) {
+      setResult({ error: e.message });
+    }
+  }
+
+  async function runSend() {
+    if (!confirm(`Send the launch email to ${dryRunInfo?.wouldSend ?? remaining} members now? This can't be un-sent.`)) return;
+    setSending(true);
+    setResult(null);
+    try {
+      const r = await fetch("/api/admin-broadcast-launch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || "Send failed");
+      setResult(d);
+      setDryRunInfo(null);
+    } catch (e) {
+      setResult({ error: e.message });
+    }
+    setSending(false);
+  }
+
+  return (
+    <div style={{ padding: 14, border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)" }}>
+      <p style={{ fontSize: 13, color: "var(--text)", margin: "0 0 8px" }}>
+        One-off email to every paying member pointing them at the install explainer page.
+      </p>
+      <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 14px" }}>
+        Idempotent — clicking Send again only emails members who haven't received it yet (new signups after your first broadcast, missed recipients from the previous run).
+      </p>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, padding: "12px 14px", borderRadius: 10, background: "var(--bg, #EDF3E3)", marginBottom: 14 }}>
+        <Stat val={payingMembers.length} lbl="Paying members" />
+        <Stat val={alreadySent} lbl="Already received" />
+        <Stat val={remaining} lbl="Will receive" />
+      </div>
+
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
+        CTA link in the email: <code style={{ background: "var(--bg, #EDF3E3)", padding: "2px 6px", borderRadius: 4 }}>{installLink}</code> — also the URL to print under your physical QR codes.
+      </div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button
+          type="button"
+          className="btn"
+          onClick={runDryRun}
+          disabled={sending}
+        >
+          Preview recipients
+        </button>
+        <button
+          type="button"
+          className="btn primary"
+          onClick={runSend}
+          disabled={sending || remaining === 0}
+          style={{ opacity: remaining === 0 ? 0.5 : 1 }}
+        >
+          {sending ? "Sending…" : remaining === 0 ? "No one to send to" : `Send launch email (${remaining})`}
+        </button>
+      </div>
+
+      {dryRunInfo && (
+        <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--bg, #EDF3E3)", borderRadius: 10, fontSize: 12 }}>
+          <strong>{dryRunInfo.wouldSend} members</strong> would receive the email now.
+          {dryRunInfo.skippedOptOut > 0 && <> {dryRunInfo.skippedOptOut} skipped (opted out of billing emails).</>}
+          {dryRunInfo.sample?.length > 0 && (
+            <div style={{ marginTop: 6, opacity: 0.75 }}>First few: {dryRunInfo.sample.map((s) => s.name || s.email).join(", ")}{dryRunInfo.wouldSend > dryRunInfo.sample.length ? "…" : ""}</div>
+          )}
+        </div>
+      )}
+
+      {result && !result.error && (
+        <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--bg, #EDF3E3)", borderRadius: 10, fontSize: 13, color: "var(--primary)" }}>
+          <strong>✓ Sent to {result.sent} of {result.total}.</strong>
+          {result.failed > 0 && <span style={{ color: "var(--danger, #C92F1F)" }}> {result.failed} failed — see console.</span>}
+        </div>
+      )}
+      {result?.error && (
+        <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--bg, #EDF3E3)", borderRadius: 10, fontSize: 13, color: "var(--danger, #C92F1F)" }}>
+          {result.error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stat({ val, lbl }) {
+  return (
+    <div style={{ minWidth: 96 }}>
+      <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--font-display, inherit)", lineHeight: 1.1 }}>{val}</div>
+      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)" }}>{lbl}</div>
+    </div>
+  );
+}
+
 function EmailConfigSection({ jwt }) {
   return (
     <div style={{ padding: 14, border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)" }}>
@@ -1118,6 +1244,9 @@ export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStrip
 
       <h2 className="section-head" style={{ marginTop: 24 }}>Birthday Bonus</h2>
       <BirthdayBonusSection jwt={jwt} />
+
+      <h2 className="section-head" style={{ marginTop: 24 }}>Launch Announcement</h2>
+      <LaunchBroadcastSection jwt={jwt} members={members} />
 
       <h2 className="section-head" style={{ marginTop: 24 }}>News &amp; Announcements</h2>
       <NewsSection jwt={jwt} />

@@ -29,6 +29,32 @@ function PastDueChip() {
   );
 }
 
+// Launch-adoption chip. Green dot next to members who have at least
+// one successful app login recorded. Absence is meaningful — helps the
+// operator identify who still needs a nudge to install.
+function OnAppChip() {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "1px 7px",
+        marginLeft: 6,
+        borderRadius: 999,
+        background: "var(--primary)",
+        color: "#EDF3E3",
+        fontSize: 9,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: 0.4,
+        verticalAlign: "middle",
+      }}
+      title="Has logged into the member app at least once"
+    >
+      App
+    </span>
+  );
+}
+
 function exportCSV(rows, filename) {
   const header = "Member #,Name,Email,Tier,Hours,Sessions";
   const lines = rows.map((r) =>
@@ -103,11 +129,22 @@ export default function CustomersView({
     const pastDue = members.filter(
       (m) => m?.subscription_status === "past_due" || m?.subscription_status === "unpaid"
     ).length;
+    // Launch adoption: how many paying members have logged into the app.
+    // first_app_login_at is stamped by member-auth.js on first successful
+    // login (or backfilled from member_sessions on migration). The KPI
+    // ratio "<X> of <paying> on app" is the single clearest launch-day
+    // metric.
+    const payingMembers = members.filter(
+      (m) => m?.tier && m.tier !== "Non-Member"
+    );
+    const onApp = payingMembers.filter((m) => !!m.first_app_login_at).length;
     return {
       total,
       members: Math.max(0, total - nonMember),
       nonMembers: nonMember,
       pastDue,
+      onApp,
+      payingTotal: payingMembers.length,
     };
   }, [allCust.length, tierCounts, members]);
 
@@ -119,6 +156,15 @@ export default function CustomersView({
       if (m?.email && (m.subscription_status === "past_due" || m.subscription_status === "unpaid")) {
         s.add(m.email);
       }
+    }
+    return s;
+  }, [members]);
+
+  // Same pattern for launch-day "has this member logged in yet?" chip.
+  const onAppEmails = useMemo(() => {
+    const s = new Set();
+    for (const m of members) {
+      if (m?.email && m.first_app_login_at) s.add(m.email);
     }
     return s;
   }, [members]);
@@ -184,6 +230,17 @@ export default function CustomersView({
           >
             <span className="sum-val" style={{ color: "var(--danger, #C92F1F)" }}>{summary.pastDue}</span>
             <span className="sum-lbl">Past Due</span>
+          </div>
+        )}
+        {summary.payingTotal > 0 && (
+          <div
+            className="sum-item"
+            title="Paying members who have ever logged into the app (launch adoption)"
+          >
+            <span className="sum-val" style={{ color: "var(--primary)" }}>
+              {summary.onApp}<span style={{ fontSize: "0.55em", opacity: 0.6, fontWeight: 500 }}> / {summary.payingTotal}</span>
+            </span>
+            <span className="sum-lbl">On App</span>
           </div>
         )}
       </div>
@@ -264,6 +321,7 @@ export default function CustomersView({
           const m = members.find((x) => x.email === c.email);
           const tier = m?.tier || "Non-Member";
           const isPastDue = pastDueEmails.has(c.email);
+          const isOnApp = onAppEmails.has(c.email);
           return (
             <div key={c.email} className="tr">
               <span style={{ flex: 2, cursor: "pointer" }} onClick={() => onSelectMember(c.email)}>
@@ -273,6 +331,7 @@ export default function CustomersView({
                     #{String(m.member_number).padStart(3, "0")}
                   </span>
                 )}
+                {isOnApp && <OnAppChip />}
                 {isPastDue && <PastDueChip />}
                 <br />
                 <span className="email-sm">{c.email}</span>
@@ -293,6 +352,7 @@ export default function CustomersView({
           const m = members.find((x) => x.email === c.email);
           const tier = m?.tier || "Non-Member";
           const isPastDue = pastDueEmails.has(c.email);
+          const isOnApp = onAppEmails.has(c.email);
           return (
             <div key={c.email} className="usage-card" onClick={() => onSelectMember(c.email)}>
               <div className="usage-card-top">
@@ -303,7 +363,8 @@ export default function CustomersView({
                       #{String(m.member_number).padStart(3, "0")}
                     </span>
                   )}
-                  {isPastDue && <PastDueChip />}
+                  {isOnApp && <OnAppChip />}
+                {isPastDue && <PastDueChip />}
                 </div>
                 <Badge tier={tier} />
               </div>

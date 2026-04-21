@@ -82,6 +82,19 @@ export default async function handler(req, res) {
     // 4b) Dual-write the scalar columns so legacy readers (19 files not
     // yet migrated) keep working. Once Tier 2 PR 2 ships, this block and
     // the columns themselves go away.
+    //
+    // Also stamp app-login timestamps so the admin "Launch adoption"
+    // KPI works. first_app_login_at is preserved after the first login
+    // by only setting it when the existing member row has it null.
+    const nowIso = new Date().toISOString();
+    const isFirstLogin = !member.first_app_login_at;
+    const scalarPatch = {
+      session_token: sessionToken,
+      session_expires_at: expiresAt,
+      last_app_login_at: nowIso,
+    };
+    if (isFirstLogin) scalarPatch.first_app_login_at = nowIso;
+
     const updateResp = await fetch(
       `${SUPABASE_URL}/rest/v1/members?email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}`,
       {
@@ -92,10 +105,7 @@ export default async function handler(req, res) {
           "Content-Type": "application/json",
           Prefer: "return=representation",
         },
-        body: JSON.stringify({
-          session_token: sessionToken,
-          session_expires_at: expiresAt,
-        }),
+        body: JSON.stringify(scalarPatch),
       }
     );
     if (!updateResp.ok) throw new Error("Failed to create session");
