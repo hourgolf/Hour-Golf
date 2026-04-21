@@ -293,6 +293,81 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
     }
   }, [router.isReady, router.query.new, hasCard]);
 
+  // Public-book funnel: /book?bay=...&date=...&start=... → sign up →
+  // /members/book?bay=...&date=...&start=... lands here. Pre-select
+  // the slot so the member sees "your slot is ready" instead of a
+  // blank form. Falls back to sessionStorage so a billing round-trip
+  // (add a card first) doesn't drop the intent.
+  //
+  // Order of operations:
+  //   1. Prefer URL params (fresh from the funnel).
+  //   2. Else read sessionStorage (set at signup redirect + kept
+  //      until consumed OR 30 min elapsed).
+  //   3. Set bookDate (re-fetches availability), then open the sheet
+  //      pre-filled. openSheet picks end = start + 1h.
+  //   4. Without a card on file: leave the slot in sessionStorage and
+  //      DON'T open the sheet — the existing "Add a card" banner takes
+  //      over. After adding the card the member comes back and the
+  //      effect re-fires from storage.
+  useEffect(() => {
+    if (!router.isReady || sheetOpen) return;
+
+    let intent = null;
+    const { bay: qBay, date: qDate, start: qStart } = router.query;
+    if (qBay && qDate && qStart) {
+      intent = { bay: String(qBay), date: String(qDate), start: String(qStart) };
+    } else if (typeof window !== "undefined") {
+      try {
+        const raw = sessionStorage.getItem("hg-intended-slot");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (
+            parsed?.bay && parsed?.date && parsed?.start &&
+            Date.now() - (parsed.stashedAt || 0) < 30 * 60 * 1000
+          ) {
+            intent = { bay: parsed.bay, date: parsed.date, start: parsed.start };
+          } else {
+            sessionStorage.removeItem("hg-intended-slot");
+          }
+        }
+      } catch { /* non-fatal */ }
+    }
+
+    if (!intent) return;
+    // Reject unknown bays (tenant bay list may have changed since the
+    // intent was stashed) and unknown start times (falls outside the
+    // current day's HOURS window).
+    if (!BAYS.includes(intent.bay)) return;
+
+    // Set the date first so availability reloads for the right day.
+    setBookDate(intent.date);
+
+    if (!hasCard) {
+      // Keep storage so they come back after adding a card.
+      try {
+        sessionStorage.setItem(
+          "hg-intended-slot",
+          JSON.stringify({ ...intent, stashedAt: Date.now() })
+        );
+      } catch { /* non-fatal */ }
+      // Strip URL query to avoid re-triggering on every re-render,
+      // but DON'T open the sheet since they can't submit it yet.
+      if (router.query.bay) {
+        const { bay: _b, date: _d, start: _s, ...rest } = router.query;
+        router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+      }
+      return;
+    }
+
+    // Happy path — open the sheet with the slot pre-filled.
+    openSheet(intent.bay, intent.start);
+    try { sessionStorage.removeItem("hg-intended-slot"); } catch { /* ignore */ }
+    if (router.query.bay) {
+      const { bay: _b, date: _d, start: _s, ...rest } = router.query;
+      router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+    }
+  }, [router.isReady, router.query.bay, router.query.date, router.query.start, hasCard, BAYS]);
+
   // If the member changes the date while the sheet is open, the previous
   // sheetStart / sheetEnd can fall outside the new day's HOURS window
   // (most obvious when flipping today <-> a future date: today's HOURS
