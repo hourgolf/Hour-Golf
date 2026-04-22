@@ -238,18 +238,26 @@ export default function PublicBookPage() {
               {tiers.map((t) => {
                 const isWalkIn = t.tier === "Non-Member";
                 const isUnlimited = Number(t.included_hours) >= 99999;
-                return (
-                  <div
-                    key={t.tier}
-                    style={{
-                      background: "rgba(255,255,255,0.6)",
-                      borderRadius: 12,
-                      padding: "14px 16px",
-                      border: isWalkIn ? `1px dashed ${text}44` : `1px solid ${text}11`,
-                    }}
-                  >
-                    <div style={{ fontWeight: 700, fontSize: 14, fontFamily: "var(--font-display, inherit)" }}>
-                      {t.tier}
+                // Each non-walk-in card is a hyperlink to the join
+                // shortcut — tapping goes straight into signup + Stripe
+                // checkout for that tier. Walk-in card is informational
+                // (no subscription) so rendered as a plain div.
+                const joinSlug = t.tier.toLowerCase().replace(/\s+/g, "-");
+                const commonStyle = {
+                  background: "rgba(255,255,255,0.6)",
+                  borderRadius: 12,
+                  padding: "14px 16px",
+                  border: isWalkIn ? `1px dashed ${text}44` : `1px solid ${text}11`,
+                  color: text,
+                  textDecoration: "none",
+                  display: "block",
+                  transition: "transform 0.1s, box-shadow 0.1s",
+                };
+                const body = (
+                  <>
+                    <div style={{ fontWeight: 700, fontSize: 14, fontFamily: "var(--font-display, inherit)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                      <span>{t.tier}</span>
+                      {!isWalkIn && <span style={{ color: primary, fontSize: 16 }} aria-hidden="true">›</span>}
                     </div>
                     {isWalkIn ? (
                       <>
@@ -276,9 +284,17 @@ export default function PublicBookPage() {
                             </>
                           )}
                         </div>
+                        <div style={{ marginTop: 10, fontSize: 12, fontWeight: 700, color: primary }}>
+                          Join {t.tier} →
+                        </div>
                       </>
                     )}
-                  </div>
+                  </>
+                );
+                return isWalkIn ? (
+                  <div key={t.tier} style={commonStyle}>{body}</div>
+                ) : (
+                  <a key={t.tier} href={`/join/${joinSlug}`} style={commonStyle}>{body}</a>
                 );
               })}
             </div>
