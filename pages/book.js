@@ -84,6 +84,15 @@ export default function PublicBookPage() {
   const supportPhone = branding?.support_phone || null;
 
   const [tiers, setTiers] = useState([]);
+  // Visible tier cards on the public page. Drops anything with
+  // is_public=false (e.g. the synthetic Non-Member row, and hidden
+  // tenant-specific tiers like HG's Unlimited which the operator
+  // shares privately rather than marketing). The unfiltered `tiers`
+  // array is still used below for the availability window calc.
+  const visibleTiers = useMemo(
+    () => (tiers || []).filter((t) => t && t.is_public !== false),
+    [tiers]
+  );
   const [availability, setAvailability] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSlot, setSelectedSlot] = useState(null); // { bay, date, time }
@@ -213,8 +222,12 @@ export default function PublicBookPage() {
           </p>
         </section>
 
-        {/* Tier pricing strip */}
-        {tiers.length > 0 && (
+        {/* Tier pricing strip. Filtered to is_public=true in the client
+            (see visibleTiers): Non-Member (walk-in — redundant since a
+            prospect here isn't a member yet) and any tier the operator
+            marked private (e.g. HG's Unlimited) are hidden. Full
+            tier set is still used below for the availability window. */}
+        {visibleTiers.length > 0 && (
           <section style={{ maxWidth: 920, margin: "0 auto", padding: "24px 20px 8px" }}>
             <h2
               style={{
@@ -235,19 +248,16 @@ export default function PublicBookPage() {
                 gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
               }}
             >
-              {tiers.map((t) => {
-                const isWalkIn = t.tier === "Non-Member";
+              {visibleTiers.map((t) => {
                 const isUnlimited = Number(t.included_hours) >= 99999;
-                // Each non-walk-in card is a hyperlink to the join
-                // shortcut — tapping goes straight into signup + Stripe
-                // checkout for that tier. Walk-in card is informational
-                // (no subscription) so rendered as a plain div.
+                // Each card is a hyperlink to the join shortcut — tap
+                // goes straight into signup + Stripe checkout.
                 const joinSlug = t.tier.toLowerCase().replace(/\s+/g, "-");
                 const commonStyle = {
                   background: "rgba(255,255,255,0.6)",
                   borderRadius: 12,
                   padding: "14px 16px",
-                  border: isWalkIn ? `1px dashed ${text}44` : `1px solid ${text}11`,
+                  border: `1px solid ${text}11`,
                   color: text,
                   textDecoration: "none",
                   display: "block",
@@ -257,43 +267,28 @@ export default function PublicBookPage() {
                   <>
                     <div style={{ fontWeight: 700, fontSize: 14, fontFamily: "var(--font-display, inherit)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
                       <span>{t.tier}</span>
-                      {!isWalkIn && <span style={{ color: primary, fontSize: 16 }} aria-hidden="true">›</span>}
+                      <span style={{ color: primary, fontSize: 16 }} aria-hidden="true">›</span>
                     </div>
-                    {isWalkIn ? (
-                      <>
-                        <div style={{ margin: "6px 0", fontSize: 20, fontWeight: 700 }}>
-                          ${Number(t.overage_rate).toFixed(0)}<span style={{ fontSize: 12, opacity: 0.7 }}>/hr</span>
-                        </div>
-                        <div style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.4 }}>
-                          Walk-in rate. No monthly commitment.
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div style={{ margin: "6px 0", fontSize: 20, fontWeight: 700 }}>
-                          ${Number(t.monthly_fee).toFixed(0)}<span style={{ fontSize: 12, opacity: 0.7 }}>/mo</span>
-                        </div>
-                        <div style={{ fontSize: 12, opacity: 0.78, lineHeight: 1.5 }}>
-                          {isUnlimited ? "Unlimited hours" : `${Number(t.included_hours)} hrs / month`}
+                    <div style={{ margin: "6px 0", fontSize: 20, fontWeight: 700 }}>
+                      ${Number(t.monthly_fee).toFixed(0)}<span style={{ fontSize: 12, opacity: 0.7 }}>/mo</span>
+                    </div>
+                    <div style={{ fontSize: 12, opacity: 0.78, lineHeight: 1.5 }}>
+                      {isUnlimited ? "Unlimited hours" : `${Number(t.included_hours)} hrs / month`}
+                      <br />
+                      ${Number(t.overage_rate).toFixed(0)}/hr after
+                      {Number(t.pro_shop_discount) > 0 && (
+                        <>
                           <br />
-                          ${Number(t.overage_rate).toFixed(0)}/hr after
-                          {Number(t.pro_shop_discount) > 0 && (
-                            <>
-                              <br />
-                              {t.pro_shop_discount}% pro-shop discount
-                            </>
-                          )}
-                        </div>
-                        <div style={{ marginTop: 10, fontSize: 12, fontWeight: 700, color: primary }}>
-                          Join {t.tier} →
-                        </div>
-                      </>
-                    )}
+                          {t.pro_shop_discount}% pro-shop discount
+                        </>
+                      )}
+                    </div>
+                    <div style={{ marginTop: 10, fontSize: 12, fontWeight: 700, color: primary }}>
+                      Join {t.tier} →
+                    </div>
                   </>
                 );
-                return isWalkIn ? (
-                  <div key={t.tier} style={commonStyle}>{body}</div>
-                ) : (
+                return (
                   <a key={t.tier} href={`/join/${joinSlug}`} style={commonStyle}>{body}</a>
                 );
               })}
