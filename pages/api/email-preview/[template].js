@@ -28,6 +28,7 @@ import * as EmailLib from "../../../lib/email";
 const TEMPLATES = {
   "booking-confirmation":       "sendBookingConfirmation",
   "booking-cancellation":       "sendCancellationEmail",
+  "access-code":                "sendAccessCodeEmail",
   "welcome":                    "sendWelcomeEmail",
   "payment-receipt":            "sendPaymentReceiptEmail",
   "payment-failed":             "sendPaymentFailedEmail",
@@ -72,6 +73,14 @@ function sampleDataFor(tpl, { tenantId, portalUrl }) {
         bay: "Bay 2",
         bookingStart: tomorrow.toISOString(),
         bookingEnd: endTomorrow.toISOString(),
+      };
+    case "access-code":
+      return {
+        ...common,
+        bay: "Bay 2",
+        bookingStart: tomorrow.toISOString(),
+        bookingEnd: endTomorrow.toISOString(),
+        accessCode: "426801",
       };
     case "welcome":
       return {

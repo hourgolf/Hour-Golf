@@ -149,8 +149,8 @@ const TRANSACTIONAL_EMAILS = [
     label: "Access code (door code)",
     trigger: "Cron job ~10 min before each Confirmed booking when the access_codes feature is enabled and Seam is configured. Code itself is rendered live on the dashboard hero too.",
     recipient: "The booking customer.",
-    customize: "The pre-booking copy is part of the booking confirmation. The code itself comes from Seam — visible on /members/dashboard once issued.",
-    preview: null, // rolled into booking_confirmation — no standalone template
+    customize: "Big-code block uses the tenant primary color. The send itself currently runs from a Supabase Edge Function; keep its inline HTML in sync with the Node-side template after design updates (see docs/EMAIL_TEMPLATE_HANDOFF.md).",
+    preview: "access-code",
   },
   {
     key: "welcome",

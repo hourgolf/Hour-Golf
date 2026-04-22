@@ -52,6 +52,7 @@ The page renders with:
 
 - `booking-confirmation` — sent on member booking
 - `booking-cancellation` — sent on cancel
+- `access-code` — door code delivery, ~10 min before a booking
 - `welcome` — new-member subscription activated
 - `payment-receipt` — monthly membership receipt (Stripe invoice.paid)
 - `payment-failed` — card declined, first attempt
@@ -61,6 +62,14 @@ The page renders with:
 - `shop-request-ready` — admin marks request ready for pickup
 - `shop-order-notification` — admin notification of a shop checkout
 - `shipment-delivered` — Shippo tracking reports delivered
+
+> **Heads up on the access-code email.** The actual send lives in a
+> Supabase Edge Function (`supabase/functions/process-access-codes/
+> index.ts`) because the cron that triggers it is over there. The
+> preview you see is the Node-side mirror in `lib/email.js`
+> (`sendAccessCodeEmail`) — when the designer finalizes, I'll port
+> the updated HTML to the edge function too. Single design, two
+> places to update — I handle both.
 
 Admin view: **Config → Email Settings**. Each row has an **Open →**
 link that goes straight to the preview. Right-click → Copy link →
