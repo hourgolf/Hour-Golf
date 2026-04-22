@@ -219,6 +219,11 @@ function LaunchBroadcastSection({ jwt, members }) {
   );
   const alreadySent = payingMembers.filter((m) => !!m.launch_email_sent_at).length;
   const remaining = payingMembers.length - alreadySent;
+  // CTA target for the launch email. Landing on /members gets members
+  // one tap from sign-in — fewer steps than the /app install explainer
+  // which is still reachable directly for anyone who wants the
+  // Add-to-Home-Screen walkthrough.
+  const signInLink = typeof window !== "undefined" ? `${window.location.origin}/members` : "/members";
   const installLink = typeof window !== "undefined" ? `${window.location.origin}/app` : "/app";
 
   async function runDryRun() {
@@ -293,7 +298,7 @@ function LaunchBroadcastSection({ jwt, members }) {
       </div>
 
       <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
-        CTA link in the email: <code style={{ background: "var(--bg, #EDF3E3)", padding: "2px 6px", borderRadius: 4 }}>{installLink}</code> — also the URL to print under your physical QR codes.
+        CTA link in the email: <code style={{ background: "var(--bg, #EDF3E3)", padding: "2px 6px", borderRadius: 4 }}>{signInLink}</code> — drops members straight on the sign-in page. Physical QR codes can still point at <code style={{ background: "var(--bg, #EDF3E3)", padding: "2px 6px", borderRadius: 4 }}>{installLink}</code> for the Add-to-Home-Screen walkthrough.
       </div>
 
       {/* Preview-to-inbox: send one copy of the exact email to the admin
