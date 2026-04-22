@@ -134,6 +134,7 @@ const TRANSACTIONAL_EMAILS = [
     trigger: "Member books a bay (or a non-member books via the public flow).",
     recipient: "The booking customer.",
     customize: "Logo + colors via Settings → Branding. Sender + footer via Settings → Tenant Email. Cancel-cutoff copy follows the tenant's policy field.",
+    preview: "booking-confirmation",
   },
   {
     key: "booking_cancellation",
@@ -141,6 +142,7 @@ const TRANSACTIONAL_EMAILS = [
     trigger: "Member cancels a booking from their dashboard, or admin cancels.",
     recipient: "The booking customer.",
     customize: "Same wrapper as above. Rebook CTA button.",
+    preview: "booking-cancellation",
   },
   {
     key: "access_code",
@@ -148,6 +150,7 @@ const TRANSACTIONAL_EMAILS = [
     trigger: "Cron job ~10 min before each Confirmed booking when the access_codes feature is enabled and Seam is configured. Code itself is rendered live on the dashboard hero too.",
     recipient: "The booking customer.",
     customize: "The pre-booking copy is part of the booking confirmation. The code itself comes from Seam — visible on /members/dashboard once issued.",
+    preview: null, // rolled into booking_confirmation — no standalone template
   },
   {
     key: "welcome",
@@ -155,6 +158,7 @@ const TRANSACTIONAL_EMAILS = [
     trigger: "Stripe webhook checkout.session.completed in subscription mode.",
     recipient: "The new member.",
     customize: "Tier name + monthly fee + included hours pulled from tier_config. CTA button lands on the member portal.",
+    preview: "welcome",
   },
   {
     key: "payment_receipt",
@@ -162,6 +166,15 @@ const TRANSACTIONAL_EMAILS = [
     trigger: "Stripe webhook invoice.paid (recurring + first payments).",
     recipient: "The paying member.",
     customize: "Amount, description, date pulled from the Stripe invoice. CTA button → /members/billing.",
+    preview: "payment-receipt",
+  },
+  {
+    key: "payment_failed",
+    label: "Payment failed (card declined)",
+    trigger: "Stripe webhook invoice.payment_failed on attempt #1.",
+    recipient: "The paying member.",
+    customize: "Amount + membership label from the invoice. CTA button → /members/billing to update card.",
+    preview: "payment-failed",
   },
   {
     key: "password_reset",
@@ -169,6 +182,15 @@ const TRANSACTIONAL_EMAILS = [
     trigger: "Member taps Forgot Password on /members.",
     recipient: "The member email on file.",
     customize: "Reset URL is single-use and expires in 1 hour.",
+    preview: "password-reset",
+  },
+  {
+    key: "launch",
+    label: "Launch announcement",
+    trigger: "Admin runs the Launch Announcement broadcast above.",
+    recipient: "Every paying member not yet emailed.",
+    customize: "Copy + CTA live in lib/email.js sendLaunchEmail.",
+    preview: "launch",
   },
   {
     key: "shop_order",
@@ -176,6 +198,7 @@ const TRANSACTIONAL_EMAILS = [
     trigger: "Member completes an in-app shop checkout via Stripe.",
     recipient: "The tenant's notification inbox (Settings → Tenant Email).",
     customize: "Item rows + totals + member discount from the order. No customer-facing receipt — Stripe sends its own.",
+    preview: "shop-order-notification",
   },
   {
     key: "shop_request_admin",
@@ -183,6 +206,7 @@ const TRANSACTIONAL_EMAILS = [
     trigger: "Member submits a 'request an item' form on the Pro Shop.",
     recipient: "The tenant's notification inbox.",
     customize: "Request fields shown verbatim. Member contact info attached.",
+    preview: "shop-request-admin",
   },
   {
     key: "shop_request_ready",
@@ -190,6 +214,7 @@ const TRANSACTIONAL_EMAILS = [
     trigger: "Admin marks a shop request as in-stock from the Pro Shop Requests panel above.",
     recipient: "The requesting member.",
     customize: "Optional admin response gets surfaced in the body.",
+    preview: "shop-request-ready",
   },
   {
     key: "shipment_delivered",
@@ -197,6 +222,7 @@ const TRANSACTIONAL_EMAILS = [
     trigger: "Shippo webhook reports a tracked order moved to delivered.",
     recipient: "The order's customer.",
     customize: "Tracking number + carrier + service rendered live; CTA → /members/shop.",
+    preview: "shipment-delivered",
   },
 ];
 
@@ -400,38 +426,58 @@ function Stat({ val, lbl }) {
 }
 
 function EmailConfigSection({ jwt }) {
+  // Base origin for preview links. Build on the client so each admin's
+  // active tenant subdomain gets used (previews are tenant-branded via
+  // the subdomain middleware resolution — same way any other public
+  // page is). Safe to share with a designer via Slack/Email.
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
   return (
     <div style={{ padding: 14, border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)" }}>
       <p style={{ fontSize: 13, color: "var(--text)", margin: "0 0 6px" }}>
-        Every transactional email the platform sends, with what triggers it and where to customize each piece.
+        Every transactional email the platform sends, with what triggers it, and a preview you can open or share.
       </p>
       <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 14px" }}>
-        Template HTML lives in <code>lib/email.js</code> and shares a branded wrapper from <code>lib/email-layout.js</code>. Logo + colors come from <strong>Settings → Branding</strong>; sender address + footer come from your tenant email config; recipient inboxes for admin notifications come from the same place.
+        Template HTML lives in <code>lib/email.js</code> and shares a branded wrapper from <code>lib/email-layout.js</code>. Logo + colors come from <strong>Settings → Branding</strong>; sender address + footer come from your tenant email config; recipient inboxes for admin notifications come from the same place. Preview URLs are public (no login) and render with fake sample data — safe to send to a designer.
       </p>
 
       <div className="tbl">
-        <div className="th" style={{ display: "grid", gridTemplateColumns: "1.4fr 2fr 1fr 2fr", gap: 12 }}>
+        <div className="th" style={{ display: "grid", gridTemplateColumns: "1.4fr 1.8fr 1fr 1.8fr 0.6fr", gap: 12 }}>
           <span>Email</span>
           <span>Triggered by</span>
           <span>Sent to</span>
           <span>Customize</span>
+          <span className="text-r">Preview</span>
         </div>
         {TRANSACTIONAL_EMAILS.map((e) => (
           <div
             key={e.key}
             className="tr"
-            style={{ display: "grid", gridTemplateColumns: "1.4fr 2fr 1fr 2fr", gap: 12, alignItems: "start", padding: "10px 12px" }}
+            style={{ display: "grid", gridTemplateColumns: "1.4fr 1.8fr 1fr 1.8fr 0.6fr", gap: 12, alignItems: "start", padding: "10px 12px" }}
           >
             <span style={{ fontWeight: 700, fontSize: 13 }}>{e.label}</span>
             <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{e.trigger}</span>
             <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{e.recipient}</span>
             <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{e.customize}</span>
+            <span style={{ fontSize: 12 }} className="text-r">
+              {e.preview ? (
+                <a
+                  href={`${origin}/api/email-preview/${e.preview}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}
+                >
+                  Open →
+                </a>
+              ) : (
+                <span style={{ color: "var(--text-muted)", fontSize: 11 }}>—</span>
+              )}
+            </span>
           </div>
         ))}
       </div>
 
       <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 12, padding: "0 4px" }}>
-        Want the email itself reworded or restyled? That's a code change today — the templates are intentionally locked so they always match the data shape they render. Ping the dev to update the copy or add a new template.
+        To hand a template to a designer: right-click the Preview link → Copy link, send it to them. The page renders the email in an iframe plus a plain-text version, and has a tab row at the top so they can cycle through every template without asking for more URLs. See <code>docs/EMAIL_TEMPLATE_HANDOFF.md</code> for the delivery format the designer should use when handing work back.
       </p>
     </div>
   );
