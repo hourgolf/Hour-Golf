@@ -75,9 +75,13 @@ export default function PublicBookPage() {
   const cream = branding?.cream_color || "#EDF3E3";
   const text = branding?.text_color || "#35443B";
   const accent = branding?.accent_color || "#ddd480";
+  // Prefer the cursive header wordmark on the public landing — reads
+  // as a brand signature rather than the full welcome-page building
+  // illustration. Falls back to welcome_logo or the legacy single-
+  // slot logo if the tenant hasn't uploaded a header-specific asset.
   const logoUrl =
-    branding?.welcome_logo_url ||
     branding?.header_logo_url ||
+    branding?.welcome_logo_url ||
     branding?.logo_url ||
     null;
   const supportEmail = branding?.support_email || null;
@@ -220,6 +224,73 @@ export default function PublicBookPage() {
           >
             Live availability below. Tap any open slot — we'll walk you through a quick signup so you can lock it in.
           </p>
+        </section>
+
+        {/* Top CTA — surfaces Sign in / Sign up right under the hero
+            so returning members can jump to booking without hunting,
+            and new prospects get a clear "Ready to book?" framing
+            before the tier cards. Previously at the bottom of the page;
+            moved up per 2026-04-22 feedback. The separate tier cards
+            below still function as per-tier shortcuts into signup. */}
+        <section style={{ maxWidth: 620, margin: "20px auto 0", padding: "0 22px" }}>
+          <div
+            style={{
+              background: "rgba(255,255,255,0.6)",
+              borderRadius: 14,
+              padding: "18px 20px",
+              textAlign: "center",
+            }}
+          >
+            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontFamily: "var(--font-display, inherit)" }}>
+              Ready to book?
+            </h3>
+            <p style={{ margin: "0 0 14px", fontSize: 13, color: `${text}bb`, lineHeight: 1.5 }}>
+              Takes under two minutes to create an account. If you're an existing member, sign in to jump straight to booking.
+            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+              <a
+                href="/members?signup=1"
+                style={{
+                  flex: "1 1 160px",
+                  background: primary,
+                  color: "#fff",
+                  padding: "12px 20px",
+                  borderRadius: 12,
+                  textDecoration: "none",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  fontFamily: "var(--font-display, inherit)",
+                  textAlign: "center",
+                  boxSizing: "border-box",
+                }}
+              >
+                Sign up
+              </a>
+              <a
+                href="/members"
+                style={{
+                  flex: "1 1 160px",
+                  background: "transparent",
+                  color: primary,
+                  padding: "12px 20px",
+                  borderRadius: 12,
+                  textDecoration: "none",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  fontFamily: "var(--font-display, inherit)",
+                  textAlign: "center",
+                  border: `2px solid ${primary}`,
+                  boxSizing: "border-box",
+                }}
+              >
+                Sign in
+              </a>
+            </div>
+            <p style={{ marginTop: 14, fontSize: 11, color: `${text}99` }}>
+              Want to see how the app works first?{" "}
+              <a href="/app" style={{ color: primary, fontWeight: 600 }}>How to install →</a>
+            </p>
+          </div>
         </section>
 
         {/* Tier pricing strip. Filtered to is_public=true in the client
@@ -507,68 +578,6 @@ export default function PublicBookPage() {
             </div>
           </section>
         )}
-
-        {/* Bottom CTA strip — always visible even without a slot selected */}
-        <section style={{ maxWidth: 620, margin: "32px auto 0", padding: "0 22px" }}>
-          <div
-            style={{
-              background: "rgba(255,255,255,0.6)",
-              borderRadius: 14,
-              padding: "18px 20px",
-              textAlign: "center",
-            }}
-          >
-            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontFamily: "var(--font-display, inherit)" }}>
-              Ready to book?
-            </h3>
-            <p style={{ margin: "0 0 14px", fontSize: 13, color: `${text}bb`, lineHeight: 1.5 }}>
-              Takes under two minutes to create an account. If you're an existing member, sign in to jump straight to booking.
-            </p>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-              <a
-                href="/members?signup=1"
-                style={{
-                  flex: "1 1 160px",
-                  background: primary,
-                  color: "#fff",
-                  padding: "12px 20px",
-                  borderRadius: 12,
-                  textDecoration: "none",
-                  fontWeight: 700,
-                  fontSize: 14,
-                  fontFamily: "var(--font-display, inherit)",
-                  textAlign: "center",
-                  boxSizing: "border-box",
-                }}
-              >
-                Sign up
-              </a>
-              <a
-                href="/members"
-                style={{
-                  flex: "1 1 160px",
-                  background: "transparent",
-                  color: primary,
-                  padding: "12px 20px",
-                  borderRadius: 12,
-                  textDecoration: "none",
-                  fontWeight: 700,
-                  fontSize: 14,
-                  fontFamily: "var(--font-display, inherit)",
-                  textAlign: "center",
-                  border: `2px solid ${primary}`,
-                  boxSizing: "border-box",
-                }}
-              >
-                Sign in
-              </a>
-            </div>
-            <p style={{ marginTop: 14, fontSize: 11, color: `${text}99` }}>
-              Want to see how the app works first?{" "}
-              <a href="/app" style={{ color: primary, fontWeight: 600 }}>How to install →</a>
-            </p>
-          </div>
-        </section>
 
         {(supportEmail || supportPhone) && (
           <section
