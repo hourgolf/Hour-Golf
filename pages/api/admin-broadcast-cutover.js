@@ -180,10 +180,16 @@ export default async function handler(req, res) {
     });
   }
 
-  // --- Send serially, stamp after success ---
+  // --- Send serially with a pacing delay, stamp after success ---
+  // 150ms gap stays under Resend's default 2 req/sec cap while still
+  // letting a 72-member broadcast finish in ~12s. Defensive against
+  // 429s that would otherwise turn a chunk of the batch into failures.
   const sent = [];
   const failed = [];
-  for (const m of eligible) {
+  const RESEND_GAP_MS = 150;
+  for (let i = 0; i < eligible.length; i++) {
+    const m = eligible[i];
+    if (i > 0) await new Promise((r) => setTimeout(r, RESEND_GAP_MS));
     try {
       const result = await phase.fn({
         tenantId: effectiveTenantId,

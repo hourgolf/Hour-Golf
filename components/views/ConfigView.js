@@ -404,7 +404,35 @@ function LaunchBroadcastSection({ jwt, members }) {
       {result && !result.error && (
         <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--bg, #EDF3E3)", borderRadius: 10, fontSize: 13, color: "var(--primary)" }}>
           <strong>✓ Sent to {result.sent} of {result.total}.</strong>
-          {result.failed > 0 && <span style={{ color: "var(--danger, #C92F1F)" }}> {result.failed} failed — see console.</span>}
+          {result.failed > 0 && (
+            <>
+              <span style={{ color: "var(--danger, #C92F1F)" }}> {result.failed} failed.</span>
+              <div style={{ marginTop: 8, fontSize: 12, color: "var(--text)" }}>
+                {result.failures?.length > 0 ? (
+                  <details>
+                    <summary style={{ cursor: "pointer", color: "var(--danger, #C92F1F)", fontWeight: 600 }}>
+                      Show failed recipients
+                    </summary>
+                    <ul style={{ margin: "6px 0 0 18px", padding: 0, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text)" }}>
+                      {result.failures.map((f, i) => (
+                        <li key={`${f.email}-${i}`} style={{ marginBottom: 2 }}>
+                          <strong>{f.email}</strong> — <span style={{ color: "var(--text-muted)" }}>{f.reason || "unknown"}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div style={{ marginTop: 6, fontSize: 11, color: "var(--text-muted)" }}>
+                      These members were NOT marked as sent — clicking Send again will retry them.
+                      Full server logs: Vercel dashboard → Logs → <code>/api/admin-broadcast-launch</code>.
+                    </div>
+                  </details>
+                ) : (
+                  <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
+                    See Vercel dashboard → Logs → <code>/api/admin-broadcast-launch</code> for details. Clicking Send again will retry these members.
+                  </span>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
       {result?.error && (
@@ -636,10 +664,29 @@ function CutoverBroadcastSection({ jwt, members }) {
                   </span>
                 )}
                 {phaseResult.kind === "sent" && (
-                  <span style={{ color: "var(--primary)" }}>
-                    <strong>✓ Sent to {phaseResult.data.sent} of {phaseResult.data.total}.</strong>
-                    {phaseResult.data.failed > 0 && <span style={{ color: "var(--danger, #C92F1F)" }}> {phaseResult.data.failed} failed — see console.</span>}
-                  </span>
+                  <>
+                    <span style={{ color: "var(--primary)" }}>
+                      <strong>✓ Sent to {phaseResult.data.sent} of {phaseResult.data.total}.</strong>
+                      {phaseResult.data.failed > 0 && <span style={{ color: "var(--danger, #C92F1F)" }}> {phaseResult.data.failed} failed.</span>}
+                    </span>
+                    {phaseResult.data.failed > 0 && phaseResult.data.failures?.length > 0 && (
+                      <details style={{ marginTop: 6 }}>
+                        <summary style={{ cursor: "pointer", color: "var(--danger, #C92F1F)", fontWeight: 600, fontSize: 11 }}>
+                          Show failed recipients
+                        </summary>
+                        <ul style={{ margin: "6px 0 0 18px", padding: 0, fontFamily: "var(--font-mono)", fontSize: 11 }}>
+                          {phaseResult.data.failures.map((f, i) => (
+                            <li key={`${f.email}-${i}`} style={{ marginBottom: 2 }}>
+                              <strong>{f.email}</strong> — <span style={{ color: "var(--text-muted)" }}>{f.reason || "unknown"}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <div style={{ marginTop: 6, fontSize: 11, color: "var(--text-muted)" }}>
+                          Not marked as sent. Clicking Send again will retry these.
+                        </div>
+                      </details>
+                    )}
+                  </>
                 )}
               </div>
             )}
