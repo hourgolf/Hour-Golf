@@ -17,8 +17,10 @@
 //
 // Original behavior: handles the insert; Supabase triggers do duration calc.
 
-import { sendBookingConfirmation } from "../../lib/email";
+import { sendBookingConfirmation, sendBookingConflictAlert } from "../../lib/email";
 import { getRequestOrigin } from "../../lib/api-helpers";
+
+const HOURGOLF_TENANT_ID = "11111111-1111-4111-8111-111111111111";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
@@ -74,6 +76,98 @@ export default async function handler(req, res) {
         const data = await resp.json();
         const booked = data[0];
         results.push({ booking_id: record.booking_id, status: "ok", duration_hours: booked?.duration_hours });
+
+        // --- Conflict detection (Skedda → new-portal transition) ---
+        //
+        // Skedda has no visibility into new-portal bookings, so a
+        // member can book the same slot there and it lands here as
+        // an overlap. We can't reject the write (they already
+        // committed on Skedda's side), so: flag BOTH rows with the
+        // conflict columns, email the admin immediately, keep the
+        // existing booking-confirmation email firing.
+        //
+        // Scope: same bay + overlapping time window + tenant 1 (HG —
+        // this webhook is HG-only per the file header). Skip cancelled
+        // rows on either side. Self-upserts (same booking_id coming
+        // through again) don't count as conflicts.
+        try {
+          if (booked && record.booking_status === "Confirmed") {
+            const overlapResp = await fetch(
+              `${SUPABASE_URL}/rest/v1/bookings?tenant_id=eq.${HOURGOLF_TENANT_ID}` +
+                `&bay=eq.${encodeURIComponent(booked.bay || "")}` +
+                `&booking_status=eq.Confirmed` +
+                `&booking_id=neq.${encodeURIComponent(booked.booking_id)}` +
+                `&booking_start=lt.${encodeURIComponent(booked.booking_end)}` +
+                `&booking_end=gt.${encodeURIComponent(booked.booking_start)}` +
+                `&select=booking_id,customer_email,customer_name,booking_start,booking_end,bay,conflict_with`,
+              { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+            );
+            const overlaps = overlapResp.ok ? await overlapResp.json() : [];
+            if (overlaps.length > 0) {
+              const nowIso = new Date().toISOString();
+              const otherIds = overlaps.map((r) => r.booking_id).filter(Boolean);
+
+              // Stamp the incoming row with its conflict partners.
+              await fetch(
+                `${SUPABASE_URL}/rest/v1/bookings?booking_id=eq.${encodeURIComponent(booked.booking_id)}&tenant_id=eq.${HOURGOLF_TENANT_ID}`,
+                {
+                  method: "PATCH",
+                  headers: {
+                    apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+                    "Content-Type": "application/json", Prefer: "return=minimal",
+                  },
+                  body: JSON.stringify({
+                    conflict_with: otherIds.join(","),
+                    conflict_detected_at: nowIso,
+                  }),
+                }
+              );
+
+              // Stamp every existing partner with the incoming id
+              // appended to its conflict_with list. PATCH per row
+              // keeps the merge logic simple without a server-side
+              // function.
+              for (const other of overlaps) {
+                const merged = [
+                  ...String(other.conflict_with || "").split(",").filter(Boolean),
+                  booked.booking_id,
+                ].filter((v, i, a) => v && a.indexOf(v) === i);
+                await fetch(
+                  `${SUPABASE_URL}/rest/v1/bookings?booking_id=eq.${encodeURIComponent(other.booking_id)}&tenant_id=eq.${HOURGOLF_TENANT_ID}`,
+                  {
+                    method: "PATCH",
+                    headers: {
+                      apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+                      "Content-Type": "application/json", Prefer: "return=minimal",
+                    },
+                    body: JSON.stringify({
+                      conflict_with: merged.join(","),
+                      conflict_detected_at: other.conflict_detected_at || nowIso,
+                    }),
+                  }
+                );
+              }
+
+              // Alert admin. Awaited (same reason as the confirmation
+              // email below — Vercel freezes fire-and-forget on return).
+              try {
+                await sendBookingConflictAlert({
+                  tenantId: HOURGOLF_TENANT_ID,
+                  incoming: booked,
+                  existing: overlaps[0], // email body focuses on the first overlap; UI surfaces all
+                });
+              } catch (e) {
+                console.error("Booking conflict alert failed:", e);
+              }
+
+              console.warn(
+                `booking-webhook: DOUBLE BOOKING detected — ${booked.booking_id} overlaps ${otherIds.join(", ")} on ${booked.bay} ${booked.booking_start}`
+              );
+            }
+          }
+        } catch (e) {
+          console.error("booking-webhook: conflict detection failed:", e);
+        }
 
         // Send booking confirmation email (fire-and-forget)
         if (booked && record.booking_status === "Confirmed") {

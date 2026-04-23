@@ -108,6 +108,7 @@ export default function DayTimeline({
         : "upcoming";
       const mem = members.find((x) => x.email === b.customer_email);
       const tier = mem?.tier || "Non-Member";
+      const isConflict = !!b.conflict_detected_at || !!b.conflict_with;
       result[b.bay].push({
         id: b.booking_id,
         booking: b,
@@ -119,6 +120,7 @@ export default function DayTimeline({
         start: s,
         end: e,
         code: codesByBooking?.get(b.booking_id) || null,
+        isConflict,
       });
     }
     return result;
@@ -172,14 +174,17 @@ export default function DayTimeline({
                       type="button"
                       key={bk.id}
                       onClick={() => onEdit && onEdit(bk.booking)}
-                      className={`day-timeline-block status-${bk.status} ${isNonMember ? "non-member" : ""}`}
+                      className={`day-timeline-block status-${bk.status} ${isNonMember ? "non-member" : ""} ${bk.isConflict ? "is-conflict" : ""}`}
                       style={{
                         left: `${bk.leftPct}%`,
                         width: `${bk.widthPct}%`,
                       }}
-                      title={`${bk.memberName} · ${fT(bk.start)}–${fT(bk.end)} · ${bk.tier}${bk.code ? ` · code ${bk.code}` : ""}`}
+                      title={`${bk.isConflict ? "⚠ DOUBLE-BOOKED · " : ""}${bk.memberName} · ${fT(bk.start)}–${fT(bk.end)} · ${bk.tier}${bk.code ? ` · code ${bk.code}` : ""}`}
                     >
-                      <span className="day-timeline-block-name">{bk.memberName}</span>
+                      <span className="day-timeline-block-name">
+                        {bk.isConflict && <span aria-hidden="true" style={{ marginRight: 4 }}>⚠</span>}
+                        {bk.memberName}
+                      </span>
                       <span className="day-timeline-block-time">
                         {fT(bk.start)}–{fT(bk.end)}
                       </span>

@@ -93,6 +93,16 @@ export default function TodayView({
     return r;
   }, [todayBk, BAYS]);
 
+  // Conflicting bookings on the viewed day. Detected upstream by the
+  // booking-webhook when Skedda-originated bookings overlap existing
+  // same-bay bookings. Surfacing them prominently here is the whole
+  // point — an operator who just walked in should see "2 bookings
+  // conflict" before they see anything else on the schedule.
+  const conflictedToday = useMemo(
+    () => todayBk.filter((b) => b.conflict_detected_at || b.conflict_with),
+    [todayBk]
+  );
+
   const todayHrs = todayBk.reduce((s, b) => s + Number(b.duration_hours || 0), 0);
   const todayRev = todayBk.reduce((s, b) => {
     const m = members.find((x) => x.email === b.customer_email);
@@ -197,6 +207,41 @@ export default function TodayView({
               Today
             </button>
           )}
+        </div>
+      )}
+
+      {/* Conflict banner — loud, unmissable. One row per conflicted
+          booking; each row links to the Edit sheet (same onEdit hook
+          as the list/timeline) so the operator can jump straight to
+          resolution. Only renders when there's at least one — zero
+          state is silent. */}
+      {conflictedToday.length > 0 && (
+        <div className="today-conflict-banner" role="alert">
+          <div className="today-conflict-banner-head">
+            <span className="today-conflict-banner-eyebrow">⚠ Double-booked</span>
+            <span className="today-conflict-banner-count">
+              {conflictedToday.length} {conflictedToday.length === 1 ? "booking overlaps" : "bookings overlap"} another on the same {bayLabel.toLowerCase()}
+            </span>
+          </div>
+          <div className="today-conflict-banner-list">
+            {conflictedToday.map((b) => (
+              <button
+                key={b.booking_id}
+                type="button"
+                className="today-conflict-banner-row"
+                onClick={() => onEdit(b)}
+                title="Open to edit or cancel"
+              >
+                <span className="today-conflict-banner-row-name">{b.customer_name || b.customer_email}</span>
+                <span className="today-conflict-banner-row-meta">
+                  {fT(new Date(b.booking_start))}&ndash;{fT(new Date(b.booking_end))} · {b.bay}
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="today-conflict-banner-hint">
+            Likely a Skedda-era booking landing on top of a new-portal booking. Call one member to reschedule — both bookings are in the DB so their members expect to show up.
+          </p>
         </div>
       )}
 
@@ -382,6 +427,15 @@ export default function TodayView({
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      {(b.conflict_detected_at || b.conflict_with) && (
+                        <span
+                          className="badge"
+                          style={{ background: "var(--danger, #C92F1F)", color: "#EDF3E3", fontSize: 9 }}
+                          title="This booking overlaps another on the same bay. Call to resolve."
+                        >
+                          ⚠ CONFLICT
+                        </span>
+                      )}
                       {st === "now" && <span className="badge" style={{ background: "var(--primary)", fontSize: 9 }}>NOW</span>}
                       {st === "upcoming" && (
                         <span className="badge badge-sm" style={{ background: "var(--blue)" }}>

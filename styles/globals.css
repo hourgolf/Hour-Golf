@@ -1923,3 +1923,83 @@ html { overflow-y: scroll; }
   background: var(--danger, #C92F1F);
 }
 
+/* Conflicted bookings — double-bookings detected by the Skedda
+   webhook. Red outline + slight pulse halo so the operator's eye
+   catches them even in a busy grid. Applies on top of the status-*
+   class so live/upcoming/past colors remain underneath. */
+.day-timeline-block.is-conflict {
+  outline: 2px solid var(--danger, #C92F1F);
+  outline-offset: -1px;
+  box-shadow: 0 0 0 3px rgba(201,47,31,0.22);
+  z-index: 2;
+}
+.day-timeline-block.is-conflict:hover {
+  box-shadow: 0 4px 14px rgba(53,68,59,0.18), 0 0 0 3px rgba(201,47,31,0.35);
+}
+
+/* Conflict banner (admin Today top) ---------------------------- */
+.today-conflict-banner {
+  margin: 10px 0 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: rgba(201,47,31,0.08);
+  border: 1px solid rgba(201,47,31,0.35);
+}
+.today-conflict-banner-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.today-conflict-banner-eyebrow {
+  font-family: var(--font-display, inherit);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--danger, #C92F1F);
+}
+.today-conflict-banner-count {
+  font-size: 13px;
+  color: var(--text);
+}
+.today-conflict-banner-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.today-conflict-banner-row {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid rgba(201,47,31,0.25);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.today-conflict-banner-row:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(53,68,59,0.12);
+}
+.today-conflict-banner-row-name {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+}
+.today-conflict-banner-row-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.today-conflict-banner-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+

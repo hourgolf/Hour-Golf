@@ -29,6 +29,7 @@ const TEMPLATES = {
   "booking-confirmation":       "sendBookingConfirmation",
   "booking-cancellation":       "sendCancellationEmail",
   "access-code":                "sendAccessCodeEmail",
+  "booking-conflict-alert":     "sendBookingConflictAlert",
   "welcome":                    "sendWelcomeEmail",
   "payment-receipt":            "sendPaymentReceiptEmail",
   "payment-failed":             "sendPaymentFailedEmail",
@@ -81,6 +82,27 @@ function sampleDataFor(tpl, { tenantId, portalUrl }) {
         bookingStart: tomorrow.toISOString(),
         bookingEnd: endTomorrow.toISOString(),
         accessCode: "426801",
+      };
+    case "booking-conflict-alert":
+      return {
+        tenantId,
+        _preview: true,
+        incoming: {
+          booking_id: "skedda-demo-982314",
+          customer_email: "alex.rivera@example.com",
+          customer_name: "Alex Rivera",
+          bay: "Bay 2",
+          booking_start: tomorrow.toISOString(),
+          booking_end: endTomorrow.toISOString(),
+        },
+        existing: {
+          booking_id: "portal-demo-20260423-001",
+          customer_email: "morgan.chen@example.com",
+          customer_name: "Morgan Chen",
+          bay: "Bay 2",
+          booking_start: tomorrow.toISOString(),
+          booking_end: endTomorrow.toISOString(),
+        },
       };
     case "welcome":
       return {
