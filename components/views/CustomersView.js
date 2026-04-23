@@ -328,6 +328,83 @@ export default function CustomersView({
     }
   }
 
+  // ── Multi-select state for bulk actions ──────────────────────────
+  const [selectedEmails, setSelectedEmails] = useState(() => new Set());
+  // Sync selection against the visible filter — when the operator
+  // switches tier chips we drop selections for rows that just left the
+  // list so the bulk bar count doesn't lie.
+  const visibleEmails = useMemo(() => new Set(filtCust.map((c) => c.email)), [filtCust]);
+  const effectiveSelected = useMemo(() => {
+    const s = new Set();
+    selectedEmails.forEach((e) => { if (visibleEmails.has(e)) s.add(e); });
+    return s;
+  }, [selectedEmails, visibleEmails]);
+  const allVisibleSelected = filtCust.length > 0 && effectiveSelected.size === filtCust.length;
+
+  function toggleRow(email) {
+    setSelectedEmails((prev) => {
+      const n = new Set(prev);
+      if (n.has(email)) n.delete(email);
+      else n.add(email);
+      return n;
+    });
+  }
+
+  function toggleAllVisible() {
+    setSelectedEmails((prev) => {
+      if (allVisibleSelected) {
+        const n = new Set(prev);
+        filtCust.forEach((c) => n.delete(c.email));
+        return n;
+      }
+      const n = new Set(prev);
+      filtCust.forEach((c) => n.add(c.email));
+      return n;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedEmails(new Set());
+  }
+
+  function bulkExport() {
+    const rows = Array.from(effectiveSelected).map((email) => {
+      const c = allCust.find((x) => x.email === email) || { email, name: "", hrs: 0, cnt: 0 };
+      const m = members.find((x) => x.email === email);
+      return {
+        ...c,
+        tier: m?.tier || "Non-Member",
+        member_number: m?.member_number || null,
+      };
+    });
+    exportCSV(
+      rows.sort((a, b) => (a.name || "").localeCompare(b.name || "")),
+      `HourGolf-Selected-${new Date().toISOString().slice(0, 10)}.csv`
+    );
+  }
+
+  async function bulkChangeTier(newTier) {
+    if (!onUpdateTier || !newTier) return;
+    const emails = Array.from(effectiveSelected);
+    if (emails.length === 0) return;
+    if (!confirm(`Change tier of ${emails.length} customer${emails.length === 1 ? "" : "s"} to "${newTier}"?`)) return;
+    // Sequential, not parallel: admin-update-tier does a Stripe lookup
+    // on first-time paying-tier flips, and we don't want to hammer the
+    // Stripe API with N parallel searches. N is typically small (<20)
+    // so the total time is fine.
+    for (const email of emails) {
+      const c = allCust.find((x) => x.email === email);
+      try {
+        await onUpdateTier(email, newTier, c?.name || "");
+      } catch (e) {
+        // onUpdateTier surfaces its own toasts; continue through the
+        // batch so one failure doesn't abandon the rest.
+        console.warn("bulk tier change failed for", email, e);
+      }
+    }
+    clearSelection();
+  }
+
   const handleExport = useCallback((tierFilter) => {
     const rows = allCust.map((c) => {
       const m = members.find((x) => x.email === c.email);
@@ -509,6 +586,15 @@ export default function CustomersView({
       {/* Desktop table */}
       <div className="tbl usage-desktop">
         <div className="th">
+          <span style={{ width: 28, flex: "0 0 28px", display: "flex", justifyContent: "center" }}>
+            <input
+              type="checkbox"
+              className="chk"
+              checked={allVisibleSelected}
+              onChange={toggleAllVisible}
+              aria-label="Select all visible"
+            />
+          </span>
           <span style={{ flex: 2 }}>Customer</span>
           <span style={{ flex: 1 }}>Tier</span>
           <span style={{ flex: 1 }} className="text-r">Hours</span>
@@ -532,6 +618,18 @@ export default function CustomersView({
           const chargeAmountUsd = toChargeInfo ? toChargeInfo.hours * nmRate : 0;
           return (
             <div key={c.email} className="tr">
+              <span
+                style={{ width: 28, flex: "0 0 28px", display: "flex", justifyContent: "center" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  className="chk"
+                  checked={effectiveSelected.has(c.email)}
+                  onChange={() => toggleRow(c.email)}
+                  aria-label={`Select ${c.name || c.email}`}
+                />
+              </span>
               <span style={{ flex: 2, cursor: "pointer" }} onClick={() => onSelectMember(c.email)}>
                 <strong>{c.name}</strong>
                 {m?.member_number && (
@@ -596,7 +694,16 @@ export default function CustomersView({
           return (
             <div key={c.email} className="usage-card" onClick={() => onSelectMember(c.email)}>
               <div className="usage-card-top">
-                <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <input
+                    type="checkbox"
+                    className="chk"
+                    checked={effectiveSelected.has(c.email)}
+                    onChange={() => toggleRow(c.email)}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={`Select ${c.name || c.email}`}
+                  />
+                  <div>
                   <strong>{c.name}</strong>
                   {m?.member_number && (
                     <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600, color: "var(--primary)", marginLeft: 6, letterSpacing: 0.5 }}>
@@ -605,6 +712,7 @@ export default function CustomersView({
                   )}
                   {isOnApp && <OnAppChip />}
                 {isPastDue && <PastDueChip />}
+                  </div>
                 </div>
                 <Badge tier={tier} />
               </div>
@@ -628,6 +736,29 @@ export default function CustomersView({
           );
         })}
       </div>
+
+      {effectiveSelected.size > 0 && (
+        <div className="bulk-bar">
+          <span>{effectiveSelected.size} selected</span>
+          {cTier !== "__tocharge__" && (
+            <select
+              value=""
+              onChange={(e) => {
+                if (!e.target.value) return;
+                bulkChangeTier(e.target.value);
+                e.target.value = "";
+              }}
+              style={{ fontSize: 12, padding: "4px 8px" }}
+              title="Change tier for selected customers"
+            >
+              <option value="" disabled>Change tier…</option>
+              {TIERS.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          )}
+          <button onClick={bulkExport}>Export CSV</button>
+          <button onClick={clearSelection}>Clear</button>
+        </div>
+      )}
     </div>
   );
 }
