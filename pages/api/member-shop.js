@@ -98,16 +98,30 @@ export default async function handler(req, res) {
         const remaining = it.quantity_available != null
           ? Math.max(0, it.quantity_available - (it.quantity_claimed || 0))
           : null;
+        // Sale replaces the member tier discount — if an item is on
+        // sale, the sale price is what the member pays (no additional
+        // percent off). Prevents double-dipping and keeps the "was X
+        // now Y" story clean for the member.
+        const onSale = !!(
+          it.compare_at_price
+          && Number(it.compare_at_price) > Number(it.price)
+          && (!it.sale_ends_at || new Date(it.sale_ends_at).getTime() > Date.now())
+        );
         return {
           id: it.id, title: it.title, subtitle: it.subtitle,
           description: it.description, image_url: it.image_url,
           image_urls: Array.isArray(it.image_urls) && it.image_urls.length > 0 ? it.image_urls : (it.image_url ? [it.image_url] : []),
           price: Number(it.price), category: it.category, brand: it.brand,
+          compare_at_price: it.compare_at_price != null ? Number(it.compare_at_price) : null,
+          sale_ends_at: it.sale_ends_at || null,
           is_limited: it.is_limited, sizes: it.sizes,
           quantity_remaining: remaining,
           sold_out: remaining !== null && remaining <= 0,
-          discount_pct: discountPct,
-          member_price: Math.round(Number(it.price) * (1 - discountPct / 100) * 100) / 100,
+          created_at: it.created_at || null,
+          discount_pct: onSale ? 0 : discountPct,
+          member_price: onSale
+            ? Number(it.price)
+            : Math.round(Number(it.price) * (1 - discountPct / 100) * 100) / 100,
         };
       });
 
@@ -217,7 +231,16 @@ export default async function handler(req, res) {
       const enriched = cartItems.map((c) => {
         const it = itemMap[c.item_id] || {};
         const unitPrice = Number(it.price || 0);
-        const memberPrice = Math.round(unitPrice * (1 - discountPct / 100) * 100) / 100;
+        // Sale price = member pays sale price; no further tier discount.
+        // Mirrors the display rule in the browse list.
+        const onSale = !!(
+          it.compare_at_price
+          && Number(it.compare_at_price) > unitPrice
+          && (!it.sale_ends_at || new Date(it.sale_ends_at).getTime() > Date.now())
+        );
+        const memberPrice = onSale
+          ? unitPrice
+          : Math.round(unitPrice * (1 - discountPct / 100) * 100) / 100;
         return {
           cart_id: c.id,
           item_id: c.item_id,
@@ -408,9 +431,17 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: `Size "${c.size}" no longer available for "${it.title}".` });
         }
         const unitPrice = Number(it.price);
-        const lineTotal = Math.round(unitPrice * c.quantity * (1 - discountPct / 100) * 100) / 100;
+        // Sale price is the unit price; member tier discount doesn't
+        // stack on sale items (rule mirrors the browse/cart render).
+        const onSale = !!(
+          it.compare_at_price
+          && Number(it.compare_at_price) > unitPrice
+          && (!it.sale_ends_at || new Date(it.sale_ends_at).getTime() > Date.now())
+        );
+        const effectiveDiscountPct = onSale ? 0 : discountPct;
+        const lineTotal = Math.round(unitPrice * c.quantity * (1 - effectiveDiscountPct / 100) * 100) / 100;
         grandTotal += lineTotal;
-        lineItems.push({ cart: c, item: it, unitPrice, lineTotal });
+        lineItems.push({ cart: c, item: it, unitPrice, lineTotal, discountPct: effectiveDiscountPct });
       }
 
       grandTotal = Math.round(grandTotal * 100) / 100;
@@ -708,7 +739,7 @@ export default async function handler(req, res) {
             size: li.cart.size || null,
             quantity: li.cart.quantity,
             unit_price: li.unitPrice,
-            discount_pct: discountPct,
+            discount_pct: li.discountPct,
             total: li.lineTotal,
             status: "confirmed",
             stripe_payment_intent_id: pi?.id || null,

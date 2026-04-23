@@ -11,6 +11,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { useBranding } from "../hooks/useBranding";
 import { optimizedImageUrl } from "../lib/branding";
+import { isOnSale } from "../lib/shop-pricing";
 
 // Per-request render so tenant branding is fresh on every load and
 // Vercel's Edge CDN doesn't cache the wrong tenant's HTML.
@@ -55,6 +56,9 @@ export default function PublicShopPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState([]);
+  const [brandFilter, setBrandFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("featured");
   const [cartOpen, setCartOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [selectedSize, setSelectedSize] = useState("");
@@ -228,8 +232,47 @@ export default function PublicShopPage() {
             No items available right now. Check back soon.
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-            {items.map((it) => (
+          <>
+            {(() => {
+              const allBrands = [...new Set(items.map((it) => it.brand).filter(Boolean))].sort();
+              const allCategories = [...new Set(items.map((it) => it.category).filter(Boolean))].sort();
+              if (items.length < 4 || (allBrands.length <= 1 && allCategories.length <= 1)) return null;
+              return (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                  {allCategories.length > 1 && (
+                    <>
+                      <button type="button" onClick={() => setCategoryFilter("all")} style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, cursor: "pointer", border: "1px solid var(--border)", background: categoryFilter === "all" ? "var(--primary)" : "var(--surface)", color: categoryFilter === "all" ? "#EDF3E3" : "var(--text)", fontFamily: "inherit" }}>All</button>
+                      {allCategories.map((c) => (
+                        <button type="button" key={c} onClick={() => setCategoryFilter(c)} style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, cursor: "pointer", border: "1px solid var(--border)", background: categoryFilter === c ? "var(--primary)" : "var(--surface)", color: categoryFilter === c ? "#EDF3E3" : "var(--text)", fontFamily: "inherit" }}>{c}</button>
+                      ))}
+                    </>
+                  )}
+                  {allBrands.length > 1 && (
+                    <select value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)} style={{ padding: "4px 8px", fontSize: 11, borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontFamily: "inherit", marginLeft: "auto" }}>
+                      <option value="">All brands</option>
+                      {allBrands.map((b) => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                  )}
+                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ padding: "4px 8px", fontSize: 11, borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontFamily: "inherit", marginLeft: allBrands.length > 1 ? 0 : "auto" }}>
+                    <option value="featured">Featured</option>
+                    <option value="newest">Newest</option>
+                    <option value="price_asc">Price: low to high</option>
+                    <option value="price_desc">Price: high to low</option>
+                    <option value="sale">On sale first</option>
+                  </select>
+                </div>
+              );
+            })()}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+              {(() => {
+                let filtered = items;
+                if (brandFilter) filtered = filtered.filter((it) => it.brand === brandFilter);
+                if (categoryFilter !== "all") filtered = filtered.filter((it) => it.category === categoryFilter);
+                if (sortBy === "newest") filtered = [...filtered].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+                else if (sortBy === "price_asc") filtered = [...filtered].sort((a, b) => Number(a.price) - Number(b.price));
+                else if (sortBy === "price_desc") filtered = [...filtered].sort((a, b) => Number(b.price) - Number(a.price));
+                else if (sortBy === "sale") filtered = [...filtered].sort((a, b) => (isOnSale(b) ? 1 : 0) - (isOnSale(a) ? 1 : 0));
+                return filtered.map((it) => (
               <button
                 key={it.id}
                 type="button"
@@ -251,15 +294,29 @@ export default function PublicShopPage() {
                   <div style={{ aspectRatio: "1", background: "var(--primary-bg)" }} />
                 )}
                 <div style={{ padding: "10px 12px" }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 2, lineHeight: 1.3 }}>{it.title}</div>
-                  {it.brand && <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>{it.brand}</div>}
-                  <div style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, color: "var(--primary)" }}>
-                    ${Number(it.price).toFixed(2)}
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 2, lineHeight: 1.3 }}>
+                    {it.title}
+                    {isOnSale(it) && (
+                      <span style={{ marginLeft: 6, background: "#C77B3C", color: "#EDF3E3", fontSize: 8, padding: "2px 6px", borderRadius: 4, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", verticalAlign: "middle" }}>SALE</span>
+                    )}
                   </div>
+                  {it.brand && <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>{it.brand}</div>}
+                  {isOnSale(it) ? (
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                      <span style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, color: "var(--danger, #C92F1F)" }}>${Number(it.price).toFixed(2)}</span>
+                      <span style={{ textDecoration: "line-through", color: "var(--text-muted)", fontSize: 12 }}>${Number(it.compare_at_price).toFixed(2)}</span>
+                    </div>
+                  ) : (
+                    <div style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, color: "var(--primary)" }}>
+                      ${Number(it.price).toFixed(2)}
+                    </div>
+                  )}
                 </div>
               </button>
-            ))}
-          </div>
+                ));
+              })()}
+            </div>
+          </>
         )}
       </div>
 
@@ -308,9 +365,17 @@ export default function PublicShopPage() {
             <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, marginBottom: 4 }}>{selected.title}</h2>
             {selected.brand && <p style={{ color: "var(--text-muted)", margin: "0 0 8px 0", fontSize: 13 }}>{selected.brand}</p>}
             {selected.description && <p style={{ fontSize: 14, lineHeight: 1.5, margin: "0 0 14px 0" }}>{selected.description}</p>}
-            <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, color: "var(--primary)", marginBottom: 14 }}>
-              ${Number(selected.price).toFixed(2)}
-            </div>
+            {isOnSale(selected) ? (
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 14 }}>
+                <span style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, color: "var(--danger, #C92F1F)" }}>${Number(selected.price).toFixed(2)}</span>
+                <span style={{ textDecoration: "line-through", color: "var(--text-muted)", fontSize: 14 }}>${Number(selected.compare_at_price).toFixed(2)}</span>
+                <span style={{ background: "#C77B3C", color: "#EDF3E3", fontSize: 10, padding: "2px 8px", borderRadius: 4, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>SALE</span>
+              </div>
+            ) : (
+              <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, color: "var(--primary)", marginBottom: 14 }}>
+                ${Number(selected.price).toFixed(2)}
+              </div>
+            )}
             {selected.sizes && selected.sizes.length > 0 && (
               <div style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 6 }}>Size</div>

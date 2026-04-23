@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import Modal from "../ui/Modal";
 import StatusBadge from "../ui/StatusBadge";
 import { optimizedImageUrl } from "../../lib/branding";
+import { isOnSale } from "../../lib/shop-pricing";
 
 const STATUS_COLORS = {
   pending: "#E8A838",
@@ -47,6 +48,9 @@ export default function MemberShop({ member, tierConfig, showToast }) {
   const [creditBalance, setCreditBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("browse");
+  const [brandFilter, setBrandFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("featured");
 
   // Product modal
   const [selectedItem, setSelectedItem] = useState(null);
@@ -330,8 +334,31 @@ export default function MemberShop({ member, tierConfig, showToast }) {
 
   if (loading) return <div className="mem-loading">Loading shop...</div>;
 
-  const limitedItems = items.filter((it) => it.is_limited);
-  const regularItems = items.filter((it) => !it.is_limited);
+  // Brand + category chip options derived from the loaded catalog.
+  // Keeps chips in sync with what's actually stocked; chips disappear
+  // if the operator stops carrying a brand.
+  const allBrands = [...new Set(items.map((it) => it.brand).filter(Boolean))].sort();
+  const allCategories = [...new Set(items.map((it) => it.category).filter(Boolean))].sort();
+
+  // Apply filter + sort before splitting into Limited / regular.
+  // Limited drops stay pinned in their hero section regardless of sort
+  // because that's editorial, but they still respect brand/category
+  // filters.
+  let filtered = items;
+  if (brandFilter) filtered = filtered.filter((it) => it.brand === brandFilter);
+  if (categoryFilter !== "all") filtered = filtered.filter((it) => it.category === categoryFilter);
+  if (sortBy === "newest") {
+    filtered = [...filtered].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+  } else if (sortBy === "price_asc") {
+    filtered = [...filtered].sort((a, b) => Number(a.price) - Number(b.price));
+  } else if (sortBy === "price_desc") {
+    filtered = [...filtered].sort((a, b) => Number(b.price) - Number(a.price));
+  } else if (sortBy === "sale") {
+    filtered = [...filtered].sort((a, b) => (isOnSale(b) ? 1 : 0) - (isOnSale(a) ? 1 : 0));
+  }
+
+  const limitedItems = filtered.filter((it) => it.is_limited);
+  const regularItems = filtered.filter((it) => !it.is_limited);
   const creditsApplied = Math.min(creditBalance, cartTotal);
   const cardChargeAmt = Math.round((cartTotal - creditsApplied) * 100) / 100;
   const modalImages = selectedItem?.image_urls?.length > 0 ? selectedItem.image_urls : (selectedItem?.image_url ? [selectedItem.image_url] : []);
@@ -403,6 +430,68 @@ export default function MemberShop({ member, tierConfig, showToast }) {
               </button>
             </div>
           </div>
+
+          {/* Filter + sort controls — only render when the catalog has
+              enough items to be worth filtering. Below 4 items, these
+              chips are noise. */}
+          {items.length >= 4 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+              {allCategories.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setCategoryFilter("all")}
+                    style={{
+                      padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                      border: "1px solid var(--border)",
+                      background: categoryFilter === "all" ? "var(--primary)" : "var(--surface)",
+                      color: categoryFilter === "all" ? "#EDF3E3" : "var(--text)",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    All
+                  </button>
+                  {allCategories.map((c) => (
+                    <button
+                      type="button"
+                      key={c}
+                      onClick={() => setCategoryFilter(c)}
+                      style={{
+                        padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                        border: "1px solid var(--border)",
+                        background: categoryFilter === c ? "var(--primary)" : "var(--surface)",
+                        color: categoryFilter === c ? "#EDF3E3" : "var(--text)",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </>
+              )}
+              {allBrands.length > 1 && (
+                <select
+                  value={brandFilter}
+                  onChange={(e) => setBrandFilter(e.target.value)}
+                  style={{ padding: "4px 8px", fontSize: 11, borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontFamily: "inherit", marginLeft: "auto" }}
+                >
+                  <option value="">All brands</option>
+                  {allBrands.map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+              )}
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                style={{ padding: "4px 8px", fontSize: 11, borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontFamily: "inherit", marginLeft: allBrands.length > 1 ? 0 : "auto" }}
+              >
+                <option value="featured">Featured</option>
+                <option value="newest">Newest</option>
+                <option value="price_asc">Price: low to high</option>
+                <option value="price_desc">Price: high to low</option>
+                <option value="sale">On sale first</option>
+              </select>
+            </div>
+          )}
 
           {limitedItems.length > 0 && (
             <>
@@ -789,7 +878,13 @@ export default function MemberShop({ member, tierConfig, showToast }) {
             {selectedItem.description && <p style={{ fontSize: 14, lineHeight: 1.5, margin: "0 0 16px 0" }}>{selectedItem.description}</p>}
 
             <div style={{ marginBottom: 16 }}>
-              {discountPct > 0 ? (
+              {isOnSale(selectedItem) ? (
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  <span style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--danger, #C92F1F)" }}>${selectedItem.price.toFixed(2)}</span>
+                  <span style={{ textDecoration: "line-through", color: "var(--text-muted)", fontSize: 14 }}>${Number(selectedItem.compare_at_price).toFixed(2)}</span>
+                  <StatusBadge intent="warning" style={{ fontSize: 10 }}>SALE</StatusBadge>
+                </div>
+              ) : discountPct > 0 ? (
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                   <span style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--primary)" }}>${selectedItem.member_price.toFixed(2)}</span>
                   <span style={{ textDecoration: "line-through", color: "var(--text-muted)", fontSize: 14 }}>${selectedItem.price.toFixed(2)}</span>
@@ -1199,6 +1294,9 @@ function ItemCard({ item, discountPct, onClick }) {
           {item.is_limited && !item.sold_out && (
             <span style={{ position: "absolute", top: 8, left: 8, background: "#C92F1F", color: "#EDF3E3", fontSize: 9, fontFamily: "var(--font-display)", fontWeight: 700, padding: "3px 10px", borderRadius: "var(--radius)", textTransform: "uppercase", letterSpacing: 1 }}>Limited</span>
           )}
+          {isOnSale(item) && !item.sold_out && (
+            <span style={{ position: "absolute", top: 8, left: item.is_limited ? 82 : 8, background: "#C77B3C", color: "#EDF3E3", fontSize: 9, fontFamily: "var(--font-display)", fontWeight: 700, padding: "3px 10px", borderRadius: "var(--radius)", textTransform: "uppercase", letterSpacing: 1 }}>Sale</span>
+          )}
           {item.image_urls?.length > 1 && (
             <span style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.5)", color: "#fff", fontSize: 9, padding: "2px 6px", borderRadius: 4 }}>1/{item.image_urls.length}</span>
           )}
@@ -1211,7 +1309,12 @@ function ItemCard({ item, discountPct, onClick }) {
         <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{item.title}</div>
         {item.subtitle && <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>{item.subtitle}</div>}
         <div style={{ marginTop: "auto", display: "flex", alignItems: "baseline", gap: 6 }}>
-          {discountPct > 0 ? (
+          {isOnSale(item) ? (
+            <>
+              <span style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--danger, #C92F1F)" }}>${item.price.toFixed(0)}</span>
+              <span style={{ textDecoration: "line-through", color: "var(--text-muted)", fontSize: 12 }}>${Number(item.compare_at_price).toFixed(0)}</span>
+            </>
+          ) : discountPct > 0 ? (
             <>
               <span style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--primary)" }}>${item.member_price.toFixed(0)}</span>
               <span style={{ textDecoration: "line-through", color: "var(--text-muted)", fontSize: 12 }}>${item.price.toFixed(0)}</span>
