@@ -12,6 +12,7 @@ const STATUS_COLORS = {
   ready: "#35443B",
   picked_up: "#8BB5A0",
   cancelled: "#C92F1F",
+  refunded: "#C77B3C",
 };
 
 function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
@@ -303,6 +304,33 @@ export default function ShopAdminView({ apiKey }) {
     } catch {}
   }
 
+  async function refundOrder(order) {
+    const amount = (
+      Number(order.unit_price || 0) * (Number(order.quantity) || 1) * (1 - Number(order.discount_pct || 0) / 100)
+      + Number(order.shipping_amount || 0)
+      + Number(order.tax_amount || 0)
+    ).toFixed(2);
+    const reason = window.prompt(
+      `Refund $${amount} to ${order.member_name || order.member_email}?\n\nOptional reason (shown in their refund email):`,
+      ""
+    );
+    if (reason === null) return; // user cancelled the prompt
+    try {
+      const r = await fetch("/api/admin-refund-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({ order_id: order.id, reason: reason || undefined }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || d.error || `HTTP ${r.status}`);
+      await fetchOrders();
+      await fetchItems();
+      alert(`Refunded $${(d.amount_cents / 100).toFixed(2)}. Stripe ref: ${d.stripe_refund_id}`);
+    } catch (e) {
+      alert("Refund failed: " + e.message);
+    }
+  }
+
   const pendingCount = orders.filter((o) => o.status === "pending").length;
 
   if (loading) return <div className="content"><p className="muted">Loading shop...</p></div>;
@@ -490,6 +518,9 @@ export default function ShopAdminView({ apiKey }) {
                   {o.status === "ready" && (
                     <button className="btn primary" style={{ fontSize: 10, padding: "2px 8px" }} onClick={() => updateOrderStatus(o.id, "picked_up")}>Picked Up</button>
                   )}
+                  {(o.status === "confirmed" || o.status === "ready" || o.status === "picked_up") && !o.refunded_at && o.stripe_payment_intent_id && (
+                    <button className="btn" style={{ fontSize: 10, padding: "2px 8px", marginLeft: 4, color: "var(--red)" }} onClick={() => refundOrder(o)} title="Refund via Stripe + email the member">Refund</button>
+                  )}
                 </span>
               </div>
             ))}
@@ -525,6 +556,9 @@ export default function ShopAdminView({ apiKey }) {
                     )}
                     {o.status === "ready" && (
                       <button className="btn primary" style={{ fontSize: 10, padding: "2px 8px" }} onClick={() => updateOrderStatus(o.id, "picked_up")}>Picked Up</button>
+                    )}
+                    {(o.status === "confirmed" || o.status === "ready" || o.status === "picked_up") && !o.refunded_at && o.stripe_payment_intent_id && (
+                      <button className="btn" style={{ fontSize: 10, padding: "2px 8px", color: "var(--red)" }} onClick={() => refundOrder(o)}>Refund</button>
                     )}
                   </div>
                 </div>
