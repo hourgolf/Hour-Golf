@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import DatePicker from "../DatePicker";
 import { useTenantFeatures } from "../../hooks/useTenantFeatures";
+import MemberAddressBook from "./MemberAddressBook";
 
 // Birthday picker bounds: anyone older than 1900 is unrealistic; max is
 // "today" minus 18 years (signup enforces 18+, and edits should stay
@@ -483,6 +484,16 @@ export default function MemberAccount({ member, tierConfig, refresh, showToast, 
             </div>
             <span style={{ fontSize: 18, color: "var(--text-muted)", flexShrink: 0 }} aria-hidden="true">›</span>
           </button>
+        </div>
+      )}
+
+      {/* Saved shipping addresses — members who order from the pro
+          shop shouldn't retype their address every time. Hidden for
+          tenants without shop enabled. */}
+      {isFeatureEnabled("pro_shop") && (
+        <div className="mem-section">
+          <div className="mem-section-head">Shipping addresses</div>
+          <MemberAddressBook showToast={showToast} />
         </div>
       )}
 
