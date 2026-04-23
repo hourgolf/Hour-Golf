@@ -1,12 +1,124 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { TIERS, TIER_COLORS, TZ } from "../../lib/constants";
 import { mL, hrs, dlr } from "../../lib/format";
 import { useBranding } from "../../hooks/useBranding";
 import { resolveBays } from "../../lib/branding";
-import { supaPatch } from "../../lib/supabase";
+import { supa, supaPatch } from "../../lib/supabase";
 import Badge from "../ui/Badge";
 import ActivityLog from "../ui/ActivityLog";
 import StatusBadge from "../ui/StatusBadge";
+
+// Shop analytics. Pulls shop_orders (last 90d) + shop_items via the
+// admin JWT + admin_all RLS. Computes top sellers, low stock, and
+// a revenue headline for the operator. Read-only.
+function ShopReportSection({ apiKey }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    if (!apiKey) return;
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    (async () => {
+      try {
+        const [orders, items] = await Promise.all([
+          supa(apiKey, "shop_orders", `?status=in.(confirmed,ready,picked_up)&created_at=gte.${encodeURIComponent(cutoff)}&select=item_id,quantity,unit_price,total,member_email,created_at,refunded_at&limit=5000`),
+          supa(apiKey, "shop_items", `?select=id,title,brand,price,quantity_available,quantity_claimed,is_published&limit=1000`),
+        ]);
+        setData({ orders, items });
+      } catch (e) {
+        setErr(e?.message || String(e));
+      }
+    })();
+  }, [apiKey]);
+
+  if (err) return <p className="muted" style={{ fontSize: 13 }}>Couldn&rsquo;t load shop report ({err}).</p>;
+  if (!data) return <p className="muted" style={{ fontSize: 13 }}>Loading shop report…</p>;
+
+  // KPI: non-refunded orders only.
+  const paidOrders = data.orders.filter((o) => !o.refunded_at);
+  const totalRevenue = paidOrders.reduce((s, o) => s + Number(o.total || 0), 0);
+  const uniqueBuyers = new Set(paidOrders.map((o) => o.member_email)).size;
+
+  // Top sellers — aggregate quantity + revenue per item.
+  const itemMap = {};
+  data.items.forEach((i) => { itemMap[i.id] = i; });
+  const sellerAgg = {};
+  paidOrders.forEach((o) => {
+    if (!o.item_id) return;
+    if (!sellerAgg[o.item_id]) sellerAgg[o.item_id] = { item_id: o.item_id, units: 0, revenue: 0 };
+    sellerAgg[o.item_id].units += Number(o.quantity || 0);
+    sellerAgg[o.item_id].revenue += Number(o.total || 0);
+  });
+  const topSellers = Object.values(sellerAgg)
+    .map((r) => ({ ...r, item: itemMap[r.item_id] }))
+    .filter((r) => r.item)
+    .sort((a, b) => b.units - a.units)
+    .slice(0, 10);
+
+  // Low stock — published items with a finite cap and ≤3 left. Sort
+  // ascending so the most-urgent item is first.
+  const lowStock = data.items
+    .filter((i) => i.is_published && i.quantity_available != null)
+    .map((i) => ({ ...i, remaining: i.quantity_available - (i.quantity_claimed || 0) }))
+    .filter((i) => i.remaining <= 3)
+    .sort((a, b) => a.remaining - b.remaining);
+
+  return (
+    <>
+      <div className="summary">
+        <div className="sum-item"><span className="sum-val">{paidOrders.length}</span><span className="sum-lbl">Orders (90d)</span></div>
+        <div className="sum-item"><span className="sum-val">{dlr(totalRevenue)}</span><span className="sum-lbl">Revenue (90d)</span></div>
+        <div className="sum-item"><span className="sum-val">{uniqueBuyers}</span><span className="sum-lbl">Unique buyers</span></div>
+      </div>
+
+      <h3 className="section-head" style={{ marginTop: 20 }}>Top Sellers (last 90 days)</h3>
+      {topSellers.length === 0 ? (
+        <p className="muted" style={{ fontSize: 13 }}>No orders in the window.</p>
+      ) : (
+        <div className="tbl">
+          <div className="th">
+            <span style={{ flex: 3 }}>Item</span>
+            <span style={{ flex: 1 }}>Brand</span>
+            <span style={{ flex: 1 }} className="text-r">Units</span>
+            <span style={{ flex: 1 }} className="text-r">Revenue</span>
+          </div>
+          {topSellers.map((r) => (
+            <div key={r.item_id} className="tr">
+              <span style={{ flex: 3 }}><strong>{r.item.title}</strong></span>
+              <span style={{ flex: 1 }} className="email-sm">{r.item.brand || "—"}</span>
+              <span style={{ flex: 1 }} className="text-r tab-num">{r.units}</span>
+              <span style={{ flex: 1 }} className="text-r tab-num">{dlr(r.revenue)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <h3 className="section-head" style={{ marginTop: 20 }}>Low Stock (3 or fewer)</h3>
+      {lowStock.length === 0 ? (
+        <p className="muted" style={{ fontSize: 13 }}>Nothing is low on stock.</p>
+      ) : (
+        <div className="tbl">
+          <div className="th">
+            <span style={{ flex: 3 }}>Item</span>
+            <span style={{ flex: 1 }}>Brand</span>
+            <span style={{ flex: 1 }} className="text-r">Remaining</span>
+            <span style={{ flex: 1 }} className="text-r">Stock</span>
+          </div>
+          {lowStock.map((i) => (
+            <div key={i.id} className="tr">
+              <span style={{ flex: 3 }}><strong>{i.title}</strong></span>
+              <span style={{ flex: 1 }} className="email-sm">{i.brand || "—"}</span>
+              <span style={{ flex: 1 }} className={`text-r tab-num ${i.remaining === 0 ? "red bold" : i.remaining <= 1 ? "red" : ""}`}>
+                {i.remaining}
+              </span>
+              <span style={{ flex: 1 }} className="text-r tab-num muted">{i.quantity_available}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
 
 /* ── helpers ────────────────────────────────────── */
 
@@ -40,6 +152,7 @@ const SECTIONS = [
   { key: "usage",     label: "Usage" },
   { key: "members",   label: "Members" },
   { key: "passes",    label: "Punch Passes" },
+  { key: "shop",      label: "Shop" },
   { key: "conflicts", label: "Conflicts" },
   { key: "activity",  label: "Activity" },
 ];
@@ -1039,6 +1152,7 @@ export default function ReportsView({ members, bookings, tierCfg, payments, apiK
       {section === "usage" && renderUsage()}
       {section === "members" && renderMembers()}
       {section === "passes" && renderPasses()}
+      {section === "shop" && <ShopReportSection apiKey={apiKey} />}
       {section === "conflicts" && renderConflicts()}
       {section === "activity" && (
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "14px 16px" }}>

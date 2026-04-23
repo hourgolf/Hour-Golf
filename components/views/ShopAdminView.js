@@ -4,6 +4,66 @@ import Confirm from "../ui/Confirm";
 import StatusBadge from "../ui/StatusBadge";
 import { isOnSale, saleDiscountPct } from "../../lib/shop-pricing";
 
+// --- CSV helpers ---
+const CSV_COLUMNS = [
+  "id", "title", "subtitle", "description", "brand", "category",
+  "price", "compare_at_price", "sale_ends_at",
+  "quantity_available", "sizes", "is_published", "is_limited",
+  "drop_date", "display_order",
+];
+
+function csvEscape(v) {
+  if (v == null) return "";
+  const s = Array.isArray(v) ? v.join("|") : String(v);
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function exportItemsCsv(items) {
+  const header = CSV_COLUMNS.join(",");
+  const lines = items.map((it) => CSV_COLUMNS.map((c) => csvEscape(it[c])).join(","));
+  const csv = [header, ...lines].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `shop-items-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Very small CSV parser: handles quoted fields + embedded commas +
+// doubled-quote escapes. Not a general-purpose library; good enough
+// for the export format we produce (round-trippable).
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { cell += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        cell += c;
+      }
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ",") { row.push(cell); cell = ""; }
+      else if (c === "\n") { row.push(cell); cell = ""; rows.push(row); row = []; }
+      else if (c === "\r") { /* skip */ }
+      else cell += c;
+    }
+  }
+  if (cell.length > 0 || row.length > 0) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows;
+}
+
 const CATEGORIES = ["Apparel", "Accessories", "Equipment", "Other"];
 
 const STATUS_COLORS = {
@@ -231,6 +291,130 @@ function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
   );
 }
 
+// CSV import modal: textarea paste → preview → upsert. Upserts by
+// the `id` column if present; otherwise inserts new. Boolean fields
+// accept true/false/1/0/yes/no; sizes accepts pipe- or comma-
+// separated values.
+function CsvImportModal({ open, onClose, onDone, apiKey }) {
+  const [text, setText] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    if (open) { setText(""); setPreview(null); setErr(null); setBusy(false); }
+  }, [open]);
+
+  function coerce(row, header) {
+    const BOOLS = ["is_published", "is_limited"];
+    const NUMS = ["price", "compare_at_price", "quantity_available", "display_order"];
+    const out = {};
+    header.forEach((col, i) => {
+      const v = row[i];
+      if (v == null || v === "") return;
+      if (BOOLS.includes(col)) out[col] = /^(true|1|yes|y)$/i.test(String(v).trim());
+      else if (NUMS.includes(col)) out[col] = Number(v);
+      else if (col === "sizes") {
+        const parts = String(v).split(/[|,]/).map((s) => s.trim()).filter(Boolean);
+        out[col] = parts.length ? parts : null;
+      } else {
+        out[col] = String(v).trim();
+      }
+    });
+    return out;
+  }
+
+  function runPreview() {
+    setErr(null);
+    try {
+      const rows = parseCsv(text.trim());
+      if (rows.length < 2) return setErr("Need a header row + at least one data row.");
+      const header = rows[0].map((s) => s.trim());
+      const missing = ["title", "price"].filter((c) => !header.includes(c));
+      if (missing.length) return setErr(`Missing required column(s): ${missing.join(", ")}`);
+      const parsed = rows.slice(1)
+        .filter((r) => r.some((c) => c && c.trim()))
+        .map((r) => coerce(r, header));
+      setPreview({ header, rows: parsed });
+    } catch (e) {
+      setErr(e.message || "Parse failed");
+    }
+  }
+
+  async function runImport() {
+    if (!preview) return;
+    setBusy(true);
+    setErr(null);
+    const results = { created: 0, updated: 0, failed: 0 };
+    try {
+      for (const row of preview.rows) {
+        const { id, ...data } = row;
+        if (!data.title || data.price == null) { results.failed++; continue; }
+        try {
+          const url = id ? `/api/admin-shop?id=${id}` : "/api/admin-shop";
+          const r = await fetch(url, {
+            method: id ? "PATCH" : "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+            body: JSON.stringify(data),
+          });
+          if (!r.ok) { results.failed++; continue; }
+          if (id) results.updated++;
+          else results.created++;
+        } catch {
+          results.failed++;
+        }
+      }
+      await onDone();
+      alert(`Import complete — ${results.created} created, ${results.updated} updated, ${results.failed} failed.`);
+      onClose();
+    } catch (e) {
+      setErr(e.message || "Import failed");
+    }
+    setBusy(false);
+  }
+
+  return (
+    <Modal open={open} onClose={onClose}>
+      <h2>Import items from CSV</h2>
+      <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+        Paste a CSV with these columns (first row is the header):
+        <br />
+        <code style={{ fontSize: 11 }}>{CSV_COLUMNS.join(", ")}</code>
+        <br />
+        Rows with an <code>id</code> update existing items; rows without one create new.
+      </p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={10}
+        placeholder="id,title,price,category,brand,is_published
+,Travis Mathew Polo,79,Apparel,Travis Mathew,true"
+        style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 12, padding: 10, border: "1px solid var(--border)", borderRadius: 6, background: "var(--surface)", color: "var(--text)" }}
+      />
+      {err && <div style={{ color: "var(--danger, #C92F1F)", fontSize: 13, marginTop: 8 }}>{err}</div>}
+      {preview && (
+        <div style={{ marginTop: 12, padding: 10, background: "var(--primary-bg)", borderRadius: 6, fontSize: 12 }}>
+          <strong>Preview:</strong> {preview.rows.length} row{preview.rows.length === 1 ? "" : "s"} ready.
+          <br />
+          <span style={{ color: "var(--text-muted)" }}>
+            {preview.rows.filter((r) => r.id).length} will update, {preview.rows.filter((r) => !r.id).length} will create.
+          </span>
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
+        <button className="btn" onClick={onClose} disabled={busy}>Cancel</button>
+        {!preview ? (
+          <button className="btn primary" onClick={runPreview} disabled={!text.trim() || busy}>Preview</button>
+        ) : (
+          <button className="btn primary" onClick={runImport} disabled={busy}>
+            {busy ? "Importing…" : `Import ${preview.rows.length}`}
+          </button>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 export default function ShopAdminView({ apiKey }) {
   const [items, setItems] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -239,6 +423,9 @@ export default function ShopAdminView({ apiKey }) {
   const [editItem, setEditItem] = useState(null);
   const [delTarget, setDelTarget] = useState(null);
   const [orderFilter, setOrderFilter] = useState("all");
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   const fetchItems = useCallback(async () => {
     try {
@@ -304,6 +491,103 @@ export default function ShopAdminView({ apiKey }) {
     } catch {}
   }
 
+  function toggleSelect(id) {
+    setSelectedIds((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  }
+
+  function selectAllItems() {
+    setSelectedIds((s) => {
+      if (s.size === items.length) return new Set();
+      return new Set(items.map((i) => i.id));
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  async function bulkPatch(patchFn) {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      // Sequential — parallel Stripe/Supabase load from 20+ concurrent
+      // PATCHes isn't worth optimizing for; admin catalogs are small.
+      for (const id of ids) {
+        const data = typeof patchFn === "function"
+          ? patchFn(items.find((i) => i.id === id))
+          : patchFn;
+        if (!data) continue;
+        await fetch(`/api/admin-shop?id=${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify(data),
+        });
+      }
+      clearSelection();
+      await fetchItems();
+    } catch (e) {
+      alert("Bulk update failed: " + (e.message || e));
+    }
+    setBulkBusy(false);
+  }
+
+  async function bulkDelete() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!confirm(`Delete ${ids.length} item${ids.length === 1 ? "" : "s"}? This can't be undone.`)) return;
+    setBulkBusy(true);
+    try {
+      for (const id of ids) {
+        await fetch(`/api/admin-shop?id=${id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+      }
+      clearSelection();
+      await fetchItems();
+    } catch (e) {
+      alert("Bulk delete failed: " + (e.message || e));
+    }
+    setBulkBusy(false);
+  }
+
+  async function bulkPriceChange() {
+    const raw = window.prompt(
+      "Adjust price for selected items:\n• Percent off: type e.g. -10% (reduces by 10%)\n• Fixed amount: type e.g. 5 (sets to $5)\n• Compare-at (creates sale): type e.g. sale 20% to mark all as 20% off current price",
+      ""
+    );
+    if (!raw) return;
+    const trimmed = raw.trim();
+    let patchFn = null;
+    const pctMatch = trimmed.match(/^(-?\d+(?:\.\d+)?)%$/);
+    const saleMatch = trimmed.match(/^sale\s+(-?\d+(?:\.\d+)?)%$/i);
+    const absMatch = trimmed.match(/^(\d+(?:\.\d+)?)$/);
+    if (saleMatch) {
+      const pct = Math.abs(Number(saleMatch[1])) / 100;
+      patchFn = (it) => {
+        const current = Number(it?.price || 0);
+        if (!current) return null;
+        const salePrice = Math.round(current * (1 - pct) * 100) / 100;
+        return { compare_at_price: current, price: salePrice };
+      };
+    } else if (pctMatch) {
+      const factor = 1 + Number(pctMatch[1]) / 100;
+      patchFn = (it) => ({ price: Math.round(Number(it?.price || 0) * factor * 100) / 100 });
+    } else if (absMatch) {
+      patchFn = () => ({ price: Number(absMatch[1]) });
+    } else {
+      alert("Couldn't parse. Examples: -10%   5   sale 20%");
+      return;
+    }
+    await bulkPatch(patchFn);
+  }
+
   async function refundOrder(order) {
     const amount = (
       Number(order.unit_price || 0) * (Number(order.quantity) || 1) * (1 - Number(order.discount_pct || 0) / 100)
@@ -345,7 +629,11 @@ export default function ShopAdminView({ apiKey }) {
           </button>
         </div>
         {tab === "items" && (
-          <button className="btn primary" onClick={() => setEditItem({})}>+ New Item</button>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button className="btn" style={{ fontSize: 11 }} onClick={() => setShowImport(true)}>Import CSV</button>
+            <button className="btn" style={{ fontSize: 11 }} onClick={() => exportItemsCsv(items)}>Export CSV</button>
+            <button className="btn primary" onClick={() => setEditItem({})}>+ New Item</button>
+          </div>
         )}
       </div>
 
@@ -357,6 +645,15 @@ export default function ShopAdminView({ apiKey }) {
           <div className="tbl usage-desktop">
             {items.length > 0 && (
               <div className="th">
+                <span style={{ width: 28, flex: "0 0 28px", display: "flex", justifyContent: "center" }}>
+                  <input
+                    type="checkbox"
+                    className="chk"
+                    checked={selectedIds.size === items.length && items.length > 0}
+                    onChange={selectAllItems}
+                    aria-label="Select all"
+                  />
+                </span>
                 <span style={{ flex: 0.5 }}></span>
                 <span style={{ flex: 2 }}>Item</span>
                 <span style={{ flex: 1 }}>Category</span>
@@ -367,7 +664,19 @@ export default function ShopAdminView({ apiKey }) {
               </div>
             )}
             {items.map((it) => (
-              <div key={it.id} className="tr">
+              <div key={it.id} className={`tr ${selectedIds.has(it.id) ? "selected" : ""}`}>
+                <span
+                  style={{ width: 28, flex: "0 0 28px", display: "flex", justifyContent: "center" }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <input
+                    type="checkbox"
+                    className="chk"
+                    checked={selectedIds.has(it.id)}
+                    onChange={() => toggleSelect(it.id)}
+                    aria-label={`Select ${it.title}`}
+                  />
+                </span>
                 <span style={{ flex: 0.5 }}>
                   {it.image_url ? (
                     <img src={it.image_url} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6 }} />
@@ -453,8 +762,27 @@ export default function ShopAdminView({ apiKey }) {
               </div>
             ))}
           </div>
+
+          {selectedIds.size > 0 && (
+            <div className="bulk-bar">
+              <span>{selectedIds.size} selected</span>
+              <button disabled={bulkBusy} onClick={() => bulkPatch({ is_published: true })}>Publish</button>
+              <button disabled={bulkBusy} onClick={() => bulkPatch({ is_published: false })}>Unpublish</button>
+              <button disabled={bulkBusy} onClick={bulkPriceChange}>Price…</button>
+              <button disabled={bulkBusy} onClick={() => bulkPatch({ compare_at_price: null, sale_ends_at: null })}>Clear sale</button>
+              <button className="bulk-danger" disabled={bulkBusy} onClick={bulkDelete}>Delete</button>
+              <button onClick={clearSelection}>Clear</button>
+            </div>
+          )}
         </>
       )}
+
+      <CsvImportModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onDone={fetchItems}
+        apiKey={apiKey}
+      />
 
       {tab === "orders" && (
         <>
