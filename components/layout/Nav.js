@@ -3,10 +3,14 @@ import { useTenantFeatures } from "../../hooks/useTenantFeatures";
 // Each tab optionally gates on a feature flag. Items with no `feature`
 // field always render (today, week, customers, tiers, reports are core
 // tenant-admin functionality regardless of tenant).
+// "Usage" (view=overview) removed from the nav 2026-04-23 — the
+// member-overage + non-member-to-charge workflows moved into chip
+// filters on the Customers tab so there's one place for per-customer
+// work. The route still renders OverviewView if reached directly
+// (?view=overview) as a safety net, but there's no UI path to it.
 const TABS = [
   { key: "today", label: "Today", countKey: "todayCount" },
   { key: "week", label: "Calendar" },
-  { key: "overview", label: "Usage" },
   { key: "customers", label: "Customers" },
   { key: "events", label: "Events", feature: "events" },
   { key: "shop", label: "Shop", feature: "pro_shop" },

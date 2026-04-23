@@ -511,6 +511,9 @@ export default function Dashboard() {
         <CustomersView
           bookings={bookings}
           members={members}
+          usage={usage}
+          payments={payments}
+          tierCfg={tierCfg}
           search={search}
           setSearch={setSearch}
           cSort={cSort}
@@ -519,6 +522,9 @@ export default function Dashboard() {
           setCTier={setCTier}
           onSelectMember={selectMember}
           onUpdateTier={updateTier}
+          onChargeNonMember={chargeNonMember}
+          onChargeNonMembersBatch={chargeNonMembersBatch}
+          saving={saving}
         />
       )}
 

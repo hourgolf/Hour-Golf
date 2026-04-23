@@ -1,5 +1,7 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState } from "react";
 import { TIERS } from "../../lib/constants";
+import { pacificMonthTag, pacificMonthWindow, mL, dlr, hrs } from "../../lib/format";
+import { remainingOverageCents, overageStatus } from "../../lib/overage";
 import Badge from "../ui/Badge";
 import TierSelect from "../ui/TierSelect";
 
@@ -71,12 +73,14 @@ function exportCSV(rows, filename) {
 }
 
 export default function CustomersView({
-  bookings, members,
+  bookings, members, usage = [], payments = [], tierCfg = [],
   search, setSearch,
   cSort, setCSort,
   cTier, setCTier,
   onSelectMember, onUpdateTier,
+  onChargeNonMember, onChargeNonMembersBatch, saving,
 }) {
+  const [batchLoading, setBatchLoading] = useState(false);
   const activeBk = useMemo(() => bookings.filter((b) => b.booking_status !== "Cancelled"), [bookings]);
 
   const allCust = useMemo(() => {
@@ -169,8 +173,110 @@ export default function CustomersView({
     return s;
   }, [members]);
 
+  // ── Billing overlays (moved from OverviewView) ────────────────────
+  // Current Pacific-month tag + window. All overage / to-charge math
+  // below is scoped to this window so it matches what the member sees
+  // on their own dashboard and what monthly_usage reports.
+  const currentMonthTag = useMemo(() => pacificMonthTag(), []);
+  const currentMonthWindow = useMemo(() => pacificMonthWindow(), []);
+  const billingMonthISO = useMemo(
+    () => `${currentMonthTag}-01T00:00:00+00:00`,
+    [currentMonthTag]
+  );
+
+  // Members with remaining overage this month → chip "Overage". Pulls
+  // from the monthly_usage view, then reconciles against payments via
+  // remainingOverageCents so refunded / partial rows don't surface as
+  // UNPAID when the money is actually in.
+  const overageRowByEmail = useMemo(() => {
+    const map = new Map();
+    (usage || []).forEach((r) => {
+      if (r.billing_month !== billingMonthISO) return;
+      if (!r.tier || r.tier === "Non-Member") return;
+      const row = {
+        ...r,
+        customer_email: r.customer_email || r.email || "",
+        customer_name: r.customer_name || r.name || "",
+      };
+      if (Number(row.overage_hours || 0) <= 0) return;
+      if (remainingOverageCents(row, payments) <= 0) return;
+      map.set(row.customer_email, row);
+    });
+    return map;
+  }, [usage, payments, billingMonthISO]);
+
+  // Non-members with uncharged bookings this month → chip "To charge".
+  // Same snapshot-tier discipline as OverviewView: historic Non-Member
+  // bookings stay classified as Non-Member even if the member later
+  // upgraded, because the booking's tier was stamped at creation time.
+  const chargedBookingIds = useMemo(() => {
+    const s = new Set();
+    (payments || []).forEach((p) => {
+      if (p.charged_booking_id) s.add(p.charged_booking_id);
+    });
+    return s;
+  }, [payments]);
+
+  const nmRate = useMemo(() => {
+    const tc = (tierCfg || []).find((t) => t.tier === "Non-Member");
+    return Number(tc?.overage_rate || 60);
+  }, [tierCfg]);
+
+  const toChargeInfoByEmail = useMemo(() => {
+    const { startISO, endISO } = currentMonthWindow;
+    const start = startISO;
+    const end = endISO;
+    const map = new Map();
+    activeBk.forEach((b) => {
+      const bookingTier = b.tier
+        || members.find((m) => m.email === b.customer_email)?.tier
+        || "Non-Member";
+      if (bookingTier !== "Non-Member") return;
+      if (!b.booking_start || b.booking_start < start || b.booking_start >= end) return;
+      if (chargedBookingIds.has(b.booking_id)) return;
+      const hours = Number(b.duration_hours || 0);
+      if (hours <= 0) return;
+      const existing = map.get(b.customer_email) || {
+        email: b.customer_email,
+        name: b.customer_name || b.customer_email,
+        hours: 0,
+        count: 0,
+        bookingIds: [],
+      };
+      existing.hours += hours;
+      existing.count += 1;
+      existing.bookingIds.push(b.booking_id);
+      if (b.customer_name) existing.name = b.customer_name;
+      map.set(b.customer_email, existing);
+    });
+    return map;
+  }, [activeBk, members, chargedBookingIds, currentMonthWindow]);
+
+  const overageCount = overageRowByEmail.size;
+  const toChargeCount = toChargeInfoByEmail.size;
+  const totalUnchargedBookings = useMemo(
+    () =>
+      Array.from(toChargeInfoByEmail.values()).reduce(
+        (sum, r) => sum + r.bookingIds.length,
+        0
+      ),
+    [toChargeInfoByEmail]
+  );
+
+  const isBillingFilter = cTier === "__overage__" || cTier === "__tocharge__";
+
   const filtCust = useMemo(() => {
     let l = [...allCust];
+    // Seed to-charge rows that don't already exist in allCust (e.g. a
+    // walk-in whose booking hasn't been aggregated yet) so the chip count
+    // matches what renders.
+    if (cTier === "__tocharge__") {
+      toChargeInfoByEmail.forEach((info, email) => {
+        if (!l.find((c) => c.email === email)) {
+          l.push({ email, name: info.name, hrs: info.hours, cnt: info.count });
+        }
+      });
+    }
     const q = search.toLowerCase();
     if (q) {
       // Strip # and leading zeros for member number search (e.g. "#042" or "42" both match member 42)
@@ -181,7 +287,11 @@ export default function CustomersView({
         return (c.name || "").toLowerCase().includes(q) || c.email.toLowerCase().includes(q) || (qNum && memberNum === qNum);
       });
     }
-    if (cTier === "members") {
+    if (cTier === "__overage__") {
+      l = l.filter((c) => overageRowByEmail.has(c.email));
+    } else if (cTier === "__tocharge__") {
+      l = l.filter((c) => toChargeInfoByEmail.has(c.email));
+    } else if (cTier === "members") {
       // Synthetic segment: every paying tier (anything not Non-Member).
       l = l.filter((c) => {
         const m = members.find((x) => x.email === c.email);
@@ -190,11 +300,33 @@ export default function CustomersView({
     } else if (cTier !== "all") {
       l = l.filter((c) => { const m = members.find((x) => x.email === c.email); return (m?.tier || "Non-Member") === cTier; });
     }
-    if (cSort === "hours") l.sort((a, b) => b.hrs - a.hrs);
+    if (cTier === "__overage__") {
+      l.sort((a, b) => {
+        const ra = remainingOverageCents(overageRowByEmail.get(a.email) || {}, payments);
+        const rb = remainingOverageCents(overageRowByEmail.get(b.email) || {}, payments);
+        return rb - ra;
+      });
+    } else if (cTier === "__tocharge__") {
+      l.sort((a, b) => {
+        const ia = toChargeInfoByEmail.get(a.email);
+        const ib = toChargeInfoByEmail.get(b.email);
+        return (ib?.hours || 0) - (ia?.hours || 0);
+      });
+    } else if (cSort === "hours") l.sort((a, b) => b.hrs - a.hrs);
     else if (cSort === "name") l.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     else l.sort((a, b) => b.cnt - a.cnt);
     return l;
-  }, [allCust, search, cSort, cTier, members]);
+  }, [allCust, search, cSort, cTier, members, overageRowByEmail, toChargeInfoByEmail, payments]);
+
+  async function handleBatchCharge() {
+    if (batchLoading || !onChargeNonMembersBatch) return;
+    setBatchLoading(true);
+    try {
+      await onChargeNonMembersBatch();
+    } finally {
+      setBatchLoading(false);
+    }
+  }
 
   const handleExport = useCallback((tierFilter) => {
     const rows = allCust.map((c) => {
@@ -287,11 +419,77 @@ export default function CustomersView({
             </button>
           );
         })}
+        {/* Billing filter chips — replace the old "Usage" tab. These only
+            render when there's something to act on this month, so the
+            chip row doesn't carry empty noise on quiet months. */}
+        {overageCount > 0 && (
+          <button
+            type="button"
+            className={`cust-chip ${cTier === "__overage__" ? "active" : ""}`}
+            onClick={() => setCTier("__overage__")}
+            title={`Paying members with remaining overage for ${mL(billingMonthISO)}`}
+            style={{ borderColor: cTier === "__overage__" ? "var(--danger, #C92F1F)" : undefined }}
+          >
+            Overage <span className="cust-chip-count">{overageCount}</span>
+          </button>
+        )}
+        {toChargeCount > 0 && (
+          <button
+            type="button"
+            className={`cust-chip ${cTier === "__tocharge__" ? "active" : ""}`}
+            onClick={() => setCTier("__tocharge__")}
+            title={`Non-members with uncharged bookings in ${mL(billingMonthISO)} (walk-in rate $${nmRate}/hr)`}
+            style={{ borderColor: cTier === "__tocharge__" ? "var(--primary)" : undefined }}
+          >
+            To charge <span className="cust-chip-count">{toChargeCount}</span>
+          </button>
+        )}
       </div>
+
+      {isBillingFilter && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "10px 14px",
+            marginBottom: 12,
+            background: "var(--primary-bg)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            fontSize: 12,
+          }}
+        >
+          <span>
+            {cTier === "__overage__" && (
+              <>
+                <strong>{filtCust.length}</strong> paying member{filtCust.length === 1 ? "" : "s"} with remaining overage for{" "}
+                <strong>{mL(billingMonthISO)}</strong>. Click a row to open their breakdown; charge from the Detail view.
+              </>
+            )}
+            {cTier === "__tocharge__" && (
+              <>
+                <strong>{totalUnchargedBookings}</strong> uncharged non-member booking{totalUnchargedBookings === 1 ? "" : "s"} in{" "}
+                <strong>{mL(billingMonthISO)}</strong> across <strong>{filtCust.length}</strong> customer{filtCust.length === 1 ? "" : "s"} (${nmRate}/hr).
+              </>
+            )}
+          </span>
+          {cTier === "__tocharge__" && totalUnchargedBookings > 0 && (
+            <button
+              className="btn primary"
+              style={{ fontSize: 11, padding: "4px 12px", marginLeft: "auto" }}
+              disabled={saving || batchLoading}
+              onClick={handleBatchCharge}
+            >
+              {batchLoading ? "Charging…" : `Charge all (${totalUnchargedBookings})`}
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="fbar">
         <label>Sort:</label>
-        <select value={cSort} onChange={(e) => setCSort(e.target.value)}>
+        <select value={cSort} onChange={(e) => setCSort(e.target.value)} disabled={isBillingFilter}>
           <option value="hours">Hours</option>
           <option value="sessions">Sessions</option>
           <option value="name">Name</option>
@@ -315,13 +513,23 @@ export default function CustomersView({
           <span style={{ flex: 1 }}>Tier</span>
           <span style={{ flex: 1 }} className="text-r">Hours</span>
           <span style={{ flex: 1 }} className="text-r">Sessions</span>
-          <span style={{ flex: 1 }} className="text-c">Assign</span>
+          {cTier === "__overage__" && <span style={{ flex: 1 }} className="text-r">Owed</span>}
+          {cTier === "__tocharge__" && <span style={{ flex: 1 }} className="text-r">Charge</span>}
+          <span style={{ flex: 1 }} className="text-c">
+            {cTier === "__tocharge__" ? "Action" : "Assign"}
+          </span>
         </div>
         {filtCust.map((c) => {
           const m = members.find((x) => x.email === c.email);
           const tier = m?.tier || "Non-Member";
           const isPastDue = pastDueEmails.has(c.email);
           const isOnApp = onAppEmails.has(c.email);
+          const overageRow = overageRowByEmail.get(c.email);
+          const toChargeInfo = toChargeInfoByEmail.get(c.email);
+          const remainingCents = overageRow ? remainingOverageCents(overageRow, payments) : 0;
+          const remainingUsd = remainingCents / 100;
+          const status = overageRow ? overageStatus(overageRow, payments) : "none";
+          const chargeAmountUsd = toChargeInfo ? toChargeInfo.hours * nmRate : 0;
           return (
             <div key={c.email} className="tr">
               <span style={{ flex: 2, cursor: "pointer" }} onClick={() => onSelectMember(c.email)}>
@@ -337,10 +545,42 @@ export default function CustomersView({
                 <span className="email-sm">{c.email}</span>
               </span>
               <span style={{ flex: 1 }}><Badge tier={tier} /></span>
-              <span style={{ flex: 1 }} className="text-r tab-num">{c.hrs.toFixed(1)}h</span>
-              <span style={{ flex: 1 }} className="text-r tab-num">{c.cnt}</span>
+              <span style={{ flex: 1 }} className="text-r tab-num">
+                {cTier === "__tocharge__" && toChargeInfo ? hrs(toChargeInfo.hours) : `${c.hrs.toFixed(1)}h`}
+              </span>
+              <span style={{ flex: 1 }} className="text-r tab-num">
+                {cTier === "__tocharge__" && toChargeInfo ? toChargeInfo.count : c.cnt}
+              </span>
+              {cTier === "__overage__" && (
+                <span
+                  style={{ flex: 1 }}
+                  className={`text-r tab-num ${remainingCents > 0 ? "red bold" : ""}`}
+                  title={status === "partial" ? `Partially paid — ${dlr(remainingUsd)} remaining` : undefined}
+                >
+                  {dlr(remainingUsd)}
+                </span>
+              )}
+              {cTier === "__tocharge__" && (
+                <span style={{ flex: 1 }} className="text-r tab-num">
+                  {dlr(chargeAmountUsd)}
+                </span>
+              )}
               <span style={{ flex: 1 }} className="text-c">
-                <TierSelect value={tier} onChange={(t) => onUpdateTier(c.email, t, c.name)} />
+                {cTier === "__tocharge__" && toChargeInfo ? (
+                  <button
+                    className="btn primary"
+                    style={{ fontSize: 10, padding: "2px 8px" }}
+                    disabled={saving || batchLoading || !onChargeNonMember}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toChargeInfo.bookingIds.forEach((id) => onChargeNonMember(id));
+                    }}
+                  >
+                    Charge {dlr(chargeAmountUsd)}
+                  </button>
+                ) : (
+                  <TierSelect value={tier} onChange={(t) => onUpdateTier(c.email, t, c.name)} />
+                )}
               </span>
             </div>
           );
