@@ -1,7 +1,6 @@
 import ThemeCustomizer from "../settings/ThemeCustomizer";
 import FontSelector from "../settings/FontSelector";
 import LogoUpload from "../settings/LogoUpload";
-import TenantBranding from "../settings/TenantBranding";
 
 export default function SettingsView({ settings, updateSetting, apiKey, user, onLogout, onOpenSync }) {
   const checkLabelStyle = {
@@ -62,18 +61,6 @@ export default function SettingsView({ settings, updateSetting, apiKey, user, on
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Tenant Brand (platform-level) */}
-      <div className="tbl" style={{ padding: 20, marginBottom: 20 }}>
-        <h3 style={{ fontFamily: "var(--font-display)", fontSize: 14, textTransform: "uppercase", letterSpacing: 2, color: "var(--primary)", marginBottom: 6 }}>
-          Tenant Brand
-        </h3>
-        <p className="muted" style={{ marginBottom: 16 }}>
-          Platform-level brand controls. Changes here affect every member and admin
-          view for this tenant. (Your personal dashboard preferences live below.)
-        </p>
-        <TenantBranding apiKey={apiKey} />
       </div>
 
       {/* Admin Preferences (per-user) */}
