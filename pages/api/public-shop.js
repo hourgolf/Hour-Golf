@@ -246,6 +246,28 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Order total too small to process." });
     }
 
+    // Validate optional discount code. Guest-only here —
+    // validateDiscountCode gets isGuest=true, so codes scoped to
+    // "member" only will be rejected. Actual Stripe Coupon is
+    // minted below (after we have a stripe client) and attached to
+    // the Checkout Session via `discounts`.
+    let appliedCode = null;
+    let discountCodeAmountCents = 0;
+    if (body.discount_code) {
+      const valid = await validateDiscountCode({
+        tenantId,
+        code: body.discount_code,
+        subtotalCents: grandTotalCents,
+        memberEmail: null,
+        isGuest: true,
+      });
+      if (!valid.ok) {
+        return res.status(400).json({ error: valid.message || "Discount code invalid" });
+      }
+      appliedCode = valid.code;
+      discountCodeAmountCents = valid.amountCents;
+    }
+
     let stripe;
     try {
       stripe = await getStripeClient(tenantId);
@@ -335,11 +357,36 @@ export default async function handler(req, res) {
       }
     }
 
+    // If a discount code applied, mint a one-shot Stripe Coupon so
+    // the hosted checkout shows the discount to the buyer and charges
+    // the reduced amount. Negative line-items aren't supported by
+    // Checkout Sessions; `discounts` is the sanctioned path.
+    let stripeCouponId = null;
+    if (appliedCode && discountCodeAmountCents > 0) {
+      try {
+        const coupon = await stripe.coupons.create({
+          amount_off: discountCodeAmountCents,
+          currency: "usd",
+          duration: "once",
+          name: `HG: ${appliedCode.code}`,
+          max_redemptions: 1,
+          metadata: { hg_code: appliedCode.code, hg_code_id: appliedCode.id },
+        });
+        stripeCouponId = coupon.id;
+      } catch (e) {
+        console.warn("public-shop stripe coupon mint failed:", e?.message || e);
+        // Fall through — the customer sees the listed price. We'll
+        // still record discount_code_id on the order so the operator
+        // knows a code was attempted.
+      }
+    }
+
     let session;
     try {
       session = await stripe.checkout.sessions.create({
         mode: "payment",
         line_items: stripeLineItems,
+        ...(stripeCouponId ? { discounts: [{ coupon: stripeCouponId }] } : {}),
         customer_email: buyer.email.trim().toLowerCase(),
         success_url: `${origin}/shop?success=1&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/shop?canceled=1`,
@@ -423,6 +470,8 @@ export default async function handler(req, res) {
             shipping_service: deliveryMethod === "ship" && isFirst ? (chosenShippoService || null) : null,
             shippo_rate_id: deliveryMethod === "ship" && isFirst ? chosenShippoRateId : null,
             notes: deliveryMethod === "ship" ? "Will ship after payment" : "Pickup at next visit",
+            discount_code_id: isFirst && appliedCode ? appliedCode.id : null,
+            discount_code_amount_cents: isFirst && appliedCode ? discountCodeAmountCents : null,
           }),
         });
       }

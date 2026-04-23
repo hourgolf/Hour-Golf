@@ -10,6 +10,7 @@ import { assertFeature } from "../../lib/feature-guard";
 import { getSessionWithMember } from "../../lib/member-session";
 import { pacificMonthWindow } from "../../lib/format";
 import { requireSameOrigin } from "../../lib/security";
+import { validateDiscountCode, bumpDiscountCodeUse } from "../../lib/discount-codes";
 
 // Phase 7B-2b: per-tenant Stripe client via lib/stripe-config.
 
@@ -433,18 +434,44 @@ export default async function handler(req, res) {
         const unitPrice = Number(it.price);
         // Sale price is the unit price; member tier discount doesn't
         // stack on sale items (rule mirrors the browse/cart render).
+        // Discount code, if applied, also replaces tier discount
+        // (rule established when discount_codes landed 2026-04-23).
         const onSale = !!(
           it.compare_at_price
           && Number(it.compare_at_price) > unitPrice
           && (!it.sale_ends_at || new Date(it.sale_ends_at).getTime() > Date.now())
         );
-        const effectiveDiscountPct = onSale ? 0 : discountPct;
+        const codeApplied = !!req.body.discount_code;
+        const effectiveDiscountPct = (onSale || codeApplied) ? 0 : discountPct;
         const lineTotal = Math.round(unitPrice * c.quantity * (1 - effectiveDiscountPct / 100) * 100) / 100;
         grandTotal += lineTotal;
         lineItems.push({ cart: c, item: it, unitPrice, lineTotal, discountPct: effectiveDiscountPct });
       }
 
       grandTotal = Math.round(grandTotal * 100) / 100;
+
+      // 3b. Validate + apply discount code (if any). Never trust the
+      //     client's apply; revalidate against the current cart
+      //     subtotal. On failure, return 400 so the client can clear
+      //     the code and let the member re-try.
+      let appliedCode = null;
+      let discountCodeAmountCents = 0;
+      if (req.body.discount_code) {
+        const subtotalCents = Math.round(grandTotal * 100);
+        const valid = await validateDiscountCode({
+          tenantId,
+          code: req.body.discount_code,
+          subtotalCents,
+          memberEmail: member.email,
+          isGuest: false,
+        });
+        if (!valid.ok) {
+          return res.status(400).json({ error: valid.message || "Discount code invalid" });
+        }
+        appliedCode = valid.code;
+        discountCodeAmountCents = valid.amountCents;
+        grandTotal = Math.round((grandTotal - discountCodeAmountCents / 100) * 100) / 100;
+      }
 
       // 4a. For shipping orders: pre-validate the destination via
       //     Shippo. We pick the cheapest carrier rate; merchant
@@ -767,6 +794,12 @@ export default async function handler(req, res) {
             shipping_status: label?.tracking_number ? "label_created" : null,
             shipping_status_detail: label?.tracking_number ? "Label created, awaiting carrier pickup." : null,
             shipping_status_updated_at: label?.tracking_number ? new Date().toISOString() : null,
+            // Discount code (applied once, on the first row — mirrors
+            // the shipping_amount pattern). Reporting joins on
+            // discount_code_id; the amount column is a denormalized
+            // ledger value.
+            discount_code_id: isFirst && appliedCode ? appliedCode.id : null,
+            discount_code_amount_cents: isFirst && appliedCode ? discountCodeAmountCents : null,
           }),
         });
         // Increment quantity_claimed
@@ -774,6 +807,11 @@ export default async function handler(req, res) {
           method: "PATCH",
           body: JSON.stringify({ quantity_claimed: (li.item.quantity_claimed || 0) + li.cart.quantity }),
         });
+      }
+
+      // Bump the discount-code counter after all rows land.
+      if (appliedCode) {
+        await bumpDiscountCodeUse(appliedCode);
       }
 
       // 6. Clear cart

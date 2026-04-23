@@ -79,6 +79,11 @@ export default function MemberShop({ member, tierConfig, showToast }) {
   // member actually has saved addresses.
   const [savedAddresses, setSavedAddresses] = useState(null);
   const [selectedAddrId, setSelectedAddrId] = useState("");
+  // Promo / discount code at checkout.
+  const [promoCode, setPromoCode] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState(null); // { code, amount_cents, message }
+  const [promoBusy, setPromoBusy] = useState(false);
+  const [promoError, setPromoError] = useState("");
 
   const loadItems = useCallback(async () => {
     try {
@@ -328,6 +333,40 @@ export default function MemberShop({ member, tierConfig, showToast }) {
     setShipAddr((prev) => ({ ...prev, [field]: value }));
   }
 
+  // Promo code: validate + apply a code against the current cart
+  // subtotal. Sends full-price subtotal (price × qty, no tier
+  // discount) because codes replace tier discount on member checkout.
+  async function applyPromo() {
+    const code = promoCode.trim();
+    if (!code) return;
+    setPromoBusy(true);
+    setPromoError("");
+    try {
+      const fullSubtotalCents = (cart || []).reduce(
+        (s, c) => s + Math.round(Number(c.price || 0) * 100) * (Number(c.quantity) || 0),
+        0
+      );
+      const r = await fetch("/api/validate-discount-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ code, subtotal_cents: fullSubtotalCents }),
+      });
+      const d = await r.json();
+      if (!d.valid) throw new Error(d.message || "Code invalid");
+      setAppliedPromo({ code: d.code, amount_cents: d.amount_cents, message: d.message });
+      setPromoCode("");
+    } catch (e) {
+      setPromoError(e.message || "Apply failed");
+    }
+    setPromoBusy(false);
+  }
+
+  function removePromo() {
+    setAppliedPromo(null);
+    setPromoError("");
+  }
+
   async function handleCheckout() {
     if (deliveryMethod === "ship") {
       if (!shipAddr.street1.trim() || !shipAddr.city.trim() || !shipAddr.state.trim() || !shipAddr.zip.trim()) {
@@ -350,6 +389,7 @@ export default function MemberShop({ member, tierConfig, showToast }) {
           },
         };
       }
+      if (appliedPromo?.code) payload.discount_code = appliedPromo.code;
       const r = await fetch("/api/member-shop?action=checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -414,8 +454,18 @@ export default function MemberShop({ member, tierConfig, showToast }) {
 
   const limitedItems = filtered.filter((it) => it.is_limited);
   const regularItems = filtered.filter((it) => !it.is_limited);
-  const creditsApplied = Math.min(creditBalance, cartTotal);
-  const cardChargeAmt = Math.round((cartTotal - creditsApplied) * 100) / 100;
+  // When a promo is applied, tier discount is stripped for the order
+  // (rule: codes don't stack with tier). Recompute the subtotal from
+  // full item prices and subtract the promo amount.
+  const fullSubtotal = (cart || []).reduce(
+    (s, c) => s + Number(c.price || 0) * (Number(c.quantity) || 0),
+    0
+  );
+  const effectiveCartTotal = appliedPromo
+    ? Math.max(0, fullSubtotal - (appliedPromo.amount_cents || 0) / 100)
+    : cartTotal;
+  const creditsApplied = Math.min(creditBalance, effectiveCartTotal);
+  const cardChargeAmt = Math.round((effectiveCartTotal - creditsApplied) * 100) / 100;
   const modalImages = selectedItem?.image_urls?.length > 0 ? selectedItem.image_urls : (selectedItem?.image_url ? [selectedItem.image_url] : []);
 
   return (
@@ -703,16 +753,47 @@ export default function MemberShop({ member, tierConfig, showToast }) {
 
               {/* Order summary + pickup + checkout — single card */}
               <div className="mem-section" style={{ padding: "16px", marginTop: 8 }}>
-                {discountPct > 0 && (
+                {discountPct > 0 && !appliedPromo && (
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--primary)", marginBottom: 6 }}>
                     <span>Member Discount</span>
                     <span>&minus;{discountPct}%</span>
                   </div>
                 )}
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, borderTop: discountPct > 0 ? "1px solid var(--border)" : "none", paddingTop: discountPct > 0 ? 8 : 0, marginBottom: creditsApplied > 0 ? 6 : 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, borderTop: discountPct > 0 && !appliedPromo ? "1px solid var(--border)" : "none", paddingTop: discountPct > 0 && !appliedPromo ? 8 : 0, marginBottom: 6 }}>
                   <span>Subtotal</span>
-                  <span className="tab-num" style={{ fontWeight: 600 }}>${cartTotal.toFixed(2)}</span>
+                  <span className="tab-num" style={{ fontWeight: 600 }}>${(appliedPromo ? fullSubtotal : cartTotal).toFixed(2)}</span>
                 </div>
+                {/* Promo code row — input when not applied, summary
+                    when applied. Replaces tier discount when active. */}
+                {appliedPromo ? (
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#C77B3C", marginBottom: 6, alignItems: "center", gap: 8 }}>
+                    <span>
+                      Code <strong style={{ fontFamily: "var(--font-mono)", letterSpacing: 1 }}>{appliedPromo.code}</strong>
+                      <button onClick={removePromo} style={{ background: "none", border: "none", color: "var(--text-muted)", fontSize: 11, cursor: "pointer", marginLeft: 6, textDecoration: "underline" }}>remove</button>
+                    </span>
+                    <span>&minus;${(appliedPromo.amount_cents / 100).toFixed(2)}</span>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, fontSize: 13 }}>
+                    <input
+                      type="text"
+                      value={promoCode}
+                      onChange={(e) => { setPromoCode(e.target.value); setPromoError(""); }}
+                      placeholder="Promo code"
+                      style={{ flex: 1, padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 6, fontSize: 13, fontFamily: "inherit", textTransform: "uppercase", letterSpacing: 1 }}
+                    />
+                    <button
+                      onClick={applyPromo}
+                      disabled={promoBusy || !promoCode.trim()}
+                      style={{ fontSize: 12, padding: "6px 12px", background: "var(--primary)", color: "#EDF3E3", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}
+                    >
+                      {promoBusy ? "…" : "Apply"}
+                    </button>
+                  </div>
+                )}
+                {promoError && (
+                  <div style={{ fontSize: 11, color: "var(--danger, #C92F1F)", marginBottom: 6 }}>{promoError}</div>
+                )}
                 {creditsApplied > 0 && (
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#ddd480", marginBottom: 6 }}>
                     <span>Pro Shop Credits</span>

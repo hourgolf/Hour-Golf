@@ -59,6 +59,10 @@ export default function PublicShopPage() {
   const [brandFilter, setBrandFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortBy, setSortBy] = useState("featured");
+  const [promoCode, setPromoCode] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState(null);
+  const [promoBusy, setPromoBusy] = useState(false);
+  const [promoError, setPromoError] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [selectedSize, setSelectedSize] = useState("");
@@ -140,6 +144,37 @@ export default function PublicShopPage() {
     setCart((prev) => prev.filter((_, i) => i !== idx));
   }
 
+  async function applyPromo() {
+    const code = promoCode.trim();
+    if (!code) return;
+    setPromoBusy(true);
+    setPromoError("");
+    try {
+      const subtotalCents = cart.reduce((s, c) => {
+        const item = items.find((it) => it.id === c.item_id);
+        if (!item) return s;
+        return s + Math.round(Number(item.price) * 100) * (Number(c.quantity) || 0);
+      }, 0);
+      const r = await fetch("/api/validate-discount-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, subtotal_cents: subtotalCents }),
+      });
+      const d = await r.json();
+      if (!d.valid) throw new Error(d.message || "Code invalid");
+      setAppliedPromo({ code: d.code, amount_cents: d.amount_cents });
+      setPromoCode("");
+    } catch (e) {
+      setPromoError(e.message || "Apply failed");
+    }
+    setPromoBusy(false);
+  }
+
+  function removePromo() {
+    setAppliedPromo(null);
+    setPromoError("");
+  }
+
   async function checkout() {
     setError("");
     if (cart.length === 0) { setError("Your cart is empty."); return; }
@@ -177,6 +212,7 @@ export default function PublicShopPage() {
           },
         };
       }
+      if (appliedPromo?.code) payload.discount_code = appliedPromo.code;
       const r = await fetch("/api/public-shop?action=checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -468,10 +504,38 @@ export default function PublicShopPage() {
                   })}
                 </div>
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "10px 0", borderTop: "1px solid var(--border)", marginBottom: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "10px 0", borderTop: "1px solid var(--border)" }}>
                   <strong style={{ fontFamily: "var(--font-display)" }}>Subtotal</strong>
                   <strong style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "var(--primary)" }}>${cartTotal.toFixed(2)}</strong>
                 </div>
+                {appliedPromo ? (
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#C77B3C", marginBottom: 8, paddingTop: 6 }}>
+                    <span>
+                      Code <strong style={{ fontFamily: "var(--font-mono)", letterSpacing: 1 }}>{appliedPromo.code}</strong>
+                      <button onClick={removePromo} style={{ background: "none", border: "none", color: "var(--text-muted)", fontSize: 11, cursor: "pointer", marginLeft: 6, textDecoration: "underline" }}>remove</button>
+                    </span>
+                    <span>&minus;${(appliedPromo.amount_cents / 100).toFixed(2)}</span>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, marginTop: 4 }}>
+                    <input
+                      type="text"
+                      value={promoCode}
+                      onChange={(e) => { setPromoCode(e.target.value); setPromoError(""); }}
+                      placeholder="Promo code"
+                      style={{ flex: 1, padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", textTransform: "uppercase", letterSpacing: 1 }}
+                    />
+                    <button
+                      onClick={applyPromo}
+                      disabled={promoBusy || !promoCode.trim()}
+                      style={{ fontSize: 12, padding: "8px 14px", background: "var(--primary)", color: "#EDF3E3", border: "none", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}
+                    >
+                      {promoBusy ? "…" : "Apply"}
+                    </button>
+                  </div>
+                )}
+                {promoError && <div style={{ fontSize: 11, color: "var(--danger, #C92F1F)", marginBottom: 6 }}>{promoError}</div>}
+                <div style={{ marginBottom: 14 }} />
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
                   <input
                     type="text"

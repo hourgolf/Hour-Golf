@@ -3,6 +3,7 @@ import Badge from "../ui/Badge";
 import TierSelect from "../ui/TierSelect";
 import Modal from "../ui/Modal";
 import TenantBranding from "../settings/TenantBranding";
+import DiscountCodesSection from "../settings/DiscountCodesSection";
 
 function TierEditModal({ open, onClose, tier, onSave }) {
   const [form, setForm] = useState({
@@ -1653,6 +1654,9 @@ export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStrip
 
       <h2 className="section-head" style={{ marginTop: 24 }}>News &amp; Announcements</h2>
       <NewsSection jwt={jwt} />
+
+      <h2 className="section-head" style={{ marginTop: 24 }}>Discount Codes</h2>
+      <DiscountCodesSection jwt={jwt} />
 
       <h2 className="section-head" style={{ marginTop: 24 }}>Pro Shop Requests</h2>
       <ShopRequestsSection jwt={jwt} />
