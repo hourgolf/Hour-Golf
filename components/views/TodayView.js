@@ -4,6 +4,7 @@ import { fT, fDL, lds, tds, hrs } from "../../lib/format";
 import { useBranding } from "../../hooks/useBranding";
 import { resolveBays, resolveBayLabel } from "../../lib/branding";
 import Badge from "../ui/Badge";
+import DayTimeline from "./DayTimeline";
 
 // Tight countdown helper used by the "Right now" + "Up next" callouts.
 // Stays terse (no padding, no leading words) because it sits inside
@@ -279,6 +280,23 @@ export default function TodayView({
           {BAYS.map((b) => <option key={b} value={b}>{b}</option>)}
         </select>
       </div>
+
+      {/* Horizontal day timeline — at-a-glance bay utilization across
+          the whole day. Lives above the list because "who's where
+          when" is the operator's primary question; the list below
+          keeps the edit/cancel/bulk-select actions. Respects the bay
+          filter so "Bay 2 only" narrows the timeline the same way. */}
+      <DayTimeline
+        bookings={todayBk}
+        bays={displayBays}
+        members={members}
+        codesByBooking={codesByBooking}
+        now={now}
+        viewDate={viewDate}
+        isToday={isToday}
+        onEdit={onEdit}
+        onSelectMember={onSelectMember}
+      />
 
       <div className="summary">
         <div className="sum-item"><span className="sum-val">{todayBk.length}</span><span className="sum-lbl">Bookings</span></div>

@@ -1680,3 +1680,246 @@ html { overflow-y: scroll; }
 }
 .mem-book-success-actions { display: flex; gap: 10px; }
 
+/* --- Admin Today tab: horizontal day timeline -------------------
+   Gantt-style view of a day's bookings. Runs above the existing bay-
+   lane list. Time axis at the top, one row per bay, booking blocks
+   positioned by start + sized by duration.
+
+   Desktop: fits the container. Mobile: horizontal scroll thanks to
+   min-width on the inner scroller. ------------------------------- */
+.day-timeline {
+  margin: 14px 0 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 12px 10px;
+  overflow: hidden;
+}
+.day-timeline-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+}
+/* Each logical row (axis + bay rows + legend) lays out as a flex box
+   with a fixed-width bay-label column on the left and a flexible
+   track on the right. Min-width forces horizontal scroll on narrow
+   viewports instead of squishing the hour marks. */
+.day-timeline-axis,
+.day-timeline-row,
+.day-timeline-legend {
+  display: flex;
+  align-items: stretch;
+  min-width: 900px;
+}
+.day-timeline-baycol {
+  flex: 0 0 110px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-right: 1px solid var(--border);
+  background: var(--bg, var(--cream-color, #EDF3E3));
+}
+.day-timeline-axis .day-timeline-baycol {
+  background: transparent;
+  border-right: 1px solid transparent;
+}
+.day-timeline-bay-label {
+  font-family: var(--font-display, inherit);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+}
+.day-timeline-bay-count {
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.4px;
+  margin-top: 3px;
+  text-transform: uppercase;
+}
+.day-timeline-track-head,
+.day-timeline-track {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.day-timeline-track-head {
+  height: 28px;
+  border-bottom: 1px solid var(--border);
+}
+.day-timeline-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px dashed rgba(53,68,59,0.14);
+}
+.day-timeline-tick-label {
+  position: absolute;
+  top: 6px;
+  left: 4px;
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.day-timeline-row {
+  border-bottom: 1px solid var(--border);
+}
+.day-timeline-row:last-of-type {
+  border-bottom: none;
+}
+.day-timeline-track {
+  height: 60px;
+  background: repeating-linear-gradient(
+    to right,
+    transparent,
+    transparent 59px,
+    rgba(53,68,59,0.04) 59px,
+    rgba(53,68,59,0.04) 60px
+  );
+}
+.day-timeline-gridline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px dashed rgba(53,68,59,0.08);
+}
+/* Booking block — absolutely positioned inside the track. Click to
+   open the existing edit sheet. */
+.day-timeline-block {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  border: none;
+  border-radius: 8px;
+  padding: 5px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  transition: transform 0.12s, box-shadow 0.12s;
+  color: #EDF3E3;
+  background: var(--primary);
+}
+.day-timeline-block:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(53,68,59,0.18);
+  z-index: 2;
+}
+.day-timeline-block.status-upcoming {
+  background: var(--primary);
+  opacity: 0.85;
+}
+.day-timeline-block.status-now {
+  background: var(--primary);
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.6), 0 0 0 4px var(--primary);
+  z-index: 1;
+}
+.day-timeline-block.status-past {
+  background: rgba(53,68,59,0.35);
+  color: rgba(237,243,227,0.88);
+}
+/* Non-member blocks ride a different accent so the operator can see
+   at a glance which slots are revenue-generating walk-ins. */
+.day-timeline-block.non-member {
+  background: var(--accent, #ddd480);
+  color: var(--text);
+}
+.day-timeline-block.non-member.status-past {
+  background: rgba(221,212,128,0.5);
+}
+.day-timeline-block-name {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.day-timeline-block-time {
+  font-size: 10px;
+  opacity: 0.85;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Vertical "now" indicator. Red to stand out from the brand green. */
+.day-timeline-nowline {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--danger, #C92F1F);
+  pointer-events: none;
+  z-index: 3;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.4);
+}
+.day-timeline-nowline::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger, #C92F1F);
+}
+.day-timeline-legend {
+  padding-top: 8px;
+}
+.day-timeline-legend .day-timeline-baycol {
+  background: transparent;
+  border-right: 1px solid transparent;
+  padding: 4px 10px;
+}
+.day-timeline-legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 6px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.day-timeline-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.day-timeline-legend-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--primary);
+}
+.day-timeline-legend-swatch.status-upcoming { opacity: 0.85; }
+.day-timeline-legend-swatch.status-now {
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.6), 0 0 0 2px var(--primary);
+}
+.day-timeline-legend-swatch.status-past { background: rgba(53,68,59,0.35); }
+.day-timeline-legend-swatch.non-member { background: var(--accent, #ddd480); }
+.day-timeline-legend-now {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--danger, #C92F1F);
+  font-weight: 600;
+}
+.day-timeline-legend-nowdot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger, #C92F1F);
+}
+
