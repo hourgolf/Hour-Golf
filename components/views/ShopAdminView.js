@@ -3,6 +3,8 @@ import Modal from "../ui/Modal";
 import Confirm from "../ui/Confirm";
 import StatusBadge from "../ui/StatusBadge";
 import { isOnSale, saleDiscountPct } from "../../lib/shop-pricing";
+import DiscountCodesSection from "../settings/DiscountCodesSection";
+import ShopRequestsSection from "../settings/ShopRequestsSection";
 
 // --- CSV helpers ---
 const CSV_COLUMNS = [
@@ -627,6 +629,8 @@ export default function ShopAdminView({ apiKey }) {
           <button className={`rpt-tab ${tab === "orders" ? "active" : ""}`} onClick={() => setTab("orders")}>
             Orders {pendingCount > 0 && <span className="cnt" style={{ marginLeft: 4 }}>{pendingCount}</span>}
           </button>
+          <button className={`rpt-tab ${tab === "requests" ? "active" : ""}`} onClick={() => setTab("requests")}>Requests</button>
+          <button className={`rpt-tab ${tab === "settings" ? "active" : ""}`} onClick={() => setTab("settings")}>Settings</button>
         </div>
         {tab === "items" && (
           <div style={{ display: "flex", gap: 6 }}>
@@ -894,6 +898,25 @@ export default function ShopAdminView({ apiKey }) {
             ))}
           </div>
         </>
+      )}
+
+      {tab === "requests" && (
+        <div style={{ padding: "12px 0" }}>
+          <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+            Members submit "please source this" requests from the member app. Review, update status, add a note — transitioning to Ready emails the member.
+          </p>
+          <ShopRequestsSection jwt={apiKey} />
+        </div>
+      )}
+
+      {tab === "settings" && (
+        <div style={{ padding: "12px 0" }}>
+          <h3 className="section-head" style={{ marginTop: 0 }}>Discount Codes</h3>
+          <p className="muted" style={{ fontSize: 12, marginTop: 0, marginBottom: 12 }}>
+            Promo codes for the member + guest checkout. Not stackable with member tier discount.
+          </p>
+          <DiscountCodesSection jwt={apiKey} />
+        </div>
       )}
 
       <ShopItemFormModal
