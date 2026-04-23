@@ -17,6 +17,7 @@ import Header from "../components/layout/Header";
 import Nav from "../components/layout/Nav";
 import Toast from "../components/ui/Toast";
 import Confirm from "../components/ui/Confirm";
+import CommandPalette from "../components/ui/CommandPalette";
 
 import LoginForm from "../components/forms/LoginForm";
 import BookingForm from "../components/forms/BookingForm";
@@ -73,6 +74,7 @@ export default function Dashboard() {
   const [delTgt, setDelTgt] = useState(null);
   const [chgTgt, setChgTgt] = useState(null);
   const [syncOpen, setSyncOpen] = useState(false);
+  const [cmdKOpen, setCmdKOpen] = useState(false);
 
   // Customer list for booking form autocomplete
   const custList = useMemo(() => {
@@ -415,6 +417,7 @@ export default function Dashboard() {
     onPrevDay: useCallback(() => shiftViewDate(-1), [viewDate]),
     onNextDay: useCallback(() => shiftViewDate(1), [viewDate]),
     onWeekView: useCallback(() => setView("week"), []),
+    onCommandPalette: useCallback(() => setCmdKOpen(true), []),
   });
 
   // --- Render ---
@@ -632,6 +635,16 @@ export default function Dashboard() {
         open={syncOpen}
         onClose={() => { setSyncOpen(false); refresh(); }}
         apiKey={apiKey}
+      />
+
+      <CommandPalette
+        open={cmdKOpen}
+        members={members}
+        onClose={() => setCmdKOpen(false)}
+        onSelect={(email) => {
+          setCmdKOpen(false);
+          selectMember(email);
+        }}
       />
 
       <Toast toast={toast} />

@@ -23,9 +23,19 @@ export function useKeyboard({
   onNextDay,
   onWeekView,
   onShowHelp,
+  onCommandPalette,
 }) {
   useEffect(() => {
     function handler(e) {
+      // Cmd/Ctrl+K fires the global command palette. Works from inside
+      // inputs too (matches the cross-app convention), so this check
+      // runs before the modifier + input-target bails below.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        if (!onCommandPalette) return;
+        e.preventDefault();
+        onCommandPalette();
+        return;
+      }
       if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
       // Bail if a modifier is held — leaves Cmd+R, Ctrl+F etc. for the
       // browser. Only bare letters / brackets / slash trigger a shortcut.
@@ -62,5 +72,5 @@ export function useKeyboard({
     }
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onNewBooking, onRefresh, onFocusSearch, onJumpToday, onPrevDay, onNextDay, onWeekView, onShowHelp]);
+  }, [onNewBooking, onRefresh, onFocusSearch, onJumpToday, onPrevDay, onNextDay, onWeekView, onShowHelp, onCommandPalette]);
 }
