@@ -18,6 +18,7 @@ import Nav from "../components/layout/Nav";
 import Toast from "../components/ui/Toast";
 import Confirm from "../components/ui/Confirm";
 import CommandPalette from "../components/ui/CommandPalette";
+import ShortcutsHelp from "../components/ui/ShortcutsHelp";
 
 import LoginForm from "../components/forms/LoginForm";
 import BookingForm from "../components/forms/BookingForm";
@@ -75,6 +76,7 @@ export default function Dashboard() {
   const [chgTgt, setChgTgt] = useState(null);
   const [syncOpen, setSyncOpen] = useState(false);
   const [cmdKOpen, setCmdKOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   // Customer list for booking form autocomplete
   const custList = useMemo(() => {
@@ -418,6 +420,7 @@ export default function Dashboard() {
     onNextDay: useCallback(() => shiftViewDate(1), [viewDate]),
     onWeekView: useCallback(() => setView("week"), []),
     onCommandPalette: useCallback(() => setCmdKOpen(true), []),
+    onShowHelp: useCallback(() => setHelpOpen(true), []),
   });
 
   // --- Render ---
@@ -652,6 +655,8 @@ export default function Dashboard() {
           selectMember(email);
         }}
       />
+
+      <ShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
 
       <Toast toast={toast} />
 
