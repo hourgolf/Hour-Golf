@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import Modal from "../ui/Modal";
 import Confirm from "../ui/Confirm";
+import StatusBadge from "../ui/StatusBadge";
+import { isOnSale, saleDiscountPct } from "../../lib/shop-pricing";
 
 const CATEGORIES = ["Apparel", "Accessories", "Equipment", "Other"];
 
@@ -15,7 +17,8 @@ const STATUS_COLORS = {
 function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
   const [form, setForm] = useState({
     title: "", subtitle: "", description: "", image_urls: [],
-    price: 0, category: "Apparel", brand: "", is_limited: false,
+    price: 0, compare_at_price: "", sale_ends_at: "",
+    category: "Apparel", brand: "", is_limited: false,
     drop_date: "", quantity_available: "", sizes: "",
     is_published: true, display_order: 0,
   });
@@ -34,6 +37,8 @@ function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
         description: item.description || "",
         image_urls: urls,
         price: Number(item.price || 0),
+        compare_at_price: item.compare_at_price != null ? Number(item.compare_at_price) : "",
+        sale_ends_at: item.sale_ends_at ? item.sale_ends_at.slice(0, 16) : "",
         category: item.category || "Apparel",
         brand: item.brand || "",
         is_limited: !!item.is_limited,
@@ -46,7 +51,8 @@ function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
     } else {
       setForm({
         title: "", subtitle: "", description: "", image_urls: [],
-        price: 0, category: "Apparel", brand: "", is_limited: false,
+        price: 0, compare_at_price: "", sale_ends_at: "",
+        category: "Apparel", brand: "", is_limited: false,
         drop_date: "", quantity_available: "", sizes: "",
         is_published: true, display_order: 0,
       });
@@ -104,6 +110,8 @@ function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
       description: form.description.trim() || null,
       image_urls: form.image_urls,
       price: Number(form.price || 0),
+      compare_at_price: form.compare_at_price !== "" ? Number(form.compare_at_price) : null,
+      sale_ends_at: form.sale_ends_at ? new Date(form.sale_ends_at).toISOString() : null,
       quantity_available: form.quantity_available !== "" ? Number(form.quantity_available) : null,
       sizes: sizesArr,
       drop_date: form.drop_date ? new Date(form.drop_date).toISOString() : null,
@@ -147,6 +155,27 @@ function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
         <div className="mf">
           <label>Price ($) *</label>
           <input type="number" min={0} step="0.01" value={form.price} onChange={(e) => update("price", e.target.value)} />
+        </div>
+        <div className="mf">
+          <label>Compare-at price ($) <span className="muted" style={{ fontSize: 10 }}>for sale</span></label>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={form.compare_at_price}
+            onChange={(e) => update("compare_at_price", e.target.value)}
+            placeholder="Blank = no sale"
+            title="Set higher than Price to show a SALE chip with the original price crossed out"
+          />
+        </div>
+        <div className="mf">
+          <label>Sale ends <span className="muted" style={{ fontSize: 10 }}>optional</span></label>
+          <input
+            type="datetime-local"
+            value={form.sale_ends_at}
+            onChange={(e) => update("sale_ends_at", e.target.value)}
+            disabled={!form.compare_at_price}
+          />
         </div>
         <div className="mf">
           <label>Category</label>
@@ -321,11 +350,23 @@ export default function ShopAdminView({ apiKey }) {
                 <span style={{ flex: 2 }}>
                   <strong>{it.title}</strong>
                   {it.brand && <><br /><span className="email-sm">{it.brand}</span></>}
-                  {it.is_limited && <span className="badge" style={{ background: "#C92F1F", color: "#EDF3E3", fontSize: 8, marginLeft: 6 }}>DROP</span>}
-                  {!it.is_published && <span className="badge" style={{ background: "var(--text-muted)", color: "#EDF3E3", fontSize: 8, marginLeft: 6 }}>DRAFT</span>}
+                  {it.is_limited && <StatusBadge intent="danger" style={{ marginLeft: 6, fontSize: 8 }}>DROP</StatusBadge>}
+                  {isOnSale(it) && <StatusBadge intent="warning" style={{ marginLeft: 6, fontSize: 8 }}>SALE</StatusBadge>}
+                  {!it.is_published && <StatusBadge intent="neutral" style={{ marginLeft: 6, fontSize: 8 }}>DRAFT</StatusBadge>}
                 </span>
                 <span style={{ flex: 1 }} className="email-sm">{it.category}</span>
-                <span style={{ flex: 0.7 }} className="text-r tab-num">${Number(it.price).toFixed(0)}</span>
+                <span style={{ flex: 0.7 }} className="text-r tab-num">
+                  {isOnSale(it) ? (
+                    <>
+                      <span style={{ textDecoration: "line-through", color: "var(--text-muted)", fontSize: 11, marginRight: 4 }}>
+                        ${Number(it.compare_at_price).toFixed(0)}
+                      </span>
+                      <span style={{ color: "var(--danger, #C92F1F)", fontWeight: 600 }}>${Number(it.price).toFixed(0)}</span>
+                    </>
+                  ) : (
+                    `$${Number(it.price).toFixed(0)}`
+                  )}
+                </span>
                 <span style={{ flex: 0.7 }} className="text-c tab-num">
                   {it.quantity_available != null ? `${it.quantity_available - (it.quantity_claimed || 0)}/${it.quantity_available}` : "\u221E"}
                 </span>
@@ -351,12 +392,22 @@ export default function ShopAdminView({ apiKey }) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       <strong style={{ fontSize: 15 }}>{it.title}</strong>
-                      {it.is_limited && <span className="badge" style={{ background: "#C92F1F", color: "#EDF3E3", fontSize: 8 }}>DROP</span>}
-                      {!it.is_published && <span className="badge" style={{ background: "var(--text-muted)", color: "#EDF3E3", fontSize: 8 }}>DRAFT</span>}
+                      {it.is_limited && <StatusBadge intent="danger" style={{ fontSize: 8 }}>DROP</StatusBadge>}
+                      {isOnSale(it) && <StatusBadge intent="warning" style={{ fontSize: 8 }}>SALE</StatusBadge>}
+                      {!it.is_published && <StatusBadge intent="neutral" style={{ fontSize: 8 }}>DRAFT</StatusBadge>}
                     </div>
                     {it.brand && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{it.brand}</div>}
                     <div style={{ fontSize: 13, marginTop: 4 }}>
-                      <span className="tab-num" style={{ fontWeight: 600 }}>${Number(it.price).toFixed(0)}</span>
+                      {isOnSale(it) ? (
+                        <>
+                          <span style={{ textDecoration: "line-through", color: "var(--text-muted)", fontSize: 11, marginRight: 4 }}>
+                            ${Number(it.compare_at_price).toFixed(0)}
+                          </span>
+                          <span className="tab-num" style={{ fontWeight: 600, color: "var(--danger, #C92F1F)" }}>${Number(it.price).toFixed(0)}</span>
+                        </>
+                      ) : (
+                        <span className="tab-num" style={{ fontWeight: 600 }}>${Number(it.price).toFixed(0)}</span>
+                      )}
                       <span className="muted" style={{ marginLeft: 8 }}>{it.category}</span>
                       <span className="muted" style={{ marginLeft: 8 }}>
                         Stock: {it.quantity_available != null ? `${it.quantity_available - (it.quantity_claimed || 0)}` : "\u221E"}
