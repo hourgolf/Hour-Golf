@@ -3,6 +3,7 @@ import { TIERS, TIER_COLORS, TZ } from "../../lib/constants";
 import { mL, hrs, dlr } from "../../lib/format";
 import { useBranding } from "../../hooks/useBranding";
 import { resolveBays } from "../../lib/branding";
+import { supaPatch } from "../../lib/supabase";
 import Badge from "../ui/Badge";
 import ActivityLog from "../ui/ActivityLog";
 
@@ -34,11 +35,12 @@ const HOUR_LABELS = Array.from({ length: 16 }, (_, i) => i + 6); // 6am–9pm
 
 /* ── sub-sections (toggle) ──────────────────────── */
 const SECTIONS = [
-  { key: "revenue",  label: "Revenue" },
-  { key: "usage",    label: "Usage" },
-  { key: "members",  label: "Members" },
-  { key: "passes",   label: "Punch Passes" },
-  { key: "activity", label: "Activity" },
+  { key: "revenue",   label: "Revenue" },
+  { key: "usage",     label: "Usage" },
+  { key: "members",   label: "Members" },
+  { key: "passes",    label: "Punch Passes" },
+  { key: "conflicts", label: "Conflicts" },
+  { key: "activity",  label: "Activity" },
 ];
 
 /* ══════════════════════════════════════════════════ */
@@ -870,6 +872,133 @@ export default function ReportsView({ members, bookings, tierCfg, payments, apiK
     );
   }
 
+  /* ── Conflicts ──────────────────────────────────── */
+  // Surfaces every booking stamped by the Skedda/new-portal overlap
+  // webhook (migration 20260422010000). Today-only conflicts are
+  // already flagged by TodayView's banner; this section extends that
+  // to historic + future days so nothing gets forgotten. "Resolve"
+  // clears conflict_detected_at + conflict_with via direct PostgREST
+  // — the flag is advisory (admin-side only), members never see it.
+  function renderConflicts() {
+    const conflictRows = allBk
+      .filter((b) => b.conflict_detected_at)
+      .sort((a, b) => {
+        // Unresolved first, then newest first.
+        return new Date(b.conflict_detected_at) - new Date(a.conflict_detected_at);
+      });
+
+    if (conflictRows.length === 0) {
+      return (
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "24px 16px", textAlign: "center" }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>No booking conflicts</div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+            Nothing flagged by the double-booking detector.
+          </div>
+        </div>
+      );
+    }
+
+    // Pair up conflicts: we stamped both sides of an overlap, so one
+    // "incident" = at least two rows sharing a time/bay window. Group
+    // by the max(conflict_detected_at) rounded to the minute so paired
+    // rows cluster. Cosmetic; the flat list still works if this
+    // heuristic mis-clusters.
+    const grouped = {};
+    conflictRows.forEach((b) => {
+      const minuteKey = String(b.conflict_detected_at || "").slice(0, 16);
+      (grouped[minuteKey] = grouped[minuteKey] || []).push(b);
+    });
+    const clusters = Object.entries(grouped).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+
+    async function resolveConflict(booking) {
+      if (!apiKey) return;
+      const ids = [booking.booking_id];
+      if (booking.conflict_with) {
+        booking.conflict_with.split(",").map((s) => s.trim()).filter(Boolean).forEach((id) => ids.push(id));
+      }
+      try {
+        await Promise.all(
+          ids.map((id) =>
+            supaPatch(apiKey, "bookings", { booking_id: id }, {
+              conflict_detected_at: null,
+              conflict_with: null,
+            })
+          )
+        );
+        // Force a soft refresh by reloading — useData refreshes on a
+        // 60s loop so the operator would otherwise see the row linger.
+        // Cheap UX tradeoff for a rare action.
+        if (typeof window !== "undefined") window.location.reload();
+      } catch (e) {
+        alert(`Failed to resolve: ${e.message || e}`);
+      }
+    }
+
+    return (
+      <div>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
+          padding: "10px 14px",
+          background: "var(--primary-bg)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius)",
+          fontSize: 13,
+        }}>
+          <strong style={{ color: "var(--danger, #C92F1F)" }}>{conflictRows.length}</strong>
+          <span>booking{conflictRows.length === 1 ? "" : "s"} flagged as conflicted.</span>
+          <span className="muted" style={{ fontSize: 11, marginLeft: "auto" }}>
+            Resolving clears the flag on both sides; it doesn&rsquo;t cancel anyone.
+          </span>
+        </div>
+
+        {clusters.map(([key, rows]) => (
+          <div key={key} style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            padding: "12px 14px",
+            marginBottom: 10,
+          }}>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
+              Detected {new Date(rows[0].conflict_detected_at).toLocaleString("en-US", { timeZone: TZ, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+            </div>
+            {rows.map((b) => (
+              <div key={b.booking_id} style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "6px 0",
+                borderTop: "1px dashed var(--border)",
+                fontSize: 13,
+              }}>
+                <div style={{ minWidth: 160 }}>
+                  <strong>{b.customer_name || b.customer_email}</strong>
+                  <div className="muted" style={{ fontSize: 11 }}>{b.customer_email}</div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  {new Date(b.booking_start).toLocaleString("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                  {" – "}
+                  {new Date(b.booking_end).toLocaleString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" })}
+                  <span className="muted" style={{ marginLeft: 8 }}>{b.bay ? `Bay ${b.bay}` : ""}</span>
+                  {b.booking_status === "Cancelled" && (
+                    <span className="badge" style={{ background: "var(--text-muted)", marginLeft: 8, fontSize: 9 }}>CANCELLED</span>
+                  )}
+                </div>
+                <button
+                  className="btn"
+                  style={{ fontSize: 10 }}
+                  onClick={() => resolveConflict(b)}
+                  title="Clear the conflict flag on this booking and every booking it's paired with"
+                >
+                  Resolve
+                </button>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   /* ── main render ────────────────────────────────── */
   return (
     <div className="content">
@@ -909,6 +1038,7 @@ export default function ReportsView({ members, bookings, tierCfg, payments, apiK
       {section === "usage" && renderUsage()}
       {section === "members" && renderMembers()}
       {section === "passes" && renderPasses()}
+      {section === "conflicts" && renderConflicts()}
       {section === "activity" && (
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "14px 16px" }}>
           <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)", marginBottom: 10 }}>
