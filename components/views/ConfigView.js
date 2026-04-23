@@ -1603,10 +1603,12 @@ export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStrip
   return (
     <div className="content">
       <h2 className="section-head">Workspace</h2>
-      <p className="muted" style={{ marginBottom: 16 }}>
-        Brand, logos, colors, fonts, bays, and facility info. Changes here affect every member and admin view for this tenant.
-      </p>
-      <TenantBranding apiKey={jwt} />
+      <div className="tbl" style={{ padding: 20, marginBottom: 20 }}>
+        <p className="muted" style={{ marginTop: 0, marginBottom: 16 }}>
+          Brand, logos, colors, fonts, bays, and facility info. Changes here affect every member and admin view for this tenant.
+        </p>
+        <TenantBranding apiKey={jwt} />
+      </div>
 
       <h2 className="section-head" style={{ marginTop: 24 }}>
         <span>Tier Configuration</span>
