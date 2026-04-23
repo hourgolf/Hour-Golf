@@ -74,6 +74,11 @@ export default function MemberShop({ member, tierConfig, showToast }) {
     street1: "", street2: "", city: "", state: "", zip: "", country: "US",
   });
   const [checking, setChecking] = useState(false);
+  // Saved shipping addresses for the dropdown picker. Null = not yet
+  // fetched; [] = fetched and empty. Picker only renders when the
+  // member actually has saved addresses.
+  const [savedAddresses, setSavedAddresses] = useState(null);
+  const [selectedAddrId, setSelectedAddrId] = useState("");
 
   const loadItems = useCallback(async () => {
     try {
@@ -267,6 +272,56 @@ export default function MemberShop({ member, tierConfig, showToast }) {
       });
       await loadCart();
     } catch {}
+  }
+
+  // Load saved addresses on mount. If the member has any, auto-fill
+  // the ship form + select ID from the default so a member with an
+  // address on file can breeze through checkout.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/member-addresses");
+        if (!r.ok) throw new Error();
+        const d = await r.json();
+        if (cancelled) return;
+        const addrs = d.addresses || [];
+        setSavedAddresses(addrs);
+        const def = addrs.find((a) => a.is_default) || addrs[0];
+        if (def) {
+          setSelectedAddrId(def.id);
+          setShipAddr({
+            street1: def.street1 || "",
+            street2: def.street2 || "",
+            city: def.city || "",
+            state: def.state || "",
+            zip: def.zip || "",
+            country: def.country || "US",
+          });
+        }
+      } catch {
+        if (!cancelled) setSavedAddresses([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  function applySavedAddress(id) {
+    setSelectedAddrId(id);
+    if (!id || id === "__new__") {
+      setShipAddr({ street1: "", street2: "", city: "", state: "", zip: "", country: "US" });
+      return;
+    }
+    const a = (savedAddresses || []).find((x) => x.id === id);
+    if (!a) return;
+    setShipAddr({
+      street1: a.street1 || "",
+      street2: a.street2 || "",
+      city: a.city || "",
+      state: a.state || "",
+      zip: a.zip || "",
+      country: a.country || "US",
+    });
   }
 
   function setShipField(field, value) {
@@ -987,6 +1042,20 @@ export default function MemberShop({ member, tierConfig, showToast }) {
         {deliveryMethod === "ship" && (
           <div style={{ marginBottom: 12, padding: 12, background: "var(--primary-bg)", borderRadius: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>Ship to</div>
+            {Array.isArray(savedAddresses) && savedAddresses.length > 0 && (
+              <select
+                value={selectedAddrId}
+                onChange={(e) => applySavedAddress(e.target.value)}
+                style={{ width: "100%", padding: 10, border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", marginBottom: 8, background: "var(--surface)", color: "var(--text)" }}
+              >
+                {savedAddresses.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.label}{a.is_default ? " (default)" : ""} — {a.street1}, {a.city}
+                  </option>
+                ))}
+                <option value="__new__">Use a new address…</option>
+              </select>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <input type="text" placeholder="Street address" value={shipAddr.street1} onChange={(e) => setShipField("street1", e.target.value)} style={{ gridColumn: "1 / -1", padding: 10, border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", width: "100%" }} />
               <input type="text" placeholder="Apt, suite, etc. (optional)" value={shipAddr.street2} onChange={(e) => setShipField("street2", e.target.value)} style={{ gridColumn: "1 / -1", padding: 10, border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", width: "100%" }} />
