@@ -3,6 +3,7 @@ import { TIERS } from "../../lib/constants";
 import { mL, hrs, dlr, allD } from "../../lib/format";
 import { overageStatus, remainingOverageCents } from "../../lib/overage";
 import Badge from "../ui/Badge";
+import KPIStrip from "../ui/KPIStrip";
 
 export default function OverviewView({
   usage, payments, members, bookings, tierCfg,
@@ -154,11 +155,15 @@ export default function OverviewView({
       </div>
 
       {memMonth.length > 0 && (
-        <div className="summary">
-          <div className="sum-item"><span className="sum-val">{totHrs.toFixed(1)}h</span><span className="sum-lbl">Member Hours</span></div>
-          <div className="sum-item"><span className={`sum-val ${totOver > 0 ? "red" : "green"}`}>{dlr(totOver)}</span><span className="sum-lbl">Overage Due</span></div>
-          <div className="sum-item"><span className="sum-val">{memMonth.filter((r) => Number(r.overage_hours) > 0).length}</span><span className="sum-lbl">Over Allotment</span></div>
-        </div>
+        <KPIStrip items={[
+          { label: "Member Hours", value: `${totHrs.toFixed(1)}h` },
+          {
+            label: "Overage Due",
+            value: dlr(totOver),
+            color: totOver > 0 ? "var(--danger, #C92F1F)" : "var(--primary)",
+          },
+          { label: "Over Allotment", value: memMonth.filter((r) => Number(r.overage_hours) > 0).length },
+        ]} />
       )}
 
       {memMonth.length > 0 && (

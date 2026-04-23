@@ -4,6 +4,7 @@ import { fT, fDL, lds, tds, hrs } from "../../lib/format";
 import { useBranding } from "../../hooks/useBranding";
 import { resolveBays, resolveBayLabel } from "../../lib/branding";
 import Badge from "../ui/Badge";
+import KPIStrip from "../ui/KPIStrip";
 import DayTimeline from "./DayTimeline";
 
 // Tight countdown helper used by the "Right now" + "Up next" callouts.
@@ -343,12 +344,12 @@ export default function TodayView({
         onSelectMember={onSelectMember}
       />
 
-      <div className="summary">
-        <div className="sum-item"><span className="sum-val">{todayBk.length}</span><span className="sum-lbl">Bookings</span></div>
-        <div className="sum-item"><span className="sum-val">{todayHrs.toFixed(1)}h</span><span className="sum-lbl">{bayLabel} Hours</span></div>
-        <div className="sum-item"><span className="sum-val">${todayRev.toFixed(0)}</span><span className="sum-lbl">Est Revenue</span></div>
-        <div className="sum-item"><span className="sum-val">{todayBk.filter((b) => bkStatus(b) === "upcoming").length}</span><span className="sum-lbl">Upcoming</span></div>
-      </div>
+      <KPIStrip items={[
+        { label: "Bookings", value: todayBk.length },
+        { label: `${bayLabel} Hours`, value: `${todayHrs.toFixed(1)}h` },
+        { label: "Est Revenue", value: `$${todayRev.toFixed(0)}` },
+        { label: "Upcoming", value: todayBk.filter((b) => bkStatus(b) === "upcoming").length },
+      ]} />
 
       {displayBays.map((bay) => {
         const laneBks = todayByBay[bay] || [];

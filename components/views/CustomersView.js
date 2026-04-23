@@ -4,6 +4,7 @@ import { pacificMonthTag, pacificMonthWindow, mL, dlr, hrs } from "../../lib/for
 import { remainingOverageCents, overageStatus } from "../../lib/overage";
 import Badge from "../ui/Badge";
 import TierSelect from "../ui/TierSelect";
+import KPIStrip from "../ui/KPIStrip";
 
 // Small inline chip next to the customer name when their Stripe
 // subscription is past_due or unpaid. Visible on both the desktop
@@ -424,35 +425,31 @@ export default function CustomersView({
 
   return (
     <div className="content">
-      {/* KPI strip — matches the shape used on TodayView + WeekView so
-          the at-a-glance bar reads the same across views. */}
-      <div className="summary">
-        <div className="sum-item"><span className="sum-val">{summary.total}</span><span className="sum-lbl">Customers</span></div>
-        <div className="sum-item"><span className="sum-val">{summary.members}</span><span className="sum-lbl">Members</span></div>
-        <div className="sum-item"><span className="sum-val">{summary.nonMembers}</span><span className="sum-lbl">Non-Members</span></div>
-        {summary.pastDue > 0 && (
-          <div
-            className="sum-item"
-            style={{ cursor: "pointer" }}
-            onClick={() => setSearch("")}
-            title="Members whose last Stripe charge failed — update their card"
-          >
-            <span className="sum-val" style={{ color: "var(--danger, #C92F1F)" }}>{summary.pastDue}</span>
-            <span className="sum-lbl">Past Due</span>
-          </div>
-        )}
-        {summary.payingTotal > 0 && (
-          <div
-            className="sum-item"
-            title="Paying members who have ever logged into the app (launch adoption)"
-          >
-            <span className="sum-val" style={{ color: "var(--primary)" }}>
-              {summary.onApp}<span style={{ fontSize: "0.55em", opacity: 0.6, fontWeight: 500 }}> / {summary.payingTotal}</span>
-            </span>
-            <span className="sum-lbl">On App</span>
-          </div>
-        )}
-      </div>
+      <KPIStrip items={[
+        { label: "Customers", value: summary.total },
+        { label: "Members", value: summary.members },
+        { label: "Non-Members", value: summary.nonMembers },
+        summary.pastDue > 0 && {
+          label: "Past Due",
+          value: summary.pastDue,
+          color: "var(--danger, #C92F1F)",
+          onClick: () => setSearch(""),
+          title: "Members whose last Stripe charge failed \u2014 update their card",
+        },
+        summary.payingTotal > 0 && {
+          label: "On App",
+          color: "var(--primary)",
+          value: (
+            <>
+              {summary.onApp}
+              <span style={{ fontSize: "0.55em", opacity: 0.6, fontWeight: 500 }}>
+                {" "}/ {summary.payingTotal}
+              </span>
+            </>
+          ),
+          title: "Paying members who have ever logged into the app (launch adoption)",
+        },
+      ]} />
 
       <input
         className="search"

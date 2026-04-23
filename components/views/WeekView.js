@@ -3,6 +3,7 @@ import { TZ } from "../../lib/constants";
 import { fT, lds, tds } from "../../lib/format";
 import { useBranding } from "../../hooks/useBranding";
 import { resolveBays } from "../../lib/branding";
+import KPIStrip from "../ui/KPIStrip";
 
 // Hours-per-day used for utilization math. 16 mirrors the same window
 // ReportsView uses (6am–10pm operational range); good enough for a
@@ -171,12 +172,12 @@ export default function WeekView({ bookings, members, weekOff, setWeekOff, onSel
 
       {/* Month-level KPI strip — same shape as TodayView's summary so
           operators have one consistent at-a-glance bar across views. */}
-      <div className="summary">
-        <div className="sum-item"><span className="sum-val">{monthKpis.count}</span><span className="sum-lbl">Bookings</span></div>
-        <div className="sum-item"><span className="sum-val">{monthKpis.hrs.toFixed(1)}h</span><span className="sum-lbl">Booked Hours</span></div>
-        <div className="sum-item"><span className="sum-val">${monthKpis.revenue.toFixed(0)}</span><span className="sum-lbl">Est Revenue</span></div>
-        <div className="sum-item"><span className="sum-val">{monthKpis.utilization.toFixed(0)}%</span><span className="sum-lbl">Utilization</span></div>
-      </div>
+      <KPIStrip items={[
+        { label: "Bookings", value: monthKpis.count },
+        { label: "Booked Hours", value: `${monthKpis.hrs.toFixed(1)}h` },
+        { label: "Est Revenue", value: `$${monthKpis.revenue.toFixed(0)}` },
+        { label: "Utilization", value: `${monthKpis.utilization.toFixed(0)}%` },
+      ]} />
 
       {/* gridTemplateColumns is inlined so the calendar adapts to
           tenants with more (or fewer) bays than HG's 2 — the global
