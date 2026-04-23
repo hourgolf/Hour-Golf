@@ -6,6 +6,7 @@ import { resolveBays } from "../../lib/branding";
 import { supaPatch } from "../../lib/supabase";
 import Badge from "../ui/Badge";
 import ActivityLog from "../ui/ActivityLog";
+import StatusBadge from "../ui/StatusBadge";
 
 /* ── helpers ────────────────────────────────────── */
 
@@ -980,7 +981,7 @@ export default function ReportsView({ members, bookings, tierCfg, payments, apiK
                   {new Date(b.booking_end).toLocaleString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" })}
                   <span className="muted" style={{ marginLeft: 8 }}>{b.bay ? `Bay ${b.bay}` : ""}</span>
                   {b.booking_status === "Cancelled" && (
-                    <span className="badge" style={{ background: "var(--text-muted)", marginLeft: 8, fontSize: 9 }}>CANCELLED</span>
+                    <StatusBadge intent="neutral" style={{ marginLeft: 8 }}>CANCELLED</StatusBadge>
                   )}
                 </div>
                 <button

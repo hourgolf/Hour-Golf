@@ -4,6 +4,7 @@ import { mL, hrs, dlr, allD } from "../../lib/format";
 import { overageStatus, remainingOverageCents } from "../../lib/overage";
 import Badge from "../ui/Badge";
 import KPIStrip from "../ui/KPIStrip";
+import StatusBadge from "../ui/StatusBadge";
 
 export default function OverviewView({
   usage, payments, members, bookings, tierCfg,
@@ -214,10 +215,10 @@ export default function OverviewView({
                   </span>
                   <span style={{ flex: 1 }} className="text-r">
                     {status === "none" && <span className="muted">&mdash;</span>}
-                    {status === "paid" && <span className="badge" style={{ background: "#4C8D73", color: "#EDF3E3", fontSize: 9 }}>PAID</span>}
-                    {status === "sub_min" && <span className="badge" style={{ background: "#4C8D73", color: "#EDF3E3", fontSize: 9 }} title={tooltip}>PAID*</span>}
-                    {status === "partial" && <span className="badge" style={{ background: "#C77B3C", color: "#EDF3E3", fontSize: 9 }} title={tooltip}>PARTIAL</span>}
-                    {status === "unpaid" && <span className="badge" style={{ background: "var(--red)", color: "#EDF3E3", fontSize: 9 }}>UNPAID</span>}
+                    {status === "paid" && <StatusBadge intent="success">PAID</StatusBadge>}
+                    {status === "sub_min" && <StatusBadge intent="success" title={tooltip}>PAID*</StatusBadge>}
+                    {status === "partial" && <StatusBadge intent="warning" title={tooltip}>PARTIAL</StatusBadge>}
+                    {status === "unpaid" && <StatusBadge intent="danger">UNPAID</StatusBadge>}
                   </span>
                 </div>
               );
@@ -325,13 +326,11 @@ export default function OverviewView({
               <span style={{ flex: 1 }} className="text-r tab-num">{r.booking_count}</span>
               <span style={{ flex: 1 }} className="text-r tab-num">${revenue.toFixed(0)}</span>
               <span style={{ flex: 1 }} className="text-r">
-                {paid > 0 && unpaid === 0 && (
-                  <span className="badge" style={{ background: "#4C8D73", color: "#EDF3E3", fontSize: 9 }}>PAID</span>
-                )}
+                {paid > 0 && unpaid === 0 && <StatusBadge intent="success">PAID</StatusBadge>}
                 {paid > 0 && unpaid > 0 && (
-                  <span className="badge" style={{ background: "var(--amber, #D97706)", color: "#EDF3E3", fontSize: 9 }}>
+                  <StatusBadge intent="warning">
                     {paid}/{r.booking_count} PAID
-                  </span>
+                  </StatusBadge>
                 )}
                 {paid === 0 && unpaid > 0 && (
                   <button

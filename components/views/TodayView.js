@@ -5,6 +5,7 @@ import { useBranding } from "../../hooks/useBranding";
 import { resolveBays, resolveBayLabel } from "../../lib/branding";
 import Badge from "../ui/Badge";
 import KPIStrip from "../ui/KPIStrip";
+import StatusBadge from "../ui/StatusBadge";
 import DayTimeline from "./DayTimeline";
 
 // Tight countdown helper used by the "Right now" + "Up next" callouts.
@@ -429,19 +430,15 @@ export default function TodayView({
                     </div>
                     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                       {(b.conflict_detected_at || b.conflict_with) && (
-                        <span
-                          className="badge"
-                          style={{ background: "var(--danger, #C92F1F)", color: "#EDF3E3", fontSize: 9 }}
-                          title="This booking overlaps another on the same bay. Call to resolve."
-                        >
+                        <StatusBadge intent="danger" title="This booking overlaps another on the same bay. Call to resolve.">
                           ⚠ CONFLICT
-                        </span>
+                        </StatusBadge>
                       )}
-                      {st === "now" && <span className="badge" style={{ background: "var(--primary)", fontSize: 9 }}>NOW</span>}
+                      {st === "now" && <StatusBadge intent="info">NOW</StatusBadge>}
                       {st === "upcoming" && (
-                        <span className="badge badge-sm" style={{ background: "var(--blue)" }}>
+                        <StatusBadge intent="info">
                           {countdown ? `IN ${countdown.toUpperCase()}` : "NEXT"}
-                        </span>
+                        </StatusBadge>
                       )}
                       <button className="btn" style={{ fontSize: 10 }} onClick={() => onEdit(b)}>Edit</button>
                       <button className="btn danger" style={{ fontSize: 10 }} onClick={() => onCancel(b)}>Cancel</button>

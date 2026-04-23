@@ -6,6 +6,7 @@ import Badge from "../ui/Badge";
 import TierSelect from "../ui/TierSelect";
 import BulkBar from "../ui/BulkBar";
 import ActivityLog from "../ui/ActivityLog";
+import StatusBadge from "../ui/StatusBadge";
 import MemberProfileForm from "../settings/MemberProfileForm";
 
 export default function DetailView({
@@ -308,9 +309,7 @@ export default function DetailView({
               </span>
               <span style={{ flex: 1 }} className="text-r">
                 {status === "none" && <span className="muted">&mdash;</span>}
-                {status === "paid" && (
-                  <span className="badge" style={{ background: "#4a7c59", fontSize: 9 }}>PAID</span>
-                )}
+                {status === "paid" && <StatusBadge intent="success">PAID</StatusBadge>}
                 {status === "sub_min" && (
                   <span className="muted" style={{ fontSize: 10 }} title={`$${remainingUsd.toFixed(2)} remaining \u2014 below Stripe's $0.50 minimum, treating as paid`}>
                     PAID*
@@ -389,7 +388,7 @@ export default function DetailView({
               </span>
               <span style={{ flex: 2 }}>
                 {fD(d)} {fT(d)}&ndash;{fT(e)}
-                {im && <span className="badge badge-sm" style={{ background: "var(--gold)", marginLeft: 6 }}>MANUAL</span>}
+                {im && <StatusBadge intent="info" style={{ marginLeft: 6 }}>MANUAL</StatusBadge>}
               </span>
               <span style={{ flex: 1 }}>{b.bay}</span>
               <span style={{ flex: 1 }} className="text-r tab-num">{hrs(b.duration_hours)}</span>
