@@ -116,10 +116,25 @@ export default function Dashboard() {
     try {
       if (editBk) {
         await supaPatch(apiKey, "bookings", { booking_id: editBk.booking_id }, bkData);
+        await logClientActivity("booking.edited", "booking", editBk.booking_id, {
+          customer_name: bkData.customer_name || editBk.customer_name || null,
+          member_email: bkData.customer_email || editBk.customer_email || null,
+          start: bkData.booking_start || null,
+          end: bkData.booking_end || null,
+          bay: bkData.bay || null,
+        });
         showToast("Updated");
         setEditBk(null);
       } else {
-        await supaPost(apiKey, "bookings", bkData);
+        const rows = await supaPost(apiKey, "bookings", bkData);
+        const newId = Array.isArray(rows) && rows[0]?.booking_id ? rows[0].booking_id : null;
+        await logClientActivity("booking.created", "booking", newId, {
+          customer_name: bkData.customer_name || null,
+          member_email: bkData.customer_email || null,
+          start: bkData.booking_start || null,
+          end: bkData.booking_end || null,
+          bay: bkData.bay || null,
+        });
         showToast("Added");
         setAddOpen(false);
       }
@@ -130,11 +145,38 @@ export default function Dashboard() {
     setSaving(false);
   }
 
+  // Fire-and-forget audit log for admin actions that mutate via direct
+  // PostgREST. Server-side admin-* routes log directly. See
+  // lib/activity-log.js + pages/api/admin-log-activity.js.
+  async function logClientActivity(action, targetType, targetId, metadata = null) {
+    if (!apiKey) return;
+    try {
+      await fetch("/api/admin-log-activity", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ action, targetType, targetId, metadata }),
+      });
+    } catch (e) {
+      // Never fail the caller on log errors.
+      console.warn("activity log failed:", e?.message || e);
+    }
+  }
+
   async function cancelBooking() {
     if (!cancTgt) return;
     setSaving(true);
     try {
       await supaPatch(apiKey, "bookings", { booking_id: cancTgt.booking_id }, { booking_status: "Cancelled" });
+      await logClientActivity("booking.cancelled", "booking", cancTgt.booking_id, {
+        customer_name: cancTgt.customer_name || null,
+        member_email: cancTgt.customer_email || null,
+        start: cancTgt.booking_start || null,
+        end: cancTgt.booking_end || null,
+        bay: cancTgt.bay || null,
+      });
       showToast("Cancelled");
       setCancTgt(null);
       await refresh();
@@ -149,6 +191,13 @@ export default function Dashboard() {
     setSaving(true);
     try {
       await supaDelete(apiKey, "bookings", { booking_id: delTgt.booking_id });
+      await logClientActivity("booking.deleted", "booking", delTgt.booking_id, {
+        customer_name: delTgt.customer_name || null,
+        member_email: delTgt.customer_email || null,
+        start: delTgt.booking_start || null,
+        end: delTgt.booking_end || null,
+        bay: delTgt.bay || null,
+      });
       showToast("Deleted");
       setDelTgt(null);
       await refresh();
@@ -162,6 +211,13 @@ export default function Dashboard() {
     setSaving(true);
     try {
       await supaPatch(apiKey, "bookings", { booking_id: b.booking_id }, { booking_status: "Confirmed" });
+      await logClientActivity("booking.restored", "booking", b.booking_id, {
+        customer_name: b.customer_name || null,
+        member_email: b.customer_email || null,
+        start: b.booking_start || null,
+        end: b.booking_end || null,
+        bay: b.bay || null,
+      });
       showToast("Restored");
       await refresh();
     } catch (e) {
@@ -489,6 +545,7 @@ export default function Dashboard() {
           bookings={bookings}
           tierCfg={tierCfg}
           payments={payments}
+          apiKey={apiKey}
         />
       )}
 

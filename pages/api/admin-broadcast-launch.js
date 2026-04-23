@@ -19,6 +19,7 @@
 
 import { SUPABASE_URL, getServiceKey, getTenantId, verifyAdmin, getRequestOrigin } from "../../lib/api-helpers";
 import { sendLaunchEmail } from "../../lib/email";
+import { logActivity } from "../../lib/activity-log";
 
 const DEFAULT_LIMIT = 500;
 
@@ -161,6 +162,19 @@ export default async function handler(req, res) {
       failed.push({ email: m.email, reason: e.message });
     }
   }
+
+  await logActivity({
+    tenantId: effectiveTenantId,
+    actor: { id: user.id, email: user.email },
+    action: "broadcast.launch_sent",
+    targetType: null,
+    targetId: null,
+    metadata: {
+      sent_count: sent.length,
+      failed_count: failed.length,
+      total_eligible: eligible.length,
+    },
+  });
 
   return res.status(200).json({
     sent: sent.length,

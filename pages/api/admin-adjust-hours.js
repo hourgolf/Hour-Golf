@@ -1,4 +1,5 @@
 import { SUPABASE_URL, getServiceKey, verifyAdmin } from "../../lib/api-helpers";
+import { logActivity } from "../../lib/activity-log";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
@@ -48,6 +49,20 @@ export default async function handler(req, res) {
     console.log(
       `Admin adjusted bonus hours for ${member_email}: ${current} → ${newBalance} (${adjustment > 0 ? "+" : ""}${adjustment}) reason: ${adjustReason || "none"}`
     );
+
+    await logActivity({
+      tenantId,
+      actor: { id: user.id, email: user.email },
+      action: "member.hours_adjusted",
+      targetType: "member",
+      targetId: member_email,
+      metadata: {
+        delta: adjustment,
+        from: current,
+        to: newBalance,
+        reason: adjustReason || null,
+      },
+    });
 
     return res.status(200).json({ success: true, previous: current, new_balance: newBalance });
   } catch (e) {

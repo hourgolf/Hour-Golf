@@ -4,6 +4,7 @@ import { mL, hrs, dlr } from "../../lib/format";
 import { useBranding } from "../../hooks/useBranding";
 import { resolveBays } from "../../lib/branding";
 import Badge from "../ui/Badge";
+import ActivityLog from "../ui/ActivityLog";
 
 /* ── helpers ────────────────────────────────────── */
 
@@ -33,14 +34,15 @@ const HOUR_LABELS = Array.from({ length: 16 }, (_, i) => i + 6); // 6am–9pm
 
 /* ── sub-sections (toggle) ──────────────────────── */
 const SECTIONS = [
-  { key: "revenue", label: "Revenue" },
-  { key: "usage",   label: "Usage" },
-  { key: "members", label: "Members" },
-  { key: "passes",  label: "Punch Passes" },
+  { key: "revenue",  label: "Revenue" },
+  { key: "usage",    label: "Usage" },
+  { key: "members",  label: "Members" },
+  { key: "passes",   label: "Punch Passes" },
+  { key: "activity", label: "Activity" },
 ];
 
 /* ══════════════════════════════════════════════════ */
-export default function ReportsView({ members, bookings, tierCfg, payments }) {
+export default function ReportsView({ members, bookings, tierCfg, payments, apiKey }) {
   const branding = useBranding();
   // Per-tenant bay list drives the by-bay breakdown + capacity math.
   // BAYS.length used to be a hardcoded 2; now it adapts so a tenant
@@ -907,6 +909,14 @@ export default function ReportsView({ members, bookings, tierCfg, payments }) {
       {section === "usage" && renderUsage()}
       {section === "members" && renderMembers()}
       {section === "passes" && renderPasses()}
+      {section === "activity" && (
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "14px 16px" }}>
+          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)", marginBottom: 10 }}>
+            Last 50 admin actions
+          </div>
+          <ActivityLog apiKey={apiKey} limit={50} includeTarget emptyMessage="No admin actions recorded yet." />
+        </div>
+      )}
     </div>
   );
 }

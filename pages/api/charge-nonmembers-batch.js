@@ -1,5 +1,6 @@
 import { verifyAdmin, SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
 import { getStripeClient } from "../../lib/stripe-config";
+import { logActivity } from "../../lib/activity-log";
 
 // Phase 7B-2d: per-tenant Stripe client via lib/stripe-config.
 
@@ -185,6 +186,20 @@ export default async function handler(req, res) {
         results.failed.push({ booking_id: bk.booking_id, email: bk.customer_email, error: err.message });
       }
     }
+
+    await logActivity({
+      tenantId,
+      actor: { id: user.id, email: user.email },
+      action: "nonmember.bulk_charged",
+      targetType: null,
+      targetId: null,
+      metadata: {
+        charged_count: results.charged.length,
+        failed_count: results.failed.length,
+        skipped_count: results.skipped.length,
+        total_cents: results.charged.reduce((sum, r) => sum + (r.amount_cents || 0), 0),
+      },
+    });
 
     return res.status(200).json({
       success: true,

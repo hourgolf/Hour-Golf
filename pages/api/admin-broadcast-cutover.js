@@ -34,6 +34,7 @@ import {
   sendCutoverReminder,
   sendCutoverComplete,
 } from "../../lib/email";
+import { logActivity } from "../../lib/activity-log";
 
 const DEFAULT_LIMIT = 500;
 
@@ -221,6 +222,20 @@ export default async function handler(req, res) {
       failed.push({ email: m.email, reason: e.message });
     }
   }
+
+  await logActivity({
+    tenantId: effectiveTenantId,
+    actor: { id: user.id, email: user.email },
+    action: "broadcast.cutover_sent",
+    targetType: null,
+    targetId: null,
+    metadata: {
+      phase: phaseKey,
+      sent_count: sent.length,
+      failed_count: failed.length,
+      total_eligible: eligible.length,
+    },
+  });
 
   return res.status(200).json({
     phase: phaseKey,

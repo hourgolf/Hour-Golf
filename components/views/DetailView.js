@@ -5,6 +5,7 @@ import { overageStatus, remainingOverageCents } from "../../lib/overage";
 import Badge from "../ui/Badge";
 import TierSelect from "../ui/TierSelect";
 import BulkBar from "../ui/BulkBar";
+import ActivityLog from "../ui/ActivityLog";
 import MemberProfileForm from "../settings/MemberProfileForm";
 
 export default function DetailView({
@@ -249,6 +250,19 @@ export default function DetailView({
             </button>
           </div>
         )}
+      </div>
+
+      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "14px 16px", marginBottom: 16 }}>
+        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "var(--text-muted)", marginBottom: 8 }}>
+          Recent Activity
+        </div>
+        <ActivityLog
+          apiKey={apiKey}
+          targetType="member"
+          targetId={selMember}
+          limit={15}
+          emptyMessage="No admin actions recorded for this member yet."
+        />
       </div>
 
       <h3 className="section-head">Monthly Breakdown</h3>

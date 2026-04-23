@@ -1,5 +1,6 @@
 import { verifyAdmin, SUPABASE_URL, getServiceKey } from "../../lib/api-helpers";
 import { getStripeClient } from "../../lib/stripe-config";
+import { logActivity } from "../../lib/activity-log";
 
 // Phase 7B-2d: per-tenant Stripe client via lib/stripe-config.
 
@@ -172,6 +173,21 @@ export default async function handler(req, res) {
         description: desc,
         charged_booking_id: booking_id,
       }),
+    });
+
+    await logActivity({
+      tenantId,
+      actor: { id: user.id, email: user.email },
+      action: "nonmember.charged",
+      targetType: "booking",
+      targetId: booking_id,
+      metadata: {
+        member_email: bk.customer_email,
+        customer_name: bk.customer_name || null,
+        amount_cents: amountCents,
+        hours,
+        payment_intent_id: pi.id,
+      },
     });
 
     return res.status(200).json({

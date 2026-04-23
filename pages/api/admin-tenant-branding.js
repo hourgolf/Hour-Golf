@@ -11,6 +11,7 @@
 
 import { verifyAdmin, getServiceKey, SUPABASE_URL } from "../../lib/api-helpers";
 import { invalidateBranding } from "../../lib/branding";
+import { logActivity } from "../../lib/activity-log";
 
 // Columns the admin is allowed to edit. Other columns on tenant_branding
 // (tenant_id, updated_at) are managed by the system.
@@ -248,6 +249,17 @@ export default async function handler(req, res) {
       // the fresh values instead of showing the admin their old branding
       // for up to 60 seconds.
       invalidateBranding(tenantId);
+
+      await logActivity({
+        tenantId,
+        actor: { id: user.id, email: user.email },
+        action: "settings.workspace_updated",
+        targetType: "settings",
+        targetId: "tenant_branding",
+        metadata: {
+          fields_changed: Object.keys(update).filter((k) => k !== "updated_at"),
+        },
+      });
 
       return res.status(200).json(rows[0] || null);
     }

@@ -1,5 +1,6 @@
 import { SUPABASE_URL, getServiceKey, verifyAdmin } from "../../lib/api-helpers";
 import { getStripeClient } from "../../lib/stripe-config";
+import { logActivity } from "../../lib/activity-log";
 
 // Admin-only tier update / member upsert.
 //
@@ -113,6 +114,22 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: "Update failed", detail: text });
       }
       const rows = await upResp.json();
+
+      if (existing.tier !== tier) {
+        await logActivity({
+          tenantId,
+          actor: { id: user.id, email: user.email },
+          action: "member.tier_changed",
+          targetType: "member",
+          targetId: cleanEmail,
+          metadata: {
+            from: existing.tier || null,
+            to: tier,
+            linked_stripe: !!stripeLink.stripe_customer_id,
+          },
+        });
+      }
+
       return res.status(200).json({ member: rows[0] || null, linked_stripe: !!stripeLink.stripe_customer_id });
     }
 
@@ -145,6 +162,20 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Insert failed", detail: text });
     }
     const rows = await inResp.json();
+
+    await logActivity({
+      tenantId,
+      actor: { id: user.id, email: user.email },
+      action: "member.created",
+      targetType: "member",
+      targetId: cleanEmail,
+      metadata: {
+        tier,
+        name: fallbackName,
+        linked_stripe: !!stripeLink.stripe_customer_id,
+      },
+    });
+
     return res.status(200).json({ member: rows[0] || null, linked_stripe: !!stripeLink.stripe_customer_id });
   } catch (e) {
     console.error("admin-update-tier error:", e);
