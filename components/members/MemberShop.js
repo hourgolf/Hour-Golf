@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Modal from "../ui/Modal";
+import StatusBadge from "../ui/StatusBadge";
 import { optimizedImageUrl } from "../../lib/branding";
 
 const STATUS_COLORS = {
@@ -628,9 +629,9 @@ export default function MemberShop({ member, tierConfig, showToast }) {
                       <span className="mem-purchase-tag">In-store</span>
                       <strong style={{ marginLeft: 8 }}>{o.description || "In-store purchase"}</strong>
                     </div>
-                    <span className="badge" style={{ background: "var(--primary)", color: "#EDF3E3", fontSize: 9 }}>
+                    <StatusBadge intent="info">
                       {(o.status || "COMPLETED").toUpperCase()}
-                    </span>
+                    </StatusBadge>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, gap: 8 }}>
                     <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>
