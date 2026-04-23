@@ -30,6 +30,10 @@ const TEMPLATES = {
   "booking-cancellation":       "sendCancellationEmail",
   "access-code":                "sendAccessCodeEmail",
   "booking-conflict-alert":     "sendBookingConflictAlert",
+  "cutover-announcement":       "sendCutoverAnnouncement",
+  "cutover-reminder":           "sendCutoverReminder",
+  "cutover-complete-member":    "sendCutoverComplete",
+  "cutover-complete-new":       "sendCutoverComplete",
   "welcome":                    "sendWelcomeEmail",
   "payment-receipt":            "sendPaymentReceiptEmail",
   "payment-failed":             "sendPaymentFailedEmail",
@@ -83,6 +87,20 @@ function sampleDataFor(tpl, { tenantId, portalUrl }) {
         bookingEnd: endTomorrow.toISOString(),
         accessCode: "426801",
       };
+    case "cutover-announcement": {
+      const cutoverDate = new Date(now);
+      cutoverDate.setDate(now.getDate() + 14);
+      return { ...common, cutoverDate: cutoverDate.toISOString() };
+    }
+    case "cutover-reminder": {
+      const cutoverDate = new Date(now);
+      cutoverDate.setDate(now.getDate() + 3);
+      return { ...common, cutoverDate: cutoverDate.toISOString() };
+    }
+    case "cutover-complete-member":
+      return { ...common, alreadyOnApp: true };
+    case "cutover-complete-new":
+      return { ...common, alreadyOnApp: false };
     case "booking-conflict-alert":
       return {
         tenantId,

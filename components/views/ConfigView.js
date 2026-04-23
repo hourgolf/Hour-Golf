@@ -425,6 +425,231 @@ function Stat({ val, lbl }) {
   );
 }
 
+// --- Skedda → new-portal cutover broadcasts --------------------------
+// Three-phase transition comms. Admin picks a cutover date, the three
+// phase rows show progress + let the operator fire each at the right
+// moment. See docs/SKEDDA_CUTOVER_PLAN.md for timing recommendations.
+// Idempotent per-phase (each row writes its own cutover_*_sent_at
+// column; re-clicks pick up stragglers without duplicating sends).
+const CUTOVER_PHASES = [
+  {
+    key: "announcement",
+    label: "Announcement (T−14)",
+    column: "cutover_announcement_sent_at",
+    previewSlug: "cutover-announcement",
+    needsDate: true,
+    targetDescription: "All paying members not yet emailed.",
+    recommendedDay: "2 weeks before cutover",
+  },
+  {
+    key: "reminder",
+    label: "T−3 reminder",
+    column: "cutover_reminder_sent_at",
+    previewSlug: "cutover-reminder",
+    needsDate: true,
+    targetDescription: "Paying members who still haven't logged in (first_app_login_at IS NULL).",
+    recommendedDay: "3 days before cutover",
+  },
+  {
+    key: "complete",
+    label: "Post-cutover (day of)",
+    column: "cutover_complete_sent_at",
+    previewSlug: "cutover-complete-member",
+    needsDate: false,
+    targetDescription: "All paying members. Renders a different variant for members already on the app vs not-yet.",
+    recommendedDay: "Morning of cutover, after Skedda/Zapier are turned off",
+  },
+];
+
+function CutoverBroadcastSection({ jwt, members }) {
+  // Default cutover date: 14 days out, Monday. Operator can override.
+  const defaultDate = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    // Roll forward to the next Monday so the default isn't a weekend.
+    const day = d.getDay();
+    if (day !== 1) d.setDate(d.getDate() + ((8 - day) % 7 || 7));
+    return d.toISOString().slice(0, 10);
+  })();
+  const [cutoverDate, setCutoverDate] = useState(defaultDate);
+  const [busy, setBusy] = useState({}); // { [phase]: bool }
+  const [result, setResult] = useState({}); // { [phase]: { kind, data } }
+
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const payingMembers = (members || []).filter(
+    (m) => m?.tier && m.tier !== "Non-Member"
+  );
+
+  async function fire(phaseKey, options = {}) {
+    const p = CUTOVER_PHASES.find((x) => x.key === phaseKey);
+    if (!p) return;
+    if (p.needsDate && !cutoverDate) {
+      setResult((r) => ({ ...r, [phaseKey]: { kind: "error", data: { error: "Pick a cutover date first." } } }));
+      return;
+    }
+    setBusy((b) => ({ ...b, [phaseKey]: true }));
+    setResult((r) => ({ ...r, [phaseKey]: null }));
+    const params = new URLSearchParams();
+    params.set("phase", phaseKey);
+    if (p.needsDate) params.set("date", cutoverDate);
+    if (options.dryRun) params.set("dryRun", "1");
+    if (options.preview) {
+      params.set("preview", "1");
+      if (options.to) params.set("to", options.to);
+    }
+    try {
+      const r = await fetch(`/api/admin-broadcast-cutover?${params.toString()}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || d.error || "Broadcast failed");
+      const kind = options.dryRun ? "dryrun" : options.preview ? "preview" : "sent";
+      setResult((x) => ({ ...x, [phaseKey]: { kind, data: d } }));
+    } catch (e) {
+      setResult((x) => ({ ...x, [phaseKey]: { kind: "error", data: { error: e.message } } }));
+    }
+    setBusy((b) => ({ ...b, [phaseKey]: false }));
+  }
+
+  async function confirmAndSend(phaseKey, remaining) {
+    const p = CUTOVER_PHASES.find((x) => x.key === phaseKey);
+    if (!window.confirm(
+      `Send "${p.label}" to ${remaining} member${remaining === 1 ? "" : "s"} now?\n\nThis can't be un-sent.${p.needsDate ? `\n\nCutover date: ${cutoverDate}` : ""}`
+    )) return;
+    fire(phaseKey);
+  }
+
+  return (
+    <div style={{ padding: 14, border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)" }}>
+      <p style={{ fontSize: 13, color: "var(--text)", margin: "0 0 6px" }}>
+        Retire Skedda on a specific date. Each phase below fires a different email — announcement, reminder, post-cutover — and tracks its own progress so re-clicking picks up stragglers without duplicating sends.
+      </p>
+      <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 14px" }}>
+        Copy + full procedure lives in <code>docs/SKEDDA_CUTOVER_PLAN.md</code>. Preview any phase in the table below before broadcasting.
+      </p>
+
+      <div style={{ padding: "12px 14px", background: "var(--bg, #EDF3E3)", borderRadius: 10, marginBottom: 14, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
+        <label style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--text)" }}>
+          Cutover date
+        </label>
+        <input
+          type="date"
+          value={cutoverDate}
+          onChange={(e) => setCutoverDate(e.target.value)}
+          min={new Date().toISOString().slice(0, 10)}
+          style={{ padding: "6px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 6, fontFamily: "inherit", background: "var(--surface)", color: "var(--text)" }}
+        />
+        <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+          Templated into the announcement + reminder copy. Pick a Monday for the smoothest first-day ops.
+        </span>
+      </div>
+
+      {CUTOVER_PHASES.map((p) => {
+        const remaining = payingMembers.filter((m) => {
+          if (m?.[p.column]) return false;
+          // Reminder-only filter: members who've never logged in.
+          if (p.key === "reminder" && m?.first_app_login_at) return false;
+          return true;
+        }).length;
+        const alreadySent = payingMembers.filter((m) => !!m?.[p.column]).length;
+        const phaseResult = result[p.key];
+        const isBusy = !!busy[p.key];
+
+        return (
+          <div
+            key={p.key}
+            style={{
+              padding: "14px 16px",
+              border: "1px solid var(--border)",
+              borderRadius: 10,
+              background: "var(--bg, #EDF3E3)",
+              marginBottom: 10,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
+              <strong style={{ fontSize: 14, fontFamily: "var(--font-display, inherit)" }}>{p.label}</strong>
+              <span style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 1 }}>
+                {p.recommendedDay}
+              </span>
+            </div>
+            <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+              {p.targetDescription}
+            </p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", fontSize: 12, marginBottom: 10 }}>
+              <Stat val={alreadySent} lbl="Already sent" />
+              <Stat val={remaining} lbl="Will receive" />
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <a
+                href={`${origin}/api/email-preview/${p.previewSlug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn"
+                style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+              >
+                Preview →
+              </a>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => fire(p.key, { preview: true })}
+                disabled={isBusy}
+              >
+                Send test to me
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => fire(p.key, { dryRun: true })}
+                disabled={isBusy}
+              >
+                Preview recipients
+              </button>
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => confirmAndSend(p.key, remaining)}
+                disabled={isBusy || remaining === 0}
+                style={{ opacity: remaining === 0 ? 0.5 : 1 }}
+              >
+                {isBusy ? "Sending…" : remaining === 0 ? "No one to send to" : `Send to ${remaining}`}
+              </button>
+            </div>
+            {phaseResult && (
+              <div style={{ marginTop: 10, padding: "10px 12px", background: "var(--surface)", borderRadius: 8, fontSize: 12, border: "1px solid var(--border)" }}>
+                {phaseResult.kind === "error" && (
+                  <span style={{ color: "var(--danger, #C92F1F)" }}>✗ {phaseResult.data.error}</span>
+                )}
+                {phaseResult.kind === "dryrun" && (
+                  <span>
+                    <strong>{phaseResult.data.wouldSend} members</strong> would receive now.
+                    {phaseResult.data.skippedOptOut > 0 && <> {phaseResult.data.skippedOptOut} skipped (opted out).</>}
+                    {phaseResult.data.sample?.length > 0 && (
+                      <div style={{ marginTop: 4, opacity: 0.75 }}>First few: {phaseResult.data.sample.map((s) => s.name || s.email).join(", ")}{phaseResult.data.wouldSend > phaseResult.data.sample.length ? "…" : ""}</div>
+                    )}
+                  </span>
+                )}
+                {phaseResult.kind === "preview" && (
+                  <span style={{ color: "var(--primary)" }}>
+                    ✓ Sent test to <strong>{phaseResult.data.to}</strong>. Check your inbox.
+                  </span>
+                )}
+                {phaseResult.kind === "sent" && (
+                  <span style={{ color: "var(--primary)" }}>
+                    <strong>✓ Sent to {phaseResult.data.sent} of {phaseResult.data.total}.</strong>
+                    {phaseResult.data.failed > 0 && <span style={{ color: "var(--danger, #C92F1F)" }}> {phaseResult.data.failed} failed — see console.</span>}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function EmailConfigSection({ jwt }) {
   // Base origin for preview links. Build on the client so each admin's
   // active tenant subdomain gets used (previews are tenant-branded via
@@ -1366,6 +1591,9 @@ export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStrip
 
       <h2 className="section-head" style={{ marginTop: 24 }}>Launch Announcement</h2>
       <LaunchBroadcastSection jwt={jwt} members={members} />
+
+      <h2 className="section-head" style={{ marginTop: 24 }}>Skedda Cutover Broadcasts</h2>
+      <CutoverBroadcastSection jwt={jwt} members={members} />
 
       <h2 className="section-head" style={{ marginTop: 24 }}>News &amp; Announcements</h2>
       <NewsSection jwt={jwt} />
