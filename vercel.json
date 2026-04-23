@@ -3,6 +3,10 @@
     {
       "path": "/api/cron-birthday-bonus",
       "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/cron-abandoned-carts",
+      "schedule": "0 17 * * *"
     }
   ]
 }
