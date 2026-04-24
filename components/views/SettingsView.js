@@ -2,6 +2,7 @@ import ThemeCustomizer from "../settings/ThemeCustomizer";
 import FontSelector from "../settings/FontSelector";
 import LogoUpload from "../settings/LogoUpload";
 import AdminInstallButton from "../settings/AdminInstallButton";
+import AdminPushButton from "../settings/AdminPushButton";
 
 export default function SettingsView({ settings, updateSetting, apiKey, user, onLogout, onOpenSync }) {
   const checkLabelStyle = {
@@ -138,6 +139,19 @@ export default function SettingsView({ settings, updateSetting, apiKey, user, on
           Add HGC Office to your home screen or dock for one-tap access. Members see a separate Hour Golf app.
         </p>
         <AdminInstallButton />
+      </div>
+
+      {/* Push notifications — enable alerts for new bookings,
+          conflicts, past-due flips, and new member signups on this
+          device. iOS requires the PWA to be installed first. */}
+      <div className="tbl" style={{ padding: 20, marginBottom: 20 }}>
+        <h3 style={{ fontFamily: "var(--font-display)", fontSize: 14, textTransform: "uppercase", letterSpacing: 2, color: "var(--primary)", marginBottom: 6 }}>
+          Notifications
+        </h3>
+        <p className="muted" style={{ marginTop: 0, marginBottom: 12, fontSize: 12 }}>
+          Get alerted on this device for new bookings, booking conflicts, past-due members, and new signups. One tap opens the relevant screen in HGC Office.
+        </p>
+        <AdminPushButton apiKey={apiKey} />
       </div>
 
       {/* Account */}
