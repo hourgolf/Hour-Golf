@@ -263,6 +263,23 @@ export default function CustomersView({
       ),
     [toChargeInfoByEmail]
   );
+  // Dollar totals for the billing chips — visible at a glance so the
+  // operator doesn't have to tap a chip to learn the magnitude of
+  // what's outstanding.
+  const overageTotalUsd = useMemo(() => {
+    let cents = 0;
+    overageRowByEmail.forEach((row) => {
+      cents += remainingOverageCents(row, payments);
+    });
+    return cents / 100;
+  }, [overageRowByEmail, payments]);
+  const toChargeTotalUsd = useMemo(() => {
+    let total = 0;
+    toChargeInfoByEmail.forEach((info) => {
+      total += (info.hours || 0) * nmRate;
+    });
+    return total;
+  }, [toChargeInfoByEmail, nmRate]);
 
   const isBillingFilter = cTier === "__overage__" || cTier === "__tocharge__";
 
@@ -436,6 +453,23 @@ export default function CustomersView({
           onClick: () => setSearch(""),
           title: "Members whose last Stripe charge failed \u2014 update their card",
         },
+        // Billing hotspots — only render when money is actually on
+        // the table. Clicking jumps to the relevant chip filter so
+        // the operator can act without scrolling.
+        overageTotalUsd > 0 && {
+          label: `Overage (${mL(billingMonthISO)})`,
+          value: dlr(overageTotalUsd),
+          color: "var(--danger, #C92F1F)",
+          onClick: () => setCTier("__overage__"),
+          title: `Remaining overage for ${mL(billingMonthISO)} across ${overageCount} member${overageCount === 1 ? "" : "s"}`,
+        },
+        toChargeTotalUsd > 0 && {
+          label: `To Charge (${mL(billingMonthISO)})`,
+          value: dlr(toChargeTotalUsd),
+          color: "#C77B3C",
+          onClick: () => setCTier("__tocharge__"),
+          title: `${totalUnchargedBookings} uncharged non-member booking${totalUnchargedBookings === 1 ? "" : "s"} across ${toChargeCount} customer${toChargeCount === 1 ? "" : "s"}`,
+        },
         summary.payingTotal > 0 && {
           label: "On App",
           color: "var(--primary)",
@@ -495,27 +529,39 @@ export default function CustomersView({
         })}
         {/* Billing filter chips — replace the old "Usage" tab. These only
             render when there's something to act on this month, so the
-            chip row doesn't carry empty noise on quiet months. */}
+            chip row doesn't carry empty noise on quiet months. The
+            $ amount is on the chip face (not just in a title tooltip)
+            so the operator can size the billing load at a glance. */}
         {overageCount > 0 && (
           <button
             type="button"
-            className={`cust-chip ${cTier === "__overage__" ? "active" : ""}`}
+            className={`cust-chip cust-chip-billing ${cTier === "__overage__" ? "active" : ""}`}
             onClick={() => setCTier("__overage__")}
             title={`Paying members with remaining overage for ${mL(billingMonthISO)}`}
-            style={{ borderColor: cTier === "__overage__" ? "var(--danger, #C92F1F)" : undefined }}
+            style={{
+              borderColor: "var(--danger, #C92F1F)",
+              color: cTier === "__overage__" ? "#EDF3E3" : "var(--danger, #C92F1F)",
+              background: cTier === "__overage__" ? "var(--danger, #C92F1F)" : "var(--surface)",
+            }}
           >
-            Overage <span className="cust-chip-count">{overageCount}</span>
+            Overage <strong style={{ fontFamily: "var(--font-mono)", marginLeft: 2 }}>{dlr(overageTotalUsd)}</strong>
+            <span className="cust-chip-count">{overageCount}</span>
           </button>
         )}
         {toChargeCount > 0 && (
           <button
             type="button"
-            className={`cust-chip ${cTier === "__tocharge__" ? "active" : ""}`}
+            className={`cust-chip cust-chip-billing ${cTier === "__tocharge__" ? "active" : ""}`}
             onClick={() => setCTier("__tocharge__")}
             title={`Non-members with uncharged bookings in ${mL(billingMonthISO)} (walk-in rate $${nmRate}/hr)`}
-            style={{ borderColor: cTier === "__tocharge__" ? "var(--primary)" : undefined }}
+            style={{
+              borderColor: "#C77B3C",
+              color: cTier === "__tocharge__" ? "#EDF3E3" : "#C77B3C",
+              background: cTier === "__tocharge__" ? "#C77B3C" : "var(--surface)",
+            }}
           >
-            To charge <span className="cust-chip-count">{toChargeCount}</span>
+            To charge <strong style={{ fontFamily: "var(--font-mono)", marginLeft: 2 }}>{dlr(toChargeTotalUsd)}</strong>
+            <span className="cust-chip-count">{toChargeCount}</span>
           </button>
         )}
       </div>
