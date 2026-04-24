@@ -41,6 +41,7 @@ const ReportsView = dynamic(() => import("../../components/views/ReportsView"), 
 const EventsView = dynamic(() => import("../../components/views/EventsView"), { loading: dynLoading, ssr: false });
 const ShopAdminView = dynamic(() => import("../../components/views/ShopAdminView"), { loading: dynLoading, ssr: false });
 const SettingsView = dynamic(() => import("../../components/views/SettingsView"), { loading: dynLoading, ssr: false });
+const InboxView = dynamic(() => import("../../components/views/InboxView"), { loading: dynLoading, ssr: false });
 
 export default function Dashboard() {
   // Auth (email/password against Supabase Auth, gated by admins table)
@@ -94,6 +95,18 @@ export default function Dashboard() {
     const t = tds();
     return bookings.filter((b) => b.booking_status !== "Cancelled" && lds(new Date(b.booking_start)) === t);
   }, [bookings]);
+
+  // Inbox badge count — conflicts + past-due. Cheap derivations from
+  // already-loaded data. Low-stock isn't included here because it
+  // requires a separate query that the Inbox view owns; adding it
+  // to the badge would mean keeping a third data stream in sync here.
+  const inboxCount = useMemo(() => {
+    const conflicts = bookings.filter((b) => b.conflict_detected_at).length;
+    const pastDue = members.filter(
+      (m) => m?.subscription_status === "past_due" || m?.subscription_status === "unpaid"
+    ).length;
+    return conflicts + pastDue;
+  }, [bookings, members]);
   const todayHours = todayBk.reduce((s, b) => s + Number(b.duration_hours || 0), 0);
 
   // Detail tab name
@@ -458,6 +471,7 @@ export default function Dashboard() {
           view={view}
           setView={setView}
           todayCount={todayBk.length}
+          inboxCount={inboxCount}
           detailName={detailName}
           onClearDetail={() => { setSelMember(null); setViewDate(null); }}
         />
@@ -465,11 +479,25 @@ export default function Dashboard() {
           view={view}
           setView={setView}
           todayCount={todayBk.length}
+          inboxCount={inboxCount}
           onClearDetail={() => { setSelMember(null); setViewDate(null); }}
         />
       </div>
 
       {saving && <div className="saving">Saving...</div>}
+
+      {view === "inbox" && (
+        <InboxView
+          bookings={bookings}
+          members={members}
+          payments={payments}
+          tierCfg={tierCfg}
+          apiKey={apiKey}
+          onSelectMember={selectMember}
+          setView={setView}
+          setCTier={setCTier}
+        />
+      )}
 
       {view === "today" && (
         <TodayView

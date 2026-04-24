@@ -10,6 +10,7 @@ import { useTenantFeatures } from "../../hooks/useTenantFeatures";
 // (?view=overview) as a safety net, but there's no UI path to it.
 const TABS = [
   { key: "today", label: "Today", countKey: "todayCount" },
+  { key: "inbox", label: "Inbox", countKey: "inboxCount" },
   { key: "week", label: "Calendar" },
   { key: "customers", label: "Customers" },
   { key: "events", label: "Events", feature: "events" },
@@ -18,24 +19,26 @@ const TABS = [
   { key: "reports", label: "Reports" },
 ];
 
-export default function Nav({ view, setView, todayCount, detailName, onClearDetail }) {
+export default function Nav({ view, setView, todayCount, inboxCount, detailName, onClearDetail }) {
   const { isEnabled } = useTenantFeatures();
   const visibleTabs = TABS.filter((t) => !t.feature || isEnabled(t.feature));
+  const counts = { todayCount, inboxCount };
   return (
     <nav className="nav">
       <div className="nav-inner-wrap">
-      {visibleTabs.map(({ key, label, countKey }) => (
-        <button
-          key={key}
-          className={`nav-btn ${view === key ? "active" : ""}`}
-          onClick={() => { setView(key); onClearDetail(); }}
-        >
-          {label}
-          {countKey && todayCount > 0 && key === "today" && (
-            <span className="cnt">{todayCount}</span>
-          )}
-        </button>
-      ))}
+      {visibleTabs.map(({ key, label, countKey }) => {
+        const n = countKey ? counts[countKey] : 0;
+        return (
+          <button
+            key={key}
+            className={`nav-btn ${view === key ? "active" : ""}`}
+            onClick={() => { setView(key); onClearDetail(); }}
+          >
+            {label}
+            {n > 0 && <span className="cnt">{n}</span>}
+          </button>
+        );
+      })}
       {detailName && (
         <button
           className={`nav-btn ${view === "detail" ? "active" : ""}`}

@@ -14,12 +14,13 @@ import { useTenantFeatures } from "../../hooks/useTenantFeatures";
 
 const PRIMARY_TABS = [
   { key: "today",     label: "Today",   icon: "\u2302" },   // ⌂ — the "today" home
-  { key: "week",      label: "Calendar", icon: "\u25A3" },  // ▣ — week grid
+  { key: "inbox",     label: "Inbox",    icon: "\u2691" },  // ⚑ — needs-attention flag
   { key: "customers", label: "Members",  icon: "\u25CE" },  // ◎ — people ring
   { key: "__more__",  label: "More",     icon: "\u22EF" },  // ⋯ — more
 ];
 
 const MORE_TABS = [
+  { key: "week",     label: "Calendar" },
   { key: "reports",  label: "Reports" },
   { key: "events",   label: "Events", feature: "events" },
   { key: "shop",     label: "Pro Shop", feature: "pro_shop" },
@@ -27,7 +28,7 @@ const MORE_TABS = [
   { key: "settings", label: "Settings" },
 ];
 
-export default function NavMobile({ view, setView, todayCount, onClearDetail }) {
+export default function NavMobile({ view, setView, todayCount, inboxCount, onClearDetail }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const { isEnabled } = useTenantFeatures();
 
@@ -76,6 +77,9 @@ export default function NavMobile({ view, setView, todayCount, onClearDetail }) 
                 {t.label}
                 {t.key === "today" && todayCount > 0 && (
                   <span className="nav-mobile-cnt">{todayCount}</span>
+                )}
+                {t.key === "inbox" && inboxCount > 0 && (
+                  <span className="nav-mobile-cnt">{inboxCount}</span>
                 )}
               </span>
             </button>
