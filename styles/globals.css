@@ -99,6 +99,24 @@ html { overflow-y: scroll; }
 .nav-btn.active { color: var(--bg); font-weight: 600; background: var(--primary); text-transform: uppercase; }
 .nav-btn .cnt { background: var(--primary); color: var(--bg); font-family: var(--font-display); font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 4px; }
 
+/* Mobile bottom nav. Hidden above 768px (shipped alongside Admin
+   PWA Phase 2, 2026-04-24). The top .nav is hidden on the same
+   breakpoint so exactly one nav renders per viewport. */
+.nav-mobile { display: none; }
+.nav-mobile-sheet-overlay { display: none; }
+.nav-mobile-btn { border: none; background: transparent; cursor: pointer; font-family: var(--font-mono); color: var(--text-muted); padding: 8px 4px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; min-width: 0; transition: color 0.15s; }
+.nav-mobile-btn.active { color: var(--primary); }
+.nav-mobile-icon { font-size: 20px; line-height: 1; }
+.nav-mobile-label { font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase; display: inline-flex; align-items: center; gap: 4px; }
+.nav-mobile-cnt { background: var(--primary); color: var(--bg); font-family: var(--font-display); font-size: 9px; padding: 1px 5px; border-radius: 10px; }
+.nav-mobile-sheet { background: var(--surface); border-top-left-radius: 18px; border-top-right-radius: 18px; padding: 10px 14px calc(14px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -12px 40px rgba(0,0,0,0.25); animation: navSheetUp 0.2s ease; }
+.nav-mobile-sheet-handle { width: 44px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 10px; }
+.nav-mobile-sheet-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 6px; font-family: var(--font-mono); }
+.nav-mobile-sheet-btn { display: block; width: 100%; padding: 14px 12px; border: none; background: transparent; text-align: left; font-size: 15px; font-family: var(--font); color: var(--text); cursor: pointer; border-radius: 10px; }
+.nav-mobile-sheet-btn.active { background: var(--primary-bg); color: var(--primary); font-weight: 600; }
+.nav-mobile-sheet-btn:hover { background: var(--primary-bg); }
+@keyframes navSheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
 
 /* ── Content ── */
 .content { max-width: 1200px; margin: 0 auto; padding: 20px; }
@@ -745,7 +763,7 @@ html { overflow-y: scroll; }
 /* Responsive — admin */
 @media (max-width: 768px) {
   .th, .tr { font-size: 11px; padding: 8px 10px; }
-  .header-stats { gap: 10px; }
+  .header-stats { display: none; }
   .stat-val { font-size: 16px; }
   .wk-grid { grid-template-columns: 60px 1fr 1fr; }
   .wk-h { font-size: 16px; padding: 10px 8px; }
@@ -756,6 +774,38 @@ html { overflow-y: scroll; }
   .hdr-title-logo { height: 22vw; min-height: 62px; max-height: 110px; padding: 16px 0 6px; }
   .settings-grid { grid-template-columns: 1fr; }
   .profile-grid { grid-template-columns: 1fr; }
+  /* Swap top nav for bottom nav on mobile. Bottom nav is fixed, so
+     the content gets padded to prevent the last row being obscured
+     by the nav + home-indicator safe area. */
+  .nav { display: none; }
+  .nav-mobile {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border-top: 2px solid var(--primary);
+    padding: 4px 0 calc(4px + env(safe-area-inset-bottom, 0px));
+    z-index: 500;
+  }
+  .nav-mobile-sheet-overlay {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 600;
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+  .content { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  /* Reposition the admin FABs above the bottom nav on mobile.
+     Settings FAB becomes redundant with the new Settings-in-More
+     nav path; refresh gets repurposed later. Hide both; keep the
+     primary "+" booking FAB as a thumb-reach shortcut. */
+  .admin-fab-settings, .admin-fab-refresh { display: none; }
+  .admin-fab-booking { bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important; }
 }
 
 @media (max-width: 600px) {

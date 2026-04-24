@@ -15,6 +15,7 @@ import { useKeyboard } from "../../hooks/useKeyboard";
 
 import Header from "../../components/layout/Header";
 import Nav from "../../components/layout/Nav";
+import NavMobile from "../../components/layout/NavMobile";
 import Toast from "../../components/ui/Toast";
 import Confirm from "../../components/ui/Confirm";
 import CommandPalette from "../../components/ui/CommandPalette";
@@ -458,6 +459,12 @@ export default function Dashboard() {
           setView={setView}
           todayCount={todayBk.length}
           detailName={detailName}
+          onClearDetail={() => { setSelMember(null); setViewDate(null); }}
+        />
+        <NavMobile
+          view={view}
+          setView={setView}
+          todayCount={todayBk.length}
           onClearDetail={() => { setSelMember(null); setViewDate(null); }}
         />
       </div>
