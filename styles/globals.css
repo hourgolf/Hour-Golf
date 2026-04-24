@@ -770,10 +770,41 @@ html { overflow-y: scroll; }
   .wk-b { font-size: 12px; padding: 4px 6px; }
   .wk-d .dn { font-size: 20px; }
   .wk-d .dl { font-size: 10px; }
-  .slot-t { width: 90px; font-size: 10px; }
   .hdr-title-logo { height: 22vw; min-height: 62px; max-height: 110px; padding: 16px 0 6px; }
   .settings-grid { grid-template-columns: 1fr; }
   .profile-grid { grid-template-columns: 1fr; }
+
+  /* TodayView mobile polish. The horizontal day-timeline doesn't
+     earn its width on a phone — the per-bay list below conveys the
+     same info without horizontal scroll. Hide it. */
+  .day-timeline { display: none; }
+
+  /* Stack each booking slot vertically: time bar on top, content +
+     actions stacked below. Frees horizontal width for the booking's
+     customer name + tier / code / status chips, and makes the tap
+     targets bigger. */
+  .slot { flex-direction: column; align-items: stretch; }
+  .slot-t {
+    width: auto;
+    padding: 8px 14px;
+    font-size: 12px;
+    border-right: none;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .slot-i {
+    padding: 12px 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .slot-i > div:first-child { flex: 1 1 100%; min-width: 0; }
+  .slot-i > div:last-child { flex: 1 1 100%; justify-content: flex-end; }
+  .slot-c { font-size: 15px; font-weight: 600; }
+  .slot-m { font-size: 12px; margin-top: 4px; }
+  /* Bigger tap targets on the per-row Edit / Cancel buttons —
+     inline font-size 10px in the JSX gets overridden because 10px
+     is below Apple's 44pt minimum. */
+  .slot-i .btn { padding: 8px 14px !important; font-size: 12px !important; min-height: 36px; }
+  .slot-check { transform: scale(1.2); margin: 0 4px; }
   /* Swap top nav for bottom nav on mobile. Bottom nav is fixed, so
      the content gets padded to prevent the last row being obscured
      by the nav + home-indicator safe area. */
@@ -825,9 +856,10 @@ html { overflow-y: scroll; }
   .sum-val { font-size: 18px; }
   .th, .tr { font-size: 10px; padding: 6px 8px; gap: 4px; }
   .detail-header { padding: 12px 14px; gap: 8px; }
-  .slot-t { width: 70px; font-size: 9px; padding: 8px 6px; }
-  .slot-c { font-size: 11px; }
-  .slot-m { font-size: 9px; }
+  /* .slot-t / .slot-c / .slot-m overrides at 600px removed 2026-04-24
+     — the 768px rule above stacks the slot vertically and sizes
+     everything appropriately. Leaving this comment as a breadcrumb
+     so a future reader doesn't re-add the old column-layout rules. */
   .wk-grid { grid-template-columns: 46px 1fr 1fr; }
   .wk-h { font-size: 14px; padding: 8px 4px; }
   .wk-b { font-size: 11px; padding: 3px 5px; }
