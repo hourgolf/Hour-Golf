@@ -262,6 +262,78 @@ html { overflow-y: scroll; }
 .font-opt { padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius); cursor: pointer; font-size: 13px; text-align: center; }
 .font-opt.active { border-color: var(--primary); }
 
+/* ── Bottom sheet (Sheet.js) — mobile-only DetailView container ──
+   Backdrop fades in; sheet slides up via translateY. Sized to
+   calc(100vh - 56px) so the operator can still see + tap the top
+   nav strip behind the sheet for orientation. */
+.sheet-bg {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0);
+  z-index: 1100;
+  display: flex;
+  align-items: flex-end;
+  transition: background 220ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.sheet-bg.open { background: rgba(0, 0, 0, 0.42); }
+.sheet {
+  position: relative;
+  width: 100%;
+  max-height: calc(100vh - 56px);
+  background: var(--surface, #fff);
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.18);
+  transform: translateY(100%);
+  transition: transform 240ms cubic-bezier(0.32, 0.72, 0, 1);
+  display: flex;
+  flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  overflow: hidden;
+}
+.sheet.open { transform: translateY(0); }
+.sheet-handle {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 4px;
+  flex: 0 0 auto;
+}
+.sheet-handle-bar {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(53, 68, 59, 0.22);
+}
+.sheet-close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(53, 68, 59, 0.1);
+  color: var(--text, #2a2a2a);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sheet-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Pull DetailView's outer .content padding back a hair so the sheet
+     doesn't waste edge space on a 375-wide phone. DetailView is an
+     un-padded stack of cards already; the .content rule from the
+     parent doesn't apply inside the portal. */
+  padding: 0 0 12px;
+}
+
 /* ── Swipe-to-action wrapper (mobile-only; SwipeRow component) ──
    The component is a passthrough on desktop, so these styles only
    matter when SwipeRow is actively rendering the wrapper. The .swipe-

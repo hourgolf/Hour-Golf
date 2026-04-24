@@ -12,6 +12,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useData } from "../../hooks/useData";
 import { useSettings } from "../../hooks/useSettings";
 import { useKeyboard } from "../../hooks/useKeyboard";
+import { useIsMobile } from "../../hooks/useIsMobile";
 
 import Header from "../../components/layout/Header";
 import Nav from "../../components/layout/Nav";
@@ -20,6 +21,7 @@ import Toast from "../../components/ui/Toast";
 import Confirm from "../../components/ui/Confirm";
 import CommandPalette from "../../components/ui/CommandPalette";
 import ShortcutsHelp from "../../components/ui/ShortcutsHelp";
+import Sheet from "../../components/ui/Sheet";
 
 import LoginForm from "../../components/forms/LoginForm";
 import BookingForm from "../../components/forms/BookingForm";
@@ -44,6 +46,8 @@ const SettingsView = dynamic(() => import("../../components/views/SettingsView")
 const InboxView = dynamic(() => import("../../components/views/InboxView"), { loading: dynLoading, ssr: false });
 
 export default function Dashboard() {
+  const isMobile = useIsMobile();
+
   // Auth (email/password against Supabase Auth, gated by admins table)
   const { apiKey, user, connected, authLoading, loading, error, login, logout } = useAuth();
 
@@ -608,7 +612,13 @@ export default function Dashboard() {
         />
       )}
 
-      {view === "detail" && (
+      {/* Detail render strategy:
+          • Desktop: full-width view (current behavior unchanged).
+          • Mobile: render the Customers list underneath and slide
+            DetailView up in a bottom sheet so the operator keeps
+            list context. Closing the sheet drops back to Customers
+            and clears selMember. */}
+      {view === "detail" && !isMobile && (
         <DetailView
           selMember={selMember}
           members={members}
@@ -633,6 +643,59 @@ export default function Dashboard() {
           onRefresh={refresh}
         />
       )}
+
+      {view === "detail" && isMobile && (
+        <CustomersView
+          bookings={bookings}
+          members={members}
+          usage={usage}
+          payments={payments}
+          tierCfg={tierCfg}
+          search={search}
+          setSearch={setSearch}
+          cSort={cSort}
+          setCSort={setCSort}
+          cTier={cTier}
+          setCTier={setCTier}
+          onSelectMember={selectMember}
+          onUpdateTier={updateTier}
+          onChargeNonMember={chargeNonMember}
+          onChargeNonMembersBatch={chargeNonMembersBatch}
+          saving={saving}
+        />
+      )}
+
+      <Sheet
+        open={isMobile && view === "detail" && !!selMember}
+        onClose={() => { setSelMember(null); setView("customers"); }}
+        ariaLabel={detailName ? `Detail for ${detailName}` : "Member detail"}
+      >
+        {selMember && (
+          <DetailView
+            selMember={selMember}
+            members={members}
+            bookings={bookings}
+            usage={usage}
+            payments={payments}
+            apiKey={apiKey}
+            bayFilter={bayFilter}
+            setBayFilter={setBayFilter}
+            showCanc={showCanc}
+            setShowCanc={setShowCanc}
+            saving={saving}
+            onUpdateTier={updateTier}
+            onEdit={setEditBk}
+            onCancel={setCancTgt}
+            onDelete={setDelTgt}
+            onRestore={restoreBooking}
+            onAddBooking={(email) => openAdd(email)}
+            onChargeOverage={setChgTgt}
+            onBulkCancel={bulkCancel}
+            onBulkDelete={bulkDelete}
+            onRefresh={refresh}
+          />
+        )}
+      </Sheet>
 
       {/* Modals */}
       <BookingForm
