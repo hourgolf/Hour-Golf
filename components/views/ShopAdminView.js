@@ -160,6 +160,18 @@ function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
     update("image_urls", form.image_urls.filter((_, i) => i !== idx));
   }
 
+  // Move the image at `from` to position `to` (for reordering).
+  // Index 0 is the primary thumbnail on every shop surface, so this
+  // lets the operator choose which image members see on the card.
+  function moveImage(from, to) {
+    if (from === to) return;
+    if (to < 0 || to >= form.image_urls.length) return;
+    const next = [...form.image_urls];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    update("image_urls", next);
+  }
+
   async function handleSave() {
     if (!form.title.trim()) return;
     setSaving(true);
@@ -187,18 +199,49 @@ function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
       <h2>{isNew ? "Add Item" : "Edit Item"}</h2>
       <div className="mf">
         <label>Product Images ({form.image_urls.length}/5)</label>
+        {form.image_urls.length > 1 && (
+          <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>
+            First image is the thumbnail members see. Use ◀ ▶ to reorder.
+          </div>
+        )}
         {form.image_urls.length > 0 && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-            {form.image_urls.map((url, i) => (
-              <div key={i} style={{ position: "relative", width: 80, height: 80 }}>
-                <img src={url} alt="" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 6, border: i === 0 ? "2px solid var(--primary)" : "1px solid var(--border)" }} />
-                <button
-                  onClick={() => removeImage(i)}
-                  style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: "var(--red)", color: "#fff", border: "none", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}
-                >x</button>
-                {i === 0 && <div style={{ position: "absolute", bottom: 2, left: 2, fontSize: 8, background: "var(--primary)", color: "#EDF3E3", padding: "1px 4px", borderRadius: 3 }}>Primary</div>}
-              </div>
-            ))}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+            {form.image_urls.map((url, i) => {
+              const isFirst = i === 0;
+              const isLast = i === form.image_urls.length - 1;
+              return (
+                <div key={`${url}-${i}`} style={{ position: "relative", width: 80, display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ position: "relative", width: 80, height: 80 }}>
+                    <img src={url} alt="" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 6, border: isFirst ? "2px solid var(--primary)" : "1px solid var(--border)" }} />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(i)}
+                      title="Remove image"
+                      style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: "var(--red)", color: "#fff", border: "none", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}
+                    >x</button>
+                    {isFirst && <div style={{ position: "absolute", bottom: 2, left: 2, fontSize: 8, background: "var(--primary)", color: "#EDF3E3", padding: "1px 4px", borderRadius: 3 }}>Primary</div>}
+                  </div>
+                  {form.image_urls.length > 1 && (
+                    <div style={{ display: "flex", gap: 2, justifyContent: "center" }}>
+                      <button
+                        type="button"
+                        onClick={() => moveImage(i, i - 1)}
+                        disabled={isFirst}
+                        title="Move earlier"
+                        style={{ flex: 1, padding: "2px 0", fontSize: 12, background: isFirst ? "var(--border)" : "var(--surface)", color: isFirst ? "var(--text-muted)" : "var(--text)", border: "1px solid var(--border)", borderRadius: 4, cursor: isFirst ? "default" : "pointer", lineHeight: 1 }}
+                      >◀</button>
+                      <button
+                        type="button"
+                        onClick={() => moveImage(i, i + 1)}
+                        disabled={isLast}
+                        title="Move later"
+                        style={{ flex: 1, padding: "2px 0", fontSize: 12, background: isLast ? "var(--border)" : "var(--surface)", color: isLast ? "var(--text-muted)" : "var(--text)", border: "1px solid var(--border)", borderRadius: 4, cursor: isLast ? "default" : "pointer", lineHeight: 1 }}
+                      >▶</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
         {form.image_urls.length < 5 && (
