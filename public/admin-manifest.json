@@ -3,7 +3,7 @@
   "short_name": "HGC Office",
   "description": "Hour Golf Club admin dashboard — bookings, members, shop, reports.",
   "start_url": "/admin",
-  "scope": "/admin/",
+  "scope": "/admin",
   "display": "standalone",
   "background_color": "#4C8D73",
   "theme_color": "#4C8D73",

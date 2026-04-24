@@ -8,10 +8,13 @@
 // Separate cache namespace ("hgc-admin-v*") so this SW and the member
 // sw.js ("hourgolf-v*") don't collide on the same origin.
 
-// v2 (2026-04-24): added push + notificationclick handlers for
-// Phase 4. Bumping the name triggers the update-available banner
-// on already-installed admin PWAs so they pick up the new SW.
-const CACHE_NAME = "hgc-admin-v2";
+// v3 (2026-04-24 later): scope fix — registration scope moved from
+// "/admin/" (trailing slash) to "/admin" so the SW controls the
+// exact URL "/admin" (without trailing slash) that the Dashboard
+// serves at. Prior scope left the main admin URL out-of-scope,
+// which broke pushManager.subscribe on desktop Chrome.
+// v2: initial push + notificationclick handlers.
+const CACHE_NAME = "hgc-admin-v3";
 
 self.addEventListener("install", () => {
   self.skipWaiting();

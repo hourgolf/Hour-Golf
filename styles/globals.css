@@ -857,12 +857,9 @@ html { overflow-y: scroll; }
     padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
   }
   .content { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
-  /* Reposition the admin FABs above the bottom nav on mobile.
-     Settings FAB becomes redundant with the new Settings-in-More
-     nav path; refresh gets repurposed later. Hide both; keep the
-     primary "+" booking FAB as a thumb-reach shortcut. */
-  .admin-fab-settings, .admin-fab-refresh { display: none; }
-  .admin-fab-booking { bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important; }
+  /* The actual hide rule for FABs lives BELOW the .admin-fab
+     definition (~line 1356) because that base rule is later in
+     source order and would otherwise re-apply display: flex. */
 }
 
 @media (max-width: 600px) {
@@ -1367,6 +1364,19 @@ html { overflow-y: scroll; }
 .admin-fab-settings { bottom: 24px; background: var(--accent); color: var(--text); font-size: 28px; }
 .admin-fab-booking { bottom: 88px; background: var(--primary); color: var(--bg); font-size: 28px; }
 .admin-fab-refresh { bottom: 152px; background: var(--red); color: var(--bg); font-size: 24px; }
+
+/* Mobile: hide all three admin FABs. Settings + refresh moved into
+   the More sheet; booking creation lives inside TodayView's per-bay
+   "+ booking" and DetailView's "+ Booking" header button. The FABs
+   were colliding with the bottom-nav and didn't add reach the
+   operator didn't already have. Lives AFTER the .admin-fab
+   definitions so source-order wins over `display: flex` above. */
+@media (max-width: 768px) {
+  .admin-fab,
+  .admin-fab-settings,
+  .admin-fab-refresh,
+  .admin-fab-booking { display: none; }
+}
 
 .help-backdrop {
   position: fixed; inset: 0; background: rgba(53,68,59,0.3);

@@ -17,7 +17,13 @@ export default function App({ Component, pageProps }) {
     const path = typeof window !== "undefined" ? window.location.pathname : "/";
     const isAdmin = path.startsWith("/admin");
     const swUrl = isAdmin ? "/admin-sw.js" : "/sw.js";
-    const swScope = isAdmin ? "/admin/" : "/";
+    // Admin SW scope is "/admin" (no trailing slash) so it covers
+    // BOTH the exact URL "/admin" (the Dashboard entry) and
+    // "/admin?view=..." query-routed views. Scope "/admin/" would
+    // only match "/admin/foo" — exactly the URL "/admin" would be
+    // out-of-scope, breaking pushManager.subscribe from the main
+    // page. Fixed 2026-04-24.
+    const swScope = isAdmin ? "/admin" : "/";
 
     navigator.serviceWorker.register(swUrl, { scope: swScope }).then((reg) => {
       if (cancelled) return;
