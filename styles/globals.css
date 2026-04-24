@@ -860,6 +860,52 @@ html { overflow-y: scroll; }
   /* The actual hide rule for FABs lives BELOW the .admin-fab
      definition (~line 1356) because that base rule is later in
      source order and would otherwise re-apply display: flex. */
+
+  /* Pull-to-refresh indicator (TodayView). Floats above the list and
+     fades while idle. The wrapping .content gets translateY'd inline
+     by the JS, so the indicator sits at the top of the scroll
+     container and rides down with the pull. */
+  .today-ptr-wrap { position: relative; }
+  .ptr-indicator {
+    position: absolute;
+    top: -52px;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 44px;
+    pointer-events: none;
+    color: var(--text-muted, #888);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    transition: opacity 180ms ease;
+  }
+  .ptr-indicator.triggered { color: var(--primary, #0a84ff); }
+  .ptr-spinner {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    opacity: 0.8;
+  }
+  .ptr-indicator.refreshing .ptr-spinner {
+    animation: ptr-spin 0.8s linear infinite;
+  }
+  @keyframes ptr-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+}
+
+@media (min-width: 769px) {
+  /* Desktop must never see PTR transforms or indicator — useIsMobile
+     guards the JS, this guards the CSS. */
+  .today-ptr-wrap { transform: none !important; }
+  .ptr-indicator { display: none !important; }
 }
 
 @media (max-width: 600px) {

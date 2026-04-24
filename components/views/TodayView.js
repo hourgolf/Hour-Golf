@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { TZ } from "../../lib/constants";
 import { fT, fDL, lds, tds, hrs } from "../../lib/format";
 import { useBranding } from "../../hooks/useBranding";
+import { useIsMobile } from "../../hooks/useIsMobile";
 import { resolveBays, resolveBayLabel } from "../../lib/branding";
 import Badge from "../ui/Badge";
 import KPIStrip from "../ui/KPIStrip";
@@ -34,8 +35,9 @@ export default function TodayView({
   bayFilter, setBayFilter,
   onEdit, onCancel, onSelectMember, targetDate,
   onPrevDay, onNextDay, onJumpToday,
-  onBulkCancel,
+  onBulkCancel, onRefresh,
 }) {
+  const isMobile = useIsMobile();
   const branding = useBranding();
   const BAYS = useMemo(() => resolveBays(branding), [branding]);
   const bayLabel = resolveBayLabel(branding);
@@ -147,6 +149,103 @@ export default function TodayView({
     }) || null;
   }, [todayBk, now, isToday]);
 
+  // Pull-to-refresh — mobile-only, scoped to this view. Activates only
+  // when the page is already at scrollTop === 0 (so a mid-list pull
+  // doesn't fight the browser's scroll). Below 60px the pull is just
+  // visual; ≥100px on release fires onRefresh. Debounced 2s after a
+  // refresh so the operator can't spam the network.
+  const ptrRef = useRef(null);
+  const ptrStateRef = useRef({ startY: 0, startX: 0, active: false, dragging: false });
+  const lastRefreshRef = useRef(0);
+  const [ptrPull, setPtrPull] = useState(0); // px pulled (0 if idle)
+  const [ptrRefreshing, setPtrRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (!isMobile || !onRefresh) return;
+    const el = ptrRef.current;
+    if (!el) return;
+
+    const TRIGGER = 100;
+    const MAX = 140;
+
+    function getScrollTop() {
+      return window.scrollY || document.documentElement.scrollTop || 0;
+    }
+
+    function onTouchStart(e) {
+      if (getScrollTop() > 0) return;
+      if (Date.now() - lastRefreshRef.current < 2000) return;
+      const t = e.touches[0];
+      ptrStateRef.current = { startY: t.clientY, startX: t.clientX, active: true, dragging: false };
+    }
+
+    function onTouchMove(e) {
+      const st = ptrStateRef.current;
+      if (!st.active) return;
+      const t = e.touches[0];
+      const dy = t.clientY - st.startY;
+      const dx = t.clientX - st.startX;
+      // Only hijack a clear vertical-down pull. Any horizontal lean or
+      // upward motion = release to the browser.
+      if (!st.dragging) {
+        if (dy <= 6) return;
+        if (Math.abs(dx) > Math.abs(dy)) {
+          ptrStateRef.current.active = false;
+          return;
+        }
+        if (getScrollTop() > 0) {
+          ptrStateRef.current.active = false;
+          return;
+        }
+        ptrStateRef.current.dragging = true;
+      }
+      // Resistance curve: 1:1 up to 60px, half-rate beyond.
+      const raw = dy;
+      const eased = raw <= 60 ? raw : 60 + (raw - 60) * 0.5;
+      const clamped = Math.min(MAX, Math.max(0, eased));
+      setPtrPull(clamped);
+    }
+
+    function onTouchEnd() {
+      const st = ptrStateRef.current;
+      if (!st.active || !st.dragging) {
+        ptrStateRef.current = { startY: 0, startX: 0, active: false, dragging: false };
+        setPtrPull(0);
+        return;
+      }
+      const pulled = ptrPullRef.current;
+      ptrStateRef.current = { startY: 0, startX: 0, active: false, dragging: false };
+      if (pulled >= TRIGGER) {
+        setPtrPull(0);
+        setPtrRefreshing(true);
+        lastRefreshRef.current = Date.now();
+        Promise.resolve(onRefresh())
+          .catch(() => {})
+          .finally(() => setPtrRefreshing(false));
+      } else {
+        setPtrPull(0);
+      }
+    }
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: true });
+    el.addEventListener("touchend", onTouchEnd);
+    el.addEventListener("touchcancel", onTouchEnd);
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, [isMobile, onRefresh]);
+
+  // Mirror the pull value in a ref so the touchend handler reads the
+  // current value (the closure captures the initial 0 otherwise).
+  const ptrPullRef = useRef(0);
+  useEffect(() => { ptrPullRef.current = ptrPull; }, [ptrPull]);
+
+  const ptrTriggered = ptrPull >= 100;
+
   const displayBays = bayFilter === "all" ? BAYS : [bayFilter];
 
   // Show callouts only when there's something live or imminent — empty
@@ -163,8 +262,36 @@ export default function TodayView({
         weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: TZ,
       });
 
+  const ptrLabel = ptrRefreshing
+    ? "Refreshing…"
+    : ptrTriggered
+      ? "Release to refresh"
+      : "Pull to refresh";
+  const ptrVisible = ptrPull > 0 || ptrRefreshing;
+
   return (
-    <div className="content">
+    <div
+      className="content today-ptr-wrap"
+      ref={ptrRef}
+      style={
+        isMobile && ptrPull > 0
+          ? { transform: `translateY(${Math.min(ptrPull, 80)}px)`, transition: "none" }
+          : isMobile
+            ? { transform: "translateY(0)", transition: "transform 220ms ease" }
+            : undefined
+      }
+    >
+      {isMobile && onRefresh && (
+        <div
+          className={`ptr-indicator${ptrTriggered ? " triggered" : ""}${ptrRefreshing ? " refreshing" : ""}`}
+          aria-hidden={!ptrVisible}
+          style={{ opacity: ptrVisible ? 1 : 0 }}
+        >
+          <span className="ptr-spinner" />
+          <span className="ptr-label">{ptrLabel}</span>
+        </div>
+      )}
+
       {/* Date nav — always rendered so the operator has a single place
           to step through days and jump back to today. Mirrored by
           keyboard shortcuts ( [ = prev, ] = next, t = today ). */}

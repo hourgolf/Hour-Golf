@@ -514,6 +514,7 @@ export default function Dashboard() {
           onNextDay={() => shiftViewDate(1)}
           onJumpToday={jumpToday}
           onBulkCancel={bulkCancel}
+          onRefresh={refresh}
         />
       )}
 
