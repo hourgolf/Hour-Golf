@@ -2,6 +2,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { SUPABASE_URL, getServiceKey, getTenantId } from "../../lib/api-helpers";
 import { enforceRateLimit, requireSameOrigin } from "../../lib/security";
+import { safePush } from "../../lib/admin-push";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
@@ -144,6 +145,16 @@ export default async function handler(req, res) {
     ];
     if (isSecure) cookie.push("Secure");
     res.setHeader("Set-Cookie", cookie.join("; "));
+
+    // Push admin PWA — new member signup. Awaited so Vercel's
+    // serverless runtime doesn't kill the fetch on return.
+    // safePush never throws.
+    await safePush(tenantId, {
+      title: "New member signup",
+      body: `${name.trim()} — ${cleanEmail}`,
+      url: `/admin?view=customers`,
+      tag: `signup-${cleanEmail}`,
+    });
 
     return res.status(200).json({
       member: {

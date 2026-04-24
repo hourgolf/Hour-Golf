@@ -19,6 +19,7 @@
 
 import { sendBookingConfirmation, sendBookingConflictAlert } from "../../lib/email";
 import { getRequestOrigin } from "../../lib/api-helpers";
+import { safePush } from "../../lib/admin-push";
 
 const HOURGOLF_TENANT_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -160,6 +161,19 @@ export default async function handler(req, res) {
                 console.error("Booking conflict alert failed:", e);
               }
 
+              // Push notify admin PWAs. safePush never throws.
+              await safePush(HOURGOLF_TENANT_ID, {
+                title: "⚠ Booking conflict",
+                body: `${booked.customer_name || booked.customer_email} overlaps ${overlaps[0]?.customer_name || "another booking"} on ${booked.bay}`,
+                url: "/admin?view=inbox",
+                tag: `conflict-${booked.booking_id}`,
+              });
+
+              // Mark that we already notified admin of this booking
+              // so the generic "new booking" push below doesn't
+              // double-fire on top of the conflict alert.
+              booked.__notifiedAsConflict = true;
+
               console.warn(
                 `booking-webhook: DOUBLE BOOKING detected — ${booked.booking_id} overlaps ${otherIds.join(", ")} on ${booked.bay} ${booked.booking_start}`
               );
@@ -189,6 +203,27 @@ export default async function handler(req, res) {
             });
           } catch (e) {
             console.error("Booking confirmation email failed:", e);
+          }
+
+          // Push notify admin — but skip if we already sent a
+          // conflict alert for this row (above). One notification
+          // per booking event.
+          if (!booked.__notifiedAsConflict) {
+            const when = (() => {
+              try {
+                return new Date(booked.booking_start).toLocaleString("en-US", {
+                  timeZone: "America/Los_Angeles",
+                  weekday: "short", month: "short", day: "numeric",
+                  hour: "numeric", minute: "2-digit",
+                });
+              } catch { return booked.booking_start; }
+            })();
+            await safePush(HOURGOLF_TENANT_ID, {
+              title: "New booking",
+              body: `${booked.customer_name || booked.customer_email} · ${when} · ${booked.bay}`,
+              url: "/admin?view=today",
+              tag: `booking-${booked.booking_id}`,
+            });
           }
         }
       } else {
