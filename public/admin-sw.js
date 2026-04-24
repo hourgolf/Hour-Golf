@@ -8,7 +8,10 @@
 // Separate cache namespace ("hgc-admin-v*") so this SW and the member
 // sw.js ("hourgolf-v*") don't collide on the same origin.
 
-const CACHE_NAME = "hgc-admin-v1";
+// v2 (2026-04-24): added push + notificationclick handlers for
+// Phase 4. Bumping the name triggers the update-available banner
+// on already-installed admin PWAs so they pick up the new SW.
+const CACHE_NAME = "hgc-admin-v2";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -35,3 +38,49 @@ self.addEventListener("activate", (event) => {
 });
 
 // No fetch handler — navigation goes straight to the network.
+
+// ── Push notifications ───────────────────────────────────────────
+// Payload shape (see lib/admin-push.js):
+//   { title, body, url, tag?, badge?, icon? }
+// url is the admin-app path the notification deep-links to; when
+// the user taps, we focus an existing admin window at that path or
+// open a new one.
+
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+  let payload = {};
+  try { payload = event.data.json(); } catch { payload = { body: event.data.text() }; }
+
+  const title = payload.title || "HGC Office";
+  const options = {
+    body: payload.body || "",
+    icon: payload.icon || "/icons/admin/icon.png",
+    badge: payload.badge || "/icons/admin/icon.png",
+    tag: payload.tag || undefined,
+    data: { url: payload.url || "/admin" },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/admin";
+  event.waitUntil((async () => {
+    const allClients = await self.clients.matchAll({
+      type: "window",
+      includeUncontrolled: true,
+    });
+    // Prefer focusing an existing admin tab and navigating it to
+    // the deep-link URL. Avoids opening duplicate PWA instances.
+    for (const client of allClients) {
+      if (client.url.includes("/admin") && "focus" in client) {
+        client.navigate(url).catch(() => {});
+        return client.focus();
+      }
+    }
+    // No admin tab open — launch one.
+    if (self.clients.openWindow) {
+      return self.clients.openWindow(url);
+    }
+  })());
+});
