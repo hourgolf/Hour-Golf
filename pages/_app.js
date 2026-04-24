@@ -9,7 +9,17 @@ export default function App({ Component, pageProps }) {
 
     let cancelled = false;
 
-    navigator.serviceWorker.register("/sw.js").then((reg) => {
+    // Route-aware SW registration. Admin routes (/admin/*) get the HGC
+    // Office service worker with its own cache namespace; every other
+    // route gets the existing member sw.js. The two are intentionally
+    // scoped to /admin/ and /members/ respectively via their manifests,
+    // so registering both on the same origin doesn't conflict.
+    const path = typeof window !== "undefined" ? window.location.pathname : "/";
+    const isAdmin = path.startsWith("/admin");
+    const swUrl = isAdmin ? "/admin-sw.js" : "/sw.js";
+    const swScope = isAdmin ? "/admin/" : "/";
+
+    navigator.serviceWorker.register(swUrl, { scope: swScope }).then((reg) => {
       if (cancelled) return;
 
       // Detect a new SW installing while another one is already

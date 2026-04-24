@@ -56,6 +56,11 @@ export default async function handler(req, res) {
     short_name: name,
     description: `Book bays, manage your membership, and stay connected with ${name}.`,
     start_url: "/members/dashboard",
+    // Explicit scope so the admin PWA (installed from /admin with
+    // scope "/admin/") and this member PWA don't overlap on the same
+    // origin. Browsers install them as distinct apps when scopes
+    // are disjoint. Added 2026-04-24 alongside the admin PWA launch.
+    scope: "/members/",
     display: "standalone",
     background_color: branding.cream_color || "#EDF3E3",
     theme_color: branding.pwa_theme_color || branding.primary_color || "#4C8D73",

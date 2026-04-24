@@ -3,6 +3,7 @@
   "short_name": "Hour Golf",
   "description": "Book bays, manage your membership, and stay connected with Hour Golf.",
   "start_url": "/members/dashboard",
+  "scope": "/members/",
   "display": "standalone",
   "background_color": "#EDF3E3",
   "theme_color": "#4C8D73",

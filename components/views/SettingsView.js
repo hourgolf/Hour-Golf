@@ -1,6 +1,7 @@
 import ThemeCustomizer from "../settings/ThemeCustomizer";
 import FontSelector from "../settings/FontSelector";
 import LogoUpload from "../settings/LogoUpload";
+import AdminInstallButton from "../settings/AdminInstallButton";
 
 export default function SettingsView({ settings, updateSetting, apiKey, user, onLogout, onOpenSync }) {
   const checkLabelStyle = {
@@ -124,6 +125,19 @@ export default function SettingsView({ settings, updateSetting, apiKey, user, on
         >
           {"\u21C5"} Sync Bookings.
         </button>
+      </div>
+
+      {/* Install HGC Office — shows a platform-appropriate install
+          path (native prompt on Chrome/Android; Share-menu hint on
+          iOS Safari; hides itself when the app is already installed). */}
+      <div className="tbl" style={{ padding: 20, marginBottom: 20 }}>
+        <h3 style={{ fontFamily: "var(--font-display)", fontSize: 14, textTransform: "uppercase", letterSpacing: 2, color: "var(--primary)", marginBottom: 6 }}>
+          Install as app
+        </h3>
+        <p className="muted" style={{ marginTop: 0, marginBottom: 12, fontSize: 12 }}>
+          Add HGC Office to your home screen or dock for one-tap access. Members see a separate Hour Golf app.
+        </p>
+        <AdminInstallButton />
       </div>
 
       {/* Account */}

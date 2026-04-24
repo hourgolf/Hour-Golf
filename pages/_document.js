@@ -21,6 +21,30 @@ function escapeHtml(s) {
     .replace(/'/g, "&#39;");
 }
 
+// Route-to-PWA mapping. "/admin/*" gets the HGC Office manifest +
+// admin icons; everything else keeps the member PWA config. The
+// split means two distinct installable apps on one origin —
+// operators see HGC Office on their home screen, members see the
+// tenant-branded Hour Golf icon.
+function pwaContextForPath(pathname, branding) {
+  const isAdmin = typeof pathname === "string" && pathname.startsWith("/admin");
+  if (isAdmin) {
+    return {
+      manifestHref: "/admin-manifest.json",
+      appTitle: "HGC Office",
+      themeColor: "#4C8D73",
+      iconHref: "/icons/admin/icon.png",
+    };
+  }
+  return {
+    manifestHref: "/manifest.json",
+    appTitle: branding?.app_name || "Ourlee",
+    themeColor: branding?.pwa_theme_color || branding?.primary_color,
+    iconHref: branding?.pwa_icon_url || "/icons/icon-192x192.png",
+    iconFallback512: branding?.pwa_icon_url || "/icons/icon-512x512.png",
+  };
+}
+
 class MyDocument extends Document {
   static async getInitialProps(ctx) {
     const initialProps = await Document.getInitialProps(ctx);
@@ -36,7 +60,9 @@ class MyDocument extends Document {
     ]);
     if (brandingResult.status === "fulfilled") branding = brandingResult.value;
     if (featuresResult.status === "fulfilled") features = featuresResult.value;
-    return { ...initialProps, branding, features, tenantId };
+    // Stash the request path so render() can pick the right manifest.
+    const pathname = (ctx.req?.url || "").split("?")[0] || "/";
+    return { ...initialProps, branding, features, tenantId, pathname };
   }
 
   render() {
@@ -46,36 +72,35 @@ class MyDocument extends Document {
     const cssVars = buildRootCssVars(branding);
     const fontFace = buildDisplayFontFace(branding);
     const bgRule = buildBackgroundImageRule(branding);
-    const appName = branding.app_name || "Ourlee";
-    const themeColor = branding.pwa_theme_color || branding.primary_color;
+    const pwa = pwaContextForPath(this.props.pathname, branding);
 
     return (
       <Html lang="en">
         <Head>
-          {/* PWA (dynamic) */}
-          <link rel="manifest" href="/manifest.json" />
-          <meta name="theme-color" content={escapeHtml(themeColor)} />
+          {/* PWA (dynamic) — admin routes get the HGC Office manifest,
+              everything else gets the tenant member manifest. */}
+          <link rel="manifest" href={pwa.manifestHref} />
+          {pwa.themeColor && (
+            <meta name="theme-color" content={escapeHtml(pwa.themeColor)} />
+          )}
           <meta name="apple-mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-          <meta name="apple-mobile-web-app-title" content={escapeHtml(appName)} />
-          {/* Icons: use per-tenant PWA icon when uploaded; otherwise fall
-              back to the bundled HG defaults. Tenants that haven't set
-              pwa_icon_url retain pre-Phase-7 behavior. */}
-          <link
-            rel="apple-touch-icon"
-            href={branding.pwa_icon_url || "/icons/icon-192x192.png"}
-          />
+          <meta name="apple-mobile-web-app-title" content={escapeHtml(pwa.appTitle)} />
+          {/* Icons: admin routes use the admin icon; member/public
+              routes use per-tenant PWA icon when uploaded, otherwise
+              the bundled HG defaults. */}
+          <link rel="apple-touch-icon" href={pwa.iconHref} />
           <link
             rel="icon"
             type="image/png"
             sizes="192x192"
-            href={branding.pwa_icon_url || "/icons/icon-192x192.png"}
+            href={pwa.iconHref}
           />
           <link
             rel="icon"
             type="image/png"
             sizes="512x512"
-            href={branding.pwa_icon_url || "/icons/icon-512x512.png"}
+            href={pwa.iconFallback512 || pwa.iconHref}
           />
 
           <link rel="preconnect" href="https://fonts.googleapis.com" />
