@@ -1,332 +1,315 @@
-# Next session handoff — admin dashboard workflow polish
+# Next session handoff — admin PWA Phase 5 stretch
 
-*Written 2026-04-23 at the end of the launch-week sprint
-(commits ~15540fb → 72c299d, roughly 70 commits over 5 days).*
+*Written 2026-04-24 at the end of the admin-PWA sprint
+(commits 9456560 → 8d525dd, shipping Phases 1-5 of the PWA plan
+plus billing discoverability + Shop e-commerce phases B-E).*
 
-**Next session focus: improve the admin dashboard workflow without
-touching anything a member might see or need to reload for.** The
-member app is live with ~72 paying members; we just ran the launch
-broadcast successfully (47/72 initial, 25 retried clean after a
-Resend rate-limit fix). Every member-facing change from here forward
-needs caution; the admin side is free to iterate hard.
+**Next session focus: three "app-feel" investments on the admin
+PWA that the last session deliberately stopped short of.** All
+three are mobile-targeted, all independent, all optional. Pick one,
+all three, or none depending on what feels most valuable to the
+operator by the time the session runs.
 
 ---
 
 ## Read these first (in order)
 
-1. **This file** — orientation + scope guardrails.
-2. **Auto-memory `MEMORY.md`** — accumulated lessons from prior
-   sessions, especially `lessons_db_migration_audits.md` (audit all
-   readers/writers before tightening anything on shared tables).
-3. **`docs/HG_IMPROVEMENTS.md`** — shipped log + open polish items
-   that might still apply to admin workflow.
-4. **`docs/SKEDDA_CUTOVER_PLAN.md`** — cutover is scheduled but not
-   yet executed. The three cutover emails are staged in
-   `/lib/email.js` (`sendCutoverAnnouncement`, `sendCutoverReminder`,
-   `sendCutoverComplete`) and the broadcast UI is in Config → Skedda
-   Cutover Broadcasts. **Don't** fire those without the operator's go-
-   ahead on the date.
+1. **This file** — orientation + task scope + guardrails.
+2. **Auto-memory `MEMORY.md`** — especially:
+   - `project_admin_pwa_plan.md` — the 6-phase PWA plan. Phases 1-5
+     shipped in the 2026-04-24 session; Phase 6 (offline + biometric)
+     explicitly skipped.
+   - `lessons_db_migration_audits.md` — audit all readers/writers
+     before tightening anything on shared tables.
+   - `feedback_staged_verification.md` — split non-trivial work into
+     phases, smoke-test between each.
+3. **`docs/HG_IMPROVEMENTS.md`** — shipped log + open items.
+4. **`docs/SKEDDA_CUTOVER_PLAN.md`** — cutover scheduled for
+   **Mon May 11, 2026**, not yet executed. Don't fire the cutover
+   broadcasts without operator sign-off on the date.
 
 ---
 
-## Where things stand right now
+## State of the admin PWA (2026-04-24)
 
-### Live in production (HG)
+Installable at `/admin` as "HGC Office" — separate manifest + SW
+(scope `/admin/`, cache `hgc-admin-v*`) from the member PWA (scope
+`/members/`, cache `hourgolf-v*`). Both coexist on one origin.
 
-- **~72 paying members** across Patron / Starter / Green Jacket /
-  Unlimited. Counts live on Reports → Members.
-- **47+ members onboarded on the new app** (post-launch-broadcast
-  landing). Watch the "On App" KPI on Customers tab — it climbs as
-  more members sign in.
-- **Per-tenant Stripe webhooks** with self-heal on `checkout.session.
-  completed` AND `invoice.paid` (Phase 7C + Rob Kim fix).
-- **Public surfaces:** `/book` (availability + tier CTA funnel),
-  `/app` (install explainer), `/join/<slug>` (tier shortcut links).
-- **Public ProShop:** `/shop` (guest checkout, Stripe, Shippo
-  shipping).
-- **Payment-failed member flow:** Stripe `invoice.payment_failed` →
-  branded email + Past Due chip on admin Customers tab.
-- **Double-booking detection:** Skedda webhook compares against
-  existing bookings; if overlap, flags both rows + emails admin +
-  shows red CONFLICT banner on Today tab. Unblocks the transition.
-- **Admin day timeline** (NEW this week): horizontal Gantt of the
-  day above the per-bay list on Today tab. Clickable blocks open
-  the edit sheet.
-- **Email preview viewer:** `/api/email-preview/<slug>` renders any
-  transactional email with fake sample data. Shareable URLs; see
-  `docs/EMAIL_TEMPLATE_HANDOFF.md` for the designer workflow.
-- **Launch broadcast shipped:** all 72 paying members received the
-  branded "Meet the new Hour Golf app" email on 2026-04-23.
+Bottom-tab nav on mobile (Today / Inbox / Members / More); top tabs
+on desktop. Inbox aggregates conflicts + past-due + non-members-to-
+charge + low-stock with count badge on the tab. Push notifications
+wired with 4 triggers: new booking, conflict, past-due flip,
+new member signup. VAPID keys live in Vercel env (VAPID_PUBLIC_KEY,
+VAPID_PRIVATE_KEY, VAPID_SUBJECT).
 
-### Open items that might surface in admin workflow work
+Billing discoverability solved — $ amounts live on the Customers
+chip faces and in the KPI strip so the operator sees the monthly
+billing load at a glance without clicking.
 
-- **Cutover is scheduled but not fired** (see
-  `docs/SKEDDA_CUTOVER_PLAN.md`). Until cutover day, double bookings
-  from Skedda are caught by the webhook + banner — operator still
-  has to call one member to resolve.
-- **Unlimited tier (Alex Tadjedin duplicate):** member #7 and #73
-  both listed as "Alex Tadjedin" with different emails. Minor data
-  hygiene item, not urgent.
-- **Broken header logo in emails was data-level**, not code. Code
-  now filters non-absolute URLs and falls through. If a new tenant
-  saves a relative path, emails still render (falls to welcome
-  logo). In-app headers keep using the relative path as-is.
+Mobile polish across Today (stacked booking rows, timeline hidden,
+36px tap targets), Customers (chip tap targets, card breathing
+room), Detail (wrapping table rows).
 
-### Test harness
-
-- `npm test` → **29 passing tests** (overage / feature-guard /
-  platform-auth). Add `*.test.js` next to source files. Vitest picks
-  them up.
-- `npm run build` compiles cleanly. **Known local quirk:** page-data
-  collection fails with `supabaseKey is required` because there's no
-  `.env.local` in the working tree. Vercel builds fine — it's only a
-  local dev-env gap.
+Everything above landed across ~25 commits in the 2026-04-24
+session. `npm test` green at 39 tests; `npm run build` compiles
+cleanly (local page-data collection still fails on missing
+`.env.local` — known quirk, Vercel fine).
 
 ---
 
-## Scope guardrails for this session
+## What's next — three stretch investments
 
-### ✅ SAFE to edit freely (admin-only surfaces)
+Each is an independently shippable chunk. Listed in rough
+descending effort / impact:
 
-These files are rendered only for admins or are admin-only APIs.
-Changes here can't reach a member.
+### Stretch 1 — Bottom-sheet DetailView on mobile (biggest)
 
-**View components (admin dashboard is these):**
+**Problem:** tapping a member on Customers currently navigates to
+the Detail tab, replacing the whole view. On mobile the transition
+feels like a page load (because it effectively is), and hitting the
+Customers nav tab to get "back" loses the customer context
+entirely. App-shaped behavior: tap a customer → half-height bottom
+sheet slides up with Detail; swipe-down or tap-away to dismiss;
+Customers list is still visible underneath.
+
+**Target files:**
+- `pages/admin/index.js` — the view dispatcher. Currently reacts
+  to `view === "detail"` and renders DetailView full-width. The
+  `selMember` state + `selectMember` callback already exist.
+- `components/views/DetailView.js` — the component itself. 408
+  lines, scrollable stack of cards. Should render inside the sheet
+  with minimal changes — maybe drop the outer padding.
+- `components/ui/Modal.js` — existing React-portal modal. Not a
+  sheet but the portal pattern is close. Might extend or write a
+  new `<Sheet>` component modelled on it.
+- `styles/globals.css` — `@media (max-width: 768px)` block starts
+  around line 746.
+
+**Approach sketch:**
+- Add `<Sheet>` (new file: `components/ui/Sheet.js`) that portals
+  children, slides up from the bottom, pins to `calc(100vh -
+  env(safe-area-inset-top))` height, has a drag-handle + close
+  button. Desktop ignores it (same as current Detail behavior).
+- On mobile, when `view === "detail"` AND `selMember` exists,
+  render `<Sheet open><DetailView ...></Sheet>` and DON'T render
+  the full-width DetailView.
+- Use `useMediaQuery` or `matchMedia` to detect mobile. There's no
+  existing hook — add `hooks/useIsMobile.js` returning a stable
+  boolean (SSR-safe, defaults to false until first effect).
+- URL state: keep `?view=detail` as-is so back-button + deep-links
+  still work. Closing the sheet should reset `view` to `"customers"`
+  and clear `selMember`.
+- Swipe-down-to-dismiss is nice-to-have; a close button covers 80%
+  of the value for half the effort.
+
+**Risks:**
+- `pages/admin/index.js` is the big file (650 lines). Be surgical.
+- Existing desktop Detail behavior must not regress — test both
+  viewports via the preview tool.
+- Scroll position inside DetailView when the sheet opens: the
+  operator expects Top on first open, but on "reopen after closing"
+  maybe remember. Not critical; document as a follow-up.
+
+**Effort estimate:** 2-3 hrs. One commit, gated behind viewport.
+
+### Stretch 2 — Swipe-to-action on booking rows (medium)
+
+**Problem:** on mobile the slot rows have Edit + Cancel buttons
+stacked next to the customer name. Fine, but cramped. Native apps
+typically expose per-row actions via swipe. Swipe left on a
+booking row → reveal red Cancel; swipe right → reveal blue Edit.
+Threshold commit runs the action; below threshold snaps back.
+
+**Target files:**
+- `components/views/TodayView.js` — booking slots at lines ~403-448
+  (the `<div className={\`slot \${st} ...\`}>` render).
+- `components/views/DetailView.js` — similar slot rendering for the
+  member's bookings list.
+- `styles/globals.css` — `.slot` styling (line 268+).
+
+**Approach sketch:**
+- Don't pull in a library. Touch events + CSS transforms ≈ 60
+  lines. Wrap each `.slot` in a `<div className="slot-swipe">`
+  that owns `onTouchStart/onTouchMove/onTouchEnd`. Track the x
+  delta; on move, translate the inner `.slot` by the delta;
+  reveal Edit on positive delta, Cancel on negative; commit at
+  ±80px; snap back with a CSS transition on release.
+- Mobile-only: no-op the handler above 768px or don't attach in
+  desktop (feature-detect via a `useIsMobile` hook — same one
+  Stretch 1 wants).
+- Keep the inline Edit/Cancel buttons around on mobile for
+  accessibility — swipe is nice but must never be the only path.
+- Respect the checkbox: swipe shouldn't fire if the operator has
+  started multi-select mode (any row selected).
+
+**Risks:**
+- Touch events on iOS conflict with vertical scroll. The pattern
+  is: capture the initial touch X/Y; only hijack the gesture if
+  horizontal delta > vertical delta after a few px; otherwise
+  release to the browser for normal scroll. Any library will do
+  this for you; rolling your own requires this exact logic.
+- Left-handed operators: swipe direction-for-action is a learned
+  convention. Match iOS Mail (swipe left = danger). Don't invent.
+
+**Effort estimate:** 3-4 hrs with careful touch-handling. One
+commit.
+
+### Stretch 3 — Pull-to-refresh on Today (smallest)
+
+**Problem:** refresh lives on a hidden FAB (↻) that got removed
+from the mobile layout entirely. Operator currently has no way to
+force a data refresh on mobile outside the 60-second auto-interval
+in `useData`. Pull-down-to-refresh is the iOS/Android native
+gesture; it should work on TodayView (at minimum).
+
+**Target files:**
+- `pages/admin/index.js` — `refresh` callback exists from
+  `useData` (line ~47). Pass it down.
+- `components/views/TodayView.js` — the wrapper that would register
+  touch events.
+- `styles/globals.css` — new `.ptr-indicator` visual.
+
+**Approach sketch:**
+- Scope to TodayView first. If it feels right, add to Customers +
+  Inbox later.
+- On mobile only: attach `onTouchStart/Move/End` to the content
+  wrapper. Only activate when `scrollTop === 0` at touchstart.
+  Track pull distance; at 60px show indicator; at 100px trigger
+  `refresh()` on release.
+- Show a circular spinner or a "Release to refresh →" text chip
+  during the pull.
+- Debounce: ignore subsequent pulls within 2s of the last refresh.
+- Desktop: no-op (no touch events, the existing desktop refresh
+  FAB at the top nav is fine).
+
+**Risks:**
+- Low. Isolated to TodayView, no shared UI changes. Easy to
+  feature-flag if it annoys the operator.
+
+**Effort estimate:** 1-1.5 hrs. One commit.
+
+---
+
+## Scope guardrails (unchanged from prior handoff)
+
+### ✅ SAFE to edit freely (admin-only)
+
 - `components/views/TodayView.js`
-- `components/views/WeekView.js`
-- `components/views/OverviewView.js`
-- `components/views/CustomersView.js`
-- `components/views/ConfigView.js`
 - `components/views/DetailView.js`
-- `components/views/ReportsView.js`
-- `components/views/EventsView.js`
-- `components/views/ShopAdminView.js`
-- `components/views/SettingsView.js`
-- `components/views/DayTimeline.js`
-- `components/settings/*.js`
-- `components/forms/*.js` (LoginForm, BookingForm, SyncModal)
-- `components/layout/Header.js` (admin header)
-- `components/layout/Nav.js` (admin nav)
+- `components/views/CustomersView.js`
+- `pages/admin/index.js`
+- `hooks/*.js` for new admin-only hooks (e.g. `useIsMobile.js`)
+- `components/ui/Sheet.js` (new, admin-only)
+- `styles/globals.css` — admin rules only; grep for `.mem-*` class
+  prefixes to spot member-side rules before editing them.
 
-**Hooks (admin only):**
-- `hooks/useData.js` (admin data refresh loop)
-- `hooks/useSettings.js`
-- `hooks/useAuth.js` (admin auth)
-- `hooks/useKeyboard.js`
-- `hooks/useToast.js`
+### ⚠️ TOUCH WITH CARE
 
-**Admin API routes:**
-- `pages/api/admin-*.js` (everything prefixed `admin-`)
-- `pages/api/platform-*.js` (platform admin only)
-- `pages/api/stripe-lookup.js`, `stripe-charge.js`,
-  `charge-nonmember*.js` (admin mutations)
-- `pages/api/upload-*.js` (admin uploads — logo/font/shop/event)
-- `pages/api/verify-member.js` (admin QR verify)
-- `pages/api/send-email.js` (admin email test endpoint)
-- `pages/api/backfill-subscriptions.js`
+- `components/ui/Modal.js` — shared with members. Don't break it;
+  either extend or clone as `Sheet.js`.
+- `hooks/useData.js` — member-app data loading passes through the
+  same hook. Adding a "force refresh" path should be fine (it
+  already takes a `refresh` callback), but don't change the polling
+  interval.
+- `public/admin-sw.js` — only bump the cache name if you change
+  behavior; bump triggers the "update available" banner on already-
+  installed admin PWAs.
 
-**Admin pages:**
-- `pages/index.js` (the admin dashboard root)
-- `pages/platform/*.js`
+### 🚫 DO NOT EDIT
 
-**Documentation, migrations, tests:**
-- `docs/*.md`, `supabase/migrations/*.sql` (new migrations OK; don't
-  edit past ones), `*.test.js`
-
-### ⚠️ TOUCH WITH CARE (shared with members)
-
-These files power admin AND member surfaces. Changes may affect
-members — use feature flags, new functions, or careful edits.
-
-**Shared libraries:**
-- `lib/email.js` — admin AND member transactional emails. New
-  templates OK; only change existing templates if you're also OK
-  with the member-side rendering it.
-- `lib/email-layout.js` — visual wrapper for every email.
-- `lib/branding.js` — tenant branding loader + helpers (bay labels,
-  cancel cutoff, etc.). Read-only from admin views is safe.
-- `lib/format.js` — date/time/Pacific-bucket helpers. Widely used.
-- `lib/overage.js` — billing math. Member dashboard + admin both
-  consume. Widely tested.
-- `lib/api-helpers.js` — `verifyAdmin`, `getTenantId`,
-  `getServiceKey`. Never loosen.
-- `lib/security.js` — CSRF + rate-limit + MIME validation. Don't
-  weaken.
-- `lib/supabase.js` — admin REST helpers (used by useData). Safe to
-  refactor as long as members don't import from here.
-
-**Shared UI primitives:**
-- `components/ui/Modal.js`, `Toast.js`, `Confirm.js`, `Badge.js`,
-  `TierSelect.js`, `SlideToConfirm.js`
-- `components/DatePicker.js`
-
-**Config:**
-- `next.config.js`, `middleware.js`, `pages/_app.js`,
-  `pages/_document.js`
-- `styles/globals.css` — admin styles are in one region; member
-  styles are in another. Grep before editing.
-
-### 🚫 DO NOT EDIT (member-facing surfaces)
-
-Any change here can force a member reload and potentially surface a
-regression on the live member app.
-
-**Member components + pages:**
-- `components/members/*`
-- `pages/members/*`
-- `pages/app.js`, `pages/book.js`, `pages/shop.js`,
-  `pages/portal.js`, `pages/verify.js`
-- `pages/join/[tier].js`
-
-**Member APIs:**
-- `pages/api/member-*.js` (all 26 of them)
-- `pages/api/customer-*.js`
-- `pages/api/public-*.js`
-- `pages/api/manifest.js`
-- `pages/api/punch-pass-purchase.js`
-- `pages/api/booking-webhook.js` (Skedda → us — member-consequential)
-
-**Member service workers + PWA:**
-- `public/sw.js`
-- `public/manifest.json`
-
-**Shared webhook handlers with member consequences:**
-- `lib/stripe-webhook-handler.js` — fires member tier flips, welcome
-  emails, past-due flags.
-- `supabase/functions/process-access-codes/*` — sends door-code
-  emails ~10 min before each booking.
-
----
-
-## Likely admin-workflow improvement targets
-
-Prioritized by what's been thumb-in-the-air during recent ops.
-
-### Tier 1 — clear pain points observed
-
-1. **Find-member flow.** There's no global search. CustomersView
-   has a search box but navigating to a specific member first-time
-   requires clicking through tabs. A `cmd+K` quick-command
-   palette with member name/email/phone fuzzy-match → jump to
-   DetailView would save minutes per day.
-2. **Booking conflicts need an empty state.** The red banner on
-   Today only renders when conflicts exist today. Viewing historic
-   days doesn't surface past conflicts at all. Consider a
-   "Conflicts" tab or inline banner on Week/Overview.
-3. **Booking-row keyboard shortcuts.** Arrow keys don't move
-   selection on TodayView. Missing quick-action model (e.g. select
-   + shift-D to delete, shift-E to edit) that power users expect.
-4. **Bulk actions only exist on TodayView.** CustomersView and
-   DetailView don't have multi-select. Bulk-message, bulk-tier-
-   change, bulk-tag would save time on large ops (e.g. "send this
-   email to everyone who hasn't logged in").
-5. **No activity log.** Who cancelled that booking? When did
-   so-and-so get upgraded? There's no history — changes are
-   observable only through their effect.
-
-### Tier 2 — workflow quality-of-life
-
-6. **Saved filters on Customers tab.** Operator repeatedly applies
-   the same filter (Patron + paying + logged-in last 30d, etc.).
-7. **Undo for destructive actions.** Cancel/delete a booking →
-   toast with Undo button. 5-second window.
-8. **Notes on members.** Private operator notes field on the
-   member row ("allergic to corn chips", "prefers bay 3 left",
-   etc.). DetailView-only; never exposed to member.
-9. **Past-due dashboard.** A focused view for billing issues —
-   who's past_due, for how much, last card-fail date, days until
-   subscription auto-cancels. Separate from the Customers chip.
-10. **Today-morning briefing.** A daily email to the operator at
-    7am: today's bookings summary, any overnight conflicts,
-    overdue shop-request follow-ups, past-due members.
-
-### Tier 3 — polish and nice-to-have
-
-11. **Mobile admin.** Operators occasionally work the phone while
-    at the counter. TodayView + DetailView could use mobile-first
-    layouts.
-12. **Timeline zoom.** DayTimeline is currently fixed 6 AM–11 PM.
-    Zoom to "next 4 hours" would pack more detail near the now line.
-13. **Shop-request resolution workflow.** Each request has status
-    transitions but no timer/escalation. An SLA warning ("this
-    request is >7 days old") would help.
-14. **Event attendee management.** EventsView shows events + RSVPs
-    but no way to email/text all attendees at once.
-
-### Tier 4 — measurements to consider
-
-15. **Admin usage analytics.** Which tabs do operators use? Which
-    actions take longest? Built-in Vercel Analytics could tag
-    admin pageviews separately.
-16. **Operator error surface.** When an admin action fails
-    (Stripe-link failed, email send failed), failures should go to
-    an admin "Issues" tab, not just Vercel logs.
+- `components/members/*`, `pages/members/*`, `pages/api/member-*.js`
+- `pages/api/booking-webhook.js` (receives Skedda writes —
+  touched this session to add a push trigger; don't expand the
+  surface further)
+- `lib/stripe-webhook-handler.js` (also touched for push; leave
+  alone beyond that)
+- `public/sw.js` / `public/manifest.json` (member PWA)
 
 ---
 
 ## Rails to hold while working
 
-- **Auto memory `lessons_db_migration_audits.md`**: audit ALL
-  readers/writers before changing RLS, dropping columns, or altering
-  shared tables. We've burned on this before.
-- **Pacific-time bucketing** (`lib/format.pacificMonthWindow()`) is
-  the contract for any monthly aggregation that touches member-
-  visible numbers. Don't roll your own.
-- **Service role key never touches the client bundle.** Double-check
-  `grep -r SERVICE_ROLE components/ hooks/` comes back empty.
-- **Admin writes go through API routes** (service-role on server),
-  not direct PostgREST calls from the browser (those would hit RLS
-  policies and potentially get blocked). The exceptions are
-  `supa()` reads in `hooks/useData.js` — which hit RLS `admin_all`
-  policies — don't add writes there.
-- **Every admin API route** checks `verifyAdmin(req)` before doing
-  anything. New routes inherit the pattern.
-- **Tests pass before push.** `npm test` stays at 29 passing. Add
-  a test next to any new shared logic.
-- **Member reloads:** by deliberately scoping this session to admin
-  files, members never need to hard-refresh. If you find yourself
-  wanting to edit `components/members/*` or `pages/members/*` for a
-  shared-logic reason, stop and confirm with the operator first.
+- **Desktop must not regress.** All three stretches are mobile-
+  only. Every change should be gated behind `@media (max-width:
+  768px)` in CSS or a mobile-detection hook in JS. Verify via
+  `preview_resize` at both 375-wide mobile and 1280-wide desktop
+  before committing.
+- **Member PWA must stay untouched.** Grep your changes for any
+  file under `components/members/` or `pages/members/` and the
+  shared SW/manifest. If something's there, stop.
+- **Verify via the preview tool, not just `npm test`.** The mobile
+  polish shipped this session was verified via `preview_resize` +
+  DOM inspection, not visual-only. Assertions about
+  `getComputedStyle` on fake elements are strong evidence rules
+  are wired.
+- **Admin credentials aren't in this environment.** The preview
+  tool can render the login page + any public route but cannot get
+  past auth. Test authenticated-view changes by:
+  1. DOM-inspecting CSS rules on synthetic elements (see the last
+     session's commit messages for examples).
+  2. Pushing to prod and testing on-device after Vercel deploys.
+  - If a change is impossible to verify pre-push, say so in the
+    commit message + verify on-device right after the push.
+- **Staged commits, push between phases.** Shipped pattern last
+  session: one commit per stretch, push after each green. Hour Golf
+  is live production with ~72 paying members.
 
 ---
 
 ## How to run + verify
 
 ```
-npm install          # if node_modules is missing
-npm run dev          # local dev server on :3000
-npm test             # 29 tests, <1s
-npm run build        # prod build (local fails on env vars; Vercel fine)
+npm install                   # if node_modules is missing
+npm run dev                   # via the preview tool, NOT Bash
+npm test                      # 39 tests, <1s
+npm run build                 # local fails on env vars, Vercel fine
 ```
 
+Preview tool launch config lives at `.claude/launch.json`
+(gitignored — regenerate if missing by pointing the preview tool
+at `npm run dev`). Use `preview_resize` to toggle between 375-wide
+mobile and 1280-wide desktop when verifying responsive rules.
+
 Deploy: `git push origin main` — Vercel auto-builds + deploys prod
-in 2–3 min.
+in 2-3 min.
 
 ---
 
-## Quick reference — the admin dashboard shape
+## Quick reference — useful context
 
-`pages/index.js` renders the `<Dashboard>` component. State is:
-- `view` ∈ { today, week, overview, customers, shop, tiers, reports,
-  detail, settings, events }
-- `selMember` (email), `selMonth`, various filters
-- Modals: `addOpen`, `editBk`, `cancTgt`, `delTgt`, `chgTgt`,
-  `syncOpen`
+**Admin URL structure:**
+- `/` — 307-redirects to `/admin` (query preserved)
+- `/admin` — admin Dashboard root (login or authenticated view)
+- `/admin?view=today` — default landing after login
+- `/admin?view=inbox` — attention-signals hub
+- `/admin?view=customers` — member list with billing chips
+- `/members/*` — member PWA (untouched, different scope)
 
-The `view` dispatches to the matching view component via
-`next/dynamic` (code-split). TodayView is eager, others lazy.
+**Admin state shape (pages/admin/index.js `<Dashboard>`):**
+- `view` ∈ { today, week, customers, events, shop, tiers, reports,
+  inbox, detail, settings }
+- `selMember` (email) — when set, Detail opens
+- `viewDate` (ISO) — when set, Today/Week show a historic day
+- Various filter + modal states.
 
-**useData hook** (`hooks/useData.js`) auto-refreshes every 60s when
-connected. Pulls: `members`, `bookings`, `tier_config`,
-`monthly_usage`, `payments`, `access_code_jobs`. Uses the admin JWT
-via `supa()`. RLS `admin_all` policies enforce tenant scoping.
+**useData hook** polls every 60s when connected. Returns:
+`members`, `bookings`, `tierCfg`, `usage`, `payments`,
+`accessCodes`, plus the `refresh` callback.
 
-**Header** (`components/layout/Header.js`): logo, today-count, hours,
-member count, nav buttons, refresh. `useBranding()` → tenant colors.
+**Mobile breakpoint convention:** `@media (max-width: 768px)` for
+layout changes. `600px` for minor tweaks (existing, don't
+redefine without reason). `400px` for very narrow polish.
 
-**Nav** (`components/layout/Nav.js`): top-level tabs. Badge counts.
+**Viewport-aware JS:** no existing `useIsMobile` hook. Create one
+at `hooks/useIsMobile.js` if any stretch needs it — SSR-safe
+shape (returns `false` on server, reads `window.matchMedia` on
+mount).
 
 ---
 
-*Ready for admin workflow polish. Pick a tier-1 item, ship a tight
-branch-per-feature, keep `git push` zero-member-impact.*
+*Ready for Phase 5 stretch work. Pick an item, branch-per-feature
+if you want separable reverts, push green. Phase 6 (offline +
+biometric) remains deferred per the project_admin_pwa_plan memory
+— only reconsider if the operator has actively hit an offline
+pain.*
