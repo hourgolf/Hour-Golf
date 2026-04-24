@@ -7,6 +7,7 @@ import { resolveBays, resolveBayLabel } from "../../lib/branding";
 import Badge from "../ui/Badge";
 import KPIStrip from "../ui/KPIStrip";
 import StatusBadge from "../ui/StatusBadge";
+import SwipeRow from "../ui/SwipeRow";
 import DayTimeline from "./DayTimeline";
 
 // Tight countdown helper used by the "Right now" + "Up next" callouts.
@@ -528,7 +529,15 @@ export default function TodayView({
                 if (ms > 0 && ms <= 6 * 60 * 60 * 1000) countdown = fmtCountdown(ms);
               }
               return (
-                <div key={b.booking_id} className={`slot ${st} ${isSelected ? "selected" : ""}`}>
+                <SwipeRow
+                  key={b.booking_id}
+                  onSwipeLeft={() => onCancel(b)}
+                  onSwipeRight={() => onEdit(b)}
+                  leftLabel="Edit"
+                  rightLabel="Cancel"
+                  disabled={selectedIds.size > 0}
+                >
+                <div className={`slot ${st} ${isSelected ? "selected" : ""}`}>
                   <input
                     type="checkbox"
                     className="slot-check"
@@ -572,6 +581,7 @@ export default function TodayView({
                     </div>
                   </div>
                 </div>
+                </SwipeRow>
               );
             })}
           </div>

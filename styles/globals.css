@@ -262,6 +262,45 @@ html { overflow-y: scroll; }
 .font-opt { padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius); cursor: pointer; font-size: 13px; text-align: center; }
 .font-opt.active { border-color: var(--primary); }
 
+/* ── Swipe-to-action wrapper (mobile-only; SwipeRow component) ──
+   The component is a passthrough on desktop, so these styles only
+   matter when SwipeRow is actively rendering the wrapper. The .swipe-
+   row-fg has no own background by default — its child .slot already
+   has var(--surface), which covers the action backgrounds when
+   delta=0. */
+.swipe-row { position: relative; overflow: hidden; }
+.swipe-row-fg { position: relative; z-index: 1; will-change: transform; }
+.swipe-row-bg {
+  position: absolute;
+  top: 0;
+  bottom: 4px; /* match .slot margin-bottom so action panel doesn't bleed below the row */
+  display: flex;
+  align-items: center;
+  padding: 0 22px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #fff;
+  border-radius: var(--radius);
+  z-index: 0;
+  transition: filter 120ms ease;
+}
+.swipe-row-bg-edit {
+  left: 0;
+  right: auto;
+  background: var(--primary, #0a84ff);
+  justify-content: flex-start;
+}
+.swipe-row-bg-cancel {
+  right: 0;
+  left: auto;
+  background: #d32f2f;
+  justify-content: flex-end;
+}
+.swipe-row-bg.active { filter: brightness(1.12); }
+
 /* ── Today view slots ── */
 .bay-lane { margin-bottom: 20px; }
 .bay-label { font-family: var(--font-display); font-size: 13px; font-weight: 700; letter-spacing: 2px; color: var(--primary); margin-bottom: 6px; text-transform: uppercase; }
