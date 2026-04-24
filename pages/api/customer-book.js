@@ -3,6 +3,19 @@ import { sendBookingConfirmation } from "../../lib/email";
 
 const TZ = "America/Los_Angeles";
 
+// Bound the email send so a slow Resend response can't hold the
+// booking confirmation hostage. 5s is conservative — a normal send
+// completes in well under 1s. If the email loses the race, we log
+// and return success on the booking anyway. The trailing email send
+// keeps running in the background; on Vercel Node functions it
+// usually finishes even after the response has been sent.
+const EMAIL_TIMEOUT_MS = 5000;
+
+// Give the function more headroom than Vercel's 10s default. The
+// client fetch has a 30s AbortController; the function should fail
+// cleanly within that window if Supabase + Resend pile up.
+export const config = { maxDuration: 30 };
+
 // Convert a date + time the user picked (in Pacific) to a proper UTC Date object.
 function pacificToUTC(dateStr, timeStr) {
   const naive = new Date(`${dateStr}T${timeStr}:00Z`);
@@ -110,23 +123,29 @@ export default async function handler(req, res) {
     const data = await resp.json();
     const booked = data[0];
 
-    // Await the confirmation email. Previously this was fire-and-forget
-    // with a swallowed catch, but Vercel can freeze/terminate the
-    // serverless process the moment res.json() returns — the Resend
-    // fetch then never completes and the email silently vanishes.
-    // Caught errors are logged but don't fail the booking response.
-    try {
-      await sendBookingConfirmation({
-        tenantId,
-        to: booked.customer_email,
-        customerName: booked.customer_name || booked.customer_email,
-        bay: booked.bay,
-        bookingStart: booked.booking_start,
-        bookingEnd: booked.booking_end,
-        portalUrl: getRequestOrigin(req),
-      });
-    } catch (emailErr) {
-      console.error("Booking confirmation email failed:", emailErr);
+    // Bounded email send. Resend occasionally takes 5-10s when their
+    // service is degraded — long enough to push this entire response
+    // past Vercel's function timeout, which made the client (especially
+    // in flaky in-app browsers like the Google iOS app's webview) sit
+    // forever at "loading." Race the email against a 5s timeout: if it
+    // wins, we await it; if it loses, we send the booking response and
+    // let the email finish in the background. Either way the booking
+    // is committed and the client gets an immediate success.
+    const emailPromise = sendBookingConfirmation({
+      tenantId,
+      to: booked.customer_email,
+      customerName: booked.customer_name || booked.customer_email,
+      bay: booked.bay,
+      bookingStart: booked.booking_start,
+      bookingEnd: booked.booking_end,
+      portalUrl: getRequestOrigin(req),
+    }).catch((e) => {
+      console.error("Booking confirmation email failed:", e);
+    });
+    const timeout = new Promise((resolve) => setTimeout(() => resolve("__timeout__"), EMAIL_TIMEOUT_MS));
+    const winner = await Promise.race([emailPromise, timeout]);
+    if (winner === "__timeout__") {
+      console.warn("Booking confirmation email exceeded 5s; returning booking + letting email finish in background");
     }
 
     return res.status(200).json({ success: true, booking: booked });

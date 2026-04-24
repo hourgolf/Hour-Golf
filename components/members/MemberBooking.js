@@ -125,24 +125,40 @@ export default function MemberBooking({ member, tierConfig, refresh, showToast }
   const timeInPast = isToday && bookStartTime < currentTime;
 
   // Shared POST to /api/customer-book. Callers handle their own UI reset.
+  // 30s AbortController so a hung network (e.g. flaky webview in
+  // Google's in-app browser) surfaces a clear error instead of an
+  // infinite spinner. Server has a 30s maxDuration so the actual
+  // backend timeout shows up before this client one.
   async function postBooking({ date, startTime, endTime, bay }) {
-    const r = await fetch("/api/customer-book", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        email: member.email,
-        name: member.name,
-        date,
-        startTime,
-        endTime,
-        bay,
-        terms_accepted: true,
-      }),
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || d.detail || "Booking failed");
-    return d;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    try {
+      const r = await fetch("/api/customer-book", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        signal: controller.signal,
+        body: JSON.stringify({
+          email: member.email,
+          name: member.name,
+          date,
+          startTime,
+          endTime,
+          bay,
+          terms_accepted: true,
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || d.detail || `Booking failed (HTTP ${r.status})`);
+      return d;
+    } catch (e) {
+      if (e?.name === "AbortError") {
+        throw new Error("Booking is taking longer than expected. Check your connection and try again — your browser's in-app webview may be slowing things down. Try opening hour.golf in your full browser if this keeps happening.");
+      }
+      throw e;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   function refetchAvailability() {
