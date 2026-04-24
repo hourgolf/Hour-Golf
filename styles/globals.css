@@ -805,6 +805,32 @@ html { overflow-y: scroll; }
      is below Apple's 44pt minimum. */
   .slot-i .btn { padding: 8px 14px !important; font-size: 12px !important; min-height: 36px; }
   .slot-check { transform: scale(1.2); margin: 0 4px; }
+
+  /* CustomersView mobile polish: bigger chip tap targets + card
+     breathing room so thumb-tapping the 72-member list doesn't feel
+     like stabbing at pixel targets. */
+  .cust-chip {
+    padding: 9px 14px;
+    font-size: 12px;
+    min-height: 36px;
+    gap: 7px;
+  }
+  .cust-chip-count { font-size: 11px; padding: 2px 7px; }
+  .cust-chips { gap: 8px; margin: 14px 0 10px; }
+  .usage-card { padding: 14px 16px; margin-bottom: 10px; }
+  .usage-card-lbl { font-size: 9px; }
+
+  /* DetailView Monthly Breakdown — the per-month overage table is
+     6 flex columns; on a 375-wide screen they collapse to an
+     illegible smear. Let the row wrap so the Month + Hours info
+     stacks above Over + Charge + Status instead of squishing. */
+  .admin-table-scroll .tbl .tr { flex-wrap: wrap; row-gap: 4px; }
+  .admin-table-scroll .tbl .th { display: none; }
+  /* DetailView + Shop admin: bigger tap targets on per-row Edit /
+     Cancel / Delete / Charge buttons. Inline font-size 10-11px in
+     JSX gets bumped to 12/13 via the ambient admin-button override
+     below. */
+  .tr .btn, .tr button.btn { min-height: 34px; padding: 7px 12px !important; font-size: 12px !important; }
   /* Swap top nav for bottom nav on mobile. Bottom nav is fixed, so
      the content gets padded to prevent the last row being obscured
      by the nav + home-indicator safe area. */
