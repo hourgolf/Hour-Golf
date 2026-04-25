@@ -68,6 +68,50 @@ function parseCsv(text) {
 
 const CATEGORIES = ["Apparel", "Accessories", "Equipment", "Other"];
 
+// Inline brand editor used in the items table + mobile cards. Saves
+// on blur (or Enter); Escape cancels back to the original value. Sized
+// and styled to read as plain text when not focused so the row's
+// visual weight stays the same as it was before inline edits — only
+// when the operator clicks does it surface input affordances.
+function InlineBrand({ value, onSave, placeholder = "Brand", style }) {
+  const [draft, setDraft] = useState(value || "");
+  const [focused, setFocused] = useState(false);
+
+  // Sync external value changes (e.g. another tab edited the same row)
+  // unless the user is mid-edit, in which case we keep their draft.
+  useEffect(() => {
+    if (!focused) setDraft(value || "");
+  }, [value, focused]);
+
+  function commit() {
+    const trimmed = (draft || "").trim();
+    const original = (value || "").trim();
+    if (trimmed !== original) {
+      onSave(trimmed || null);
+    }
+  }
+
+  return (
+    <input
+      type="text"
+      value={draft}
+      placeholder={placeholder}
+      onChange={(e) => setDraft(e.target.value)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => { setFocused(false); commit(); }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") { e.currentTarget.blur(); }
+        else if (e.key === "Escape") { setDraft(value || ""); e.currentTarget.blur(); }
+      }}
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onDragStart={(e) => e.preventDefault()}
+      className="shop-inline-input"
+      style={style}
+    />
+  );
+}
+
 const STATUS_COLORS = {
   pending: "#E8A838",
   confirmed: "#4C8D73",
@@ -596,6 +640,31 @@ export default function ShopAdminView({ apiKey }) {
     };
   }
 
+  // Optimistic single-field patch used by inline category select +
+  // brand input. Updates local state first so the UI reflects the
+  // change immediately, fires the PATCH, reverts to the server view
+  // on failure. Returns true on success so callers can blur safely.
+  async function patchItem(id, partial) {
+    const prev = items;
+    setItems((curr) => curr.map((i) => (i.id === id ? { ...i, ...partial } : i)));
+    try {
+      const r = await fetch(`/api/admin-shop?id=${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify(partial),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d.error || `Update failed (${r.status})`);
+      }
+      return true;
+    } catch (e) {
+      alert("Save failed: " + e.message);
+      setItems(prev);
+      return false;
+    }
+  }
+
   async function handleDelete() {
     if (!delTarget) return;
     try {
@@ -844,12 +913,29 @@ export default function ShopAdminView({ apiKey }) {
                 </span>
                 <span style={{ flex: 2 }}>
                   <strong>{it.title}</strong>
-                  {it.brand && <><br /><span className="email-sm">{it.brand}</span></>}
                   {it.is_limited && <StatusBadge intent="danger" style={{ marginLeft: 6, fontSize: 8 }}>DROP</StatusBadge>}
                   {isOnSale(it) && <StatusBadge intent="warning" style={{ marginLeft: 6, fontSize: 8 }}>SALE</StatusBadge>}
                   {!it.is_published && <StatusBadge intent="neutral" style={{ marginLeft: 6, fontSize: 8 }}>DRAFT</StatusBadge>}
+                  <div style={{ marginTop: 4 }}>
+                    <InlineBrand
+                      value={it.brand}
+                      onSave={(v) => patchItem(it.id, { brand: v })}
+                    />
+                  </div>
                 </span>
-                <span style={{ flex: 1 }} className="email-sm">{it.category}</span>
+                <span style={{ flex: 1 }}>
+                  <select
+                    value={it.category || ""}
+                    onChange={(e) => patchItem(it.id, { category: e.target.value })}
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onDragStart={(e) => e.preventDefault()}
+                    className="shop-inline-select"
+                    aria-label={`Category for ${it.title}`}
+                  >
+                    {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </span>
                 <span style={{ flex: 0.7 }} className="text-r tab-num">
                   {isOnSale(it) ? (
                     <>
@@ -891,7 +977,13 @@ export default function ShopAdminView({ apiKey }) {
                       {isOnSale(it) && <StatusBadge intent="warning" style={{ fontSize: 8 }}>SALE</StatusBadge>}
                       {!it.is_published && <StatusBadge intent="neutral" style={{ fontSize: 8 }}>DRAFT</StatusBadge>}
                     </div>
-                    {it.brand && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{it.brand}</div>}
+                    <div style={{ marginTop: 4 }}>
+                      <InlineBrand
+                        value={it.brand}
+                        onSave={(v) => patchItem(it.id, { brand: v })}
+                        style={{ fontSize: 12 }}
+                      />
+                    </div>
                     <div style={{ fontSize: 13, marginTop: 4 }}>
                       {isOnSale(it) ? (
                         <>
@@ -903,7 +995,16 @@ export default function ShopAdminView({ apiKey }) {
                       ) : (
                         <span className="tab-num" style={{ fontWeight: 600 }}>${Number(it.price).toFixed(0)}</span>
                       )}
-                      <span className="muted" style={{ marginLeft: 8 }}>{it.category}</span>
+                      <select
+                        value={it.category || ""}
+                        onChange={(e) => patchItem(it.id, { category: e.target.value })}
+                        onClick={(e) => e.stopPropagation()}
+                        className="shop-inline-select"
+                        style={{ marginLeft: 8 }}
+                        aria-label={`Category for ${it.title}`}
+                      >
+                        {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
                       <span className="muted" style={{ marginLeft: 8 }}>
                         Stock: {it.quantity_available != null ? `${it.quantity_available - (it.quantity_claimed || 0)}` : "\u221E"}
                       </span>

@@ -272,6 +272,40 @@ html { overflow-y: scroll; }
 .tr.drag-over { box-shadow: inset 0 2px 0 0 var(--primary, #4c8d73); }
 .tr.dragging { opacity: 0.4; }
 
+/* Inline editors in the items table — read as plain text until
+   focused/hovered, then surface input affordances. The point is the
+   row's visual weight stays the same as before so the table remains
+   scannable; affordances appear only when the operator engages. */
+.shop-inline-select,
+.shop-inline-input {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+  max-width: 100%;
+}
+.shop-inline-input { min-width: 80px; }
+.shop-inline-select:hover,
+.shop-inline-input:hover {
+  border-color: var(--border, rgba(0,0,0,0.12));
+  background: var(--surface, #fff);
+}
+.shop-inline-select:focus,
+.shop-inline-input:focus {
+  outline: none;
+  border-color: var(--primary, #4c8d73);
+  background: var(--surface, #fff);
+  color: var(--text);
+  box-shadow: 0 0 0 3px var(--primary-bg, rgba(76,141,115,0.12));
+  cursor: text;
+}
+.shop-inline-input::placeholder { color: var(--text-muted); opacity: 0.6; }
+
 /* ── Shop admin toolbar (ShopAdminView) ──
    Desktop: tabs on left, action buttons on right, single row.
    Mobile (≤768px): tabs become a horizontally-scrollable strip
