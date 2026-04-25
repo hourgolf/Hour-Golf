@@ -262,6 +262,40 @@ html { overflow-y: scroll; }
 .font-opt { padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius); cursor: pointer; font-size: 13px; text-align: center; }
 .font-opt.active { border-color: var(--primary); }
 
+/* ── Shop admin toolbar (ShopAdminView) ──
+   Desktop: tabs on left, action buttons on right, single row.
+   Mobile (≤768px): tabs become a horizontally-scrollable strip
+   so they never blow out the page width; actions wrap to a second
+   row below the tabs. */
+.shop-admin-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 8px;
+}
+.shop-admin-tabs { display: flex; gap: 8px; }
+.shop-admin-actions { display: flex; gap: 6px; }
+
+@media (max-width: 768px) {
+  .shop-admin-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .shop-admin-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+  }
+  .shop-admin-tabs > .rpt-tab { flex: 0 0 auto; white-space: nowrap; }
+  .shop-admin-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .shop-admin-actions > .btn { min-height: 36px; }
+}
+
 /* ── Bottom sheet (Sheet.js) — mobile-only DetailView container ──
    Backdrop fades in; sheet slides up via translateY. Sized to
    calc(100vh - 56px) so the operator can still see + tap the top

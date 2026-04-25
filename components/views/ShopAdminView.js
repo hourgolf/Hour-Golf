@@ -666,8 +666,8 @@ export default function ShopAdminView({ apiKey }) {
 
   return (
     <div className="content">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <div style={{ display: "flex", gap: 8 }}>
+      <div className="shop-admin-toolbar">
+        <div className="shop-admin-tabs">
           <button className={`rpt-tab ${tab === "items" ? "active" : ""}`} onClick={() => setTab("items")}>Items</button>
           <button className={`rpt-tab ${tab === "orders" ? "active" : ""}`} onClick={() => setTab("orders")}>
             Orders {pendingCount > 0 && <span className="cnt" style={{ marginLeft: 4 }}>{pendingCount}</span>}
@@ -676,7 +676,7 @@ export default function ShopAdminView({ apiKey }) {
           <button className={`rpt-tab ${tab === "settings" ? "active" : ""}`} onClick={() => setTab("settings")}>Settings</button>
         </div>
         {tab === "items" && (
-          <div style={{ display: "flex", gap: 6 }}>
+          <div className="shop-admin-actions">
             <button className="btn" style={{ fontSize: 11 }} onClick={() => setShowImport(true)}>Import CSV</button>
             <button className="btn" style={{ fontSize: 11 }} onClick={() => exportItemsCsv(items)}>Export CSV</button>
             <button className="btn primary" onClick={() => setEditItem({})}>+ New Item</button>
