@@ -7,6 +7,7 @@ import { supa, supaPatch } from "../../lib/supabase";
 import Badge from "../ui/Badge";
 import ActivityLog from "../ui/ActivityLog";
 import StatusBadge from "../ui/StatusBadge";
+import DailyRevenueChart from "./charts/DailyRevenueChart";
 
 // Shop analytics. Pulls shop_orders (last 90d) + shop_items via the
 // admin JWT + admin_all RLS. Computes top sellers, low stock, and
@@ -632,6 +633,14 @@ export default function ReportsView({ members, bookings, tierCfg, payments, apiK
             </p>
           )}
         </div>
+
+        {/* Daily run-rate — same calculation as the TodayView KPI
+            (computeTodayRevenue) applied to each day in the trailing
+            30-day window. Hovering shows the three components plus the
+            per-member overage detail. Useful for spotting day-of-week
+            patterns and overage spikes that the monthly bar chart
+            below smooths over. */}
+        <DailyRevenueChart bookings={bookings} members={members} tierCfg={tierCfg} days={30} />
 
         {/* Monthly trend — stacked bars per bucket so the operator
             can see WHERE growth is coming from at a glance. Click a
