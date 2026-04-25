@@ -3,6 +3,7 @@ import { TZ } from "../../lib/constants";
 import { fT, fDL, lds, tds, hrs } from "../../lib/format";
 import { useBranding } from "../../hooks/useBranding";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { computeTodayRevenue } from "../../lib/today-revenue";
 import { resolveBays, resolveBayLabel } from "../../lib/branding";
 import Badge from "../ui/Badge";
 import KPIStrip from "../ui/KPIStrip";
@@ -32,7 +33,7 @@ function fmtRemaining(ms) {
 }
 
 export default function TodayView({
-  bookings, members, accessCodes,
+  bookings, members, accessCodes, tierCfg,
   bayFilter, setBayFilter,
   onEdit, onCancel, onSelectMember, targetDate,
   onPrevDay, onNextDay, onJumpToday,
@@ -109,11 +110,20 @@ export default function TodayView({
   );
 
   const todayHrs = todayBk.reduce((s, b) => s + Number(b.duration_hours || 0), 0);
-  const todayRev = todayBk.reduce((s, b) => {
-    const m = members.find((x) => x.email === b.customer_email);
-    if (m && m.tier !== "Non-Member") return s;
-    return s + Number(b.duration_hours || 0) * 60;
-  }, 0);
+
+  // Three-part revenue picture for the KPI strip:
+  //   1. non-member walk-in cash (today's Non-Member bookings × rate)
+  //   2. member-overage cash (today's bookings that pushed members
+  //      past their tier allotment, costed at the tier's overage rate)
+  //   3. MRR daily share (sum of paying members' monthly fees ÷
+  //      days in the current Pacific month)
+  // Earlier implementation only counted (1), so days where every
+  // booking was a member showed $0 even when overage was accruing.
+  const revenue = useMemo(
+    () => computeTodayRevenue({ bookings, members, tierCfg, viewDate }),
+    [bookings, members, tierCfg, viewDate]
+  );
+  const todayRev = revenue.total;
 
   function bkStatus(b) {
     if (!isToday) return "upcoming";
@@ -483,7 +493,27 @@ export default function TodayView({
       <KPIStrip items={[
         { label: "Bookings", value: todayBk.length },
         { label: `${bayLabel} Hours`, value: `${todayHrs.toFixed(1)}h` },
-        { label: "Est Revenue", value: `$${todayRev.toFixed(0)}` },
+        {
+          label: "Est Revenue",
+          value: `$${todayRev.toFixed(0)}`,
+          // Tooltip surfaces the three components + per-member overage
+          // detail so the operator can see why the total is what it is
+          // without leaving the view.
+          title: (() => {
+            const parts = [];
+            parts.push(`Non-member: $${revenue.nonMember.toFixed(2)}`);
+            parts.push(`Member overage: $${revenue.memberOverage.toFixed(2)}`);
+            parts.push(`MRR daily share: $${revenue.mrrShare.toFixed(2)}  (= $${revenue.mrrTotal.toFixed(0)} / ${revenue.daysInMonth} days)`);
+            if (revenue.breakdown.length > 0) {
+              parts.push("");
+              parts.push("Today's overage:");
+              for (const row of revenue.breakdown) {
+                parts.push(`  · ${row.name} (${row.tier}) — ${row.overage_hours.toFixed(2)}h × tier rate = $${row.overage_dollars.toFixed(2)}`);
+              }
+            }
+            return parts.join("\n");
+          })(),
+        },
         { label: "Upcoming", value: todayBk.filter((b) => bkStatus(b) === "upcoming").length },
       ]} />
 

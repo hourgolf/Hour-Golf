@@ -551,6 +551,7 @@ export default function Dashboard() {
           bookings={bookings}
           members={members}
           accessCodes={accessCodes}
+          tierCfg={tierCfg}
           bayFilter={bayFilter}
           setBayFilter={setBayFilter}
           onEdit={setEditBk}
