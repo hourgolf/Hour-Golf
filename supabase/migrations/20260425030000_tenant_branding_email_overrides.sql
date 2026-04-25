@@ -1,0 +1,28 @@
+-- Lift the per-tenant editable parts of transactional emails into
+-- tenant_branding so admins can change subject + intro + outro + CTA
+-- copy from the email preview page without a code deploy.
+--
+-- Shape:
+--   {
+--     "booking-confirmation": {
+--       "subject":     "Booked: {date} at {time} · {bay}",
+--       "preheader":   "...",
+--       "intro":       "Hey {name}, ...",
+--       "outro":       "...",
+--       "cta_label":   "View in dashboard"
+--     },
+--     "welcome": { ... },
+--     ...
+--   }
+--
+-- Keys are the kebab-case template slugs already used by
+-- /api/email-preview/<slug>. Each value is an object with optional
+-- string fields. NULL or missing fields fall back to the platform
+-- default copy compiled into lib/email.js — that way a tenant who
+-- has never edited an email gets the same copy they have today.
+--
+-- Token substitution at render time is handled by lib/email-overrides.js;
+-- valid tokens depend on the template (e.g. {access_code} only for
+-- the access-code email).
+ALTER TABLE tenant_branding
+  ADD COLUMN IF NOT EXISTS email_overrides JSONB DEFAULT NULL;

@@ -12,6 +12,7 @@
 import { verifyAdmin, getServiceKey, SUPABASE_URL } from "../../lib/api-helpers";
 import { invalidateBranding } from "../../lib/branding";
 import { logActivity } from "../../lib/activity-log";
+import { validateAllOverrides } from "../../lib/email-overrides";
 
 // Columns the admin is allowed to edit. Other columns on tenant_branding
 // (tenant_id, updated_at) are managed by the system.
@@ -58,6 +59,10 @@ const EDITABLE_COLUMNS = [
   // Editable Help Center FAQ tree. NULL means "use the platform default
   // shape from lib/help-faqs.js"; an array overrides it.
   "help_faqs",
+  // Per-template email copy overrides. NULL = use platform defaults
+  // baked into lib/email.js. Shape validated below via
+  // validateAllOverrides from lib/email-overrides.js.
+  "email_overrides",
 ];
 
 // Bounds for help_faqs validation. Generous enough to cover any real
@@ -205,6 +210,11 @@ export default async function handler(req, res) {
           else if (typeof value !== "string" || value.length > 300) {
             return res.status(400).json({ error: `${col} must be a string up to 300 chars` });
           }
+        } else if (col === "email_overrides") {
+          // Validate via the shared helper which knows the template
+          // catalog and per-field length limits.
+          const err = validateAllOverrides(value);
+          if (err) return res.status(400).json({ error: err });
         } else if (col === "help_faqs") {
           // Array of category objects, or null to revert to platform
           // defaults. Each category needs a non-empty label and an
