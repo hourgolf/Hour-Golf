@@ -1062,36 +1062,45 @@ html { overflow-y: scroll; }
      definition (~line 1356) because that base rule is later in
      source order and would otherwise re-apply display: flex. */
 
-  /* Pull-to-refresh indicator (TodayView). Floats above the list and
-     fades while idle. The wrapping .content gets translateY'd inline
-     by the JS, so the indicator sits at the top of the scroll
-     container and rides down with the pull. */
+  /* Pull-to-refresh chip — floats over the sticky header at the top
+     of the viewport so it's never clipped. Driven by inline
+     transform from TodayView based on pull distance. The chip is
+     position: fixed so it doesn't fight iOS Safari's body-level
+     rubber-band overscroll (we let the native bounce happen and
+     just animate this floating element). */
   .today-ptr-wrap { position: relative; }
   .ptr-indicator {
-    position: absolute;
-    top: -52px;
-    left: 0;
-    right: 0;
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    left: 50%;
+    z-index: 1200; /* above sticky-top (z-index 100) and sheet bg */
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    height: 44px;
+    padding: 8px 16px;
+    height: 36px;
+    background: var(--surface, #fff);
+    border: 1px solid var(--border, rgba(0,0,0,0.08));
+    border-radius: 18px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
     pointer-events: none;
     color: var(--text-muted, #888);
     font-size: 12px;
     font-weight: 500;
     letter-spacing: 0.3px;
-    transition: opacity 180ms ease;
+    transition: opacity 180ms ease, transform 180ms cubic-bezier(0.32, 0.72, 0, 1);
+    will-change: transform, opacity;
   }
-  .ptr-indicator.triggered { color: var(--primary, #0a84ff); }
+  .ptr-indicator.triggered { color: var(--primary, #0a84ff); border-color: var(--primary, #0a84ff); }
   .ptr-spinner {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
     border: 2px solid currentColor;
     border-top-color: transparent;
-    opacity: 0.8;
+    opacity: 0.85;
+    flex-shrink: 0;
   }
   .ptr-indicator.refreshing .ptr-spinner {
     animation: ptr-spin 0.8s linear infinite;
@@ -1100,12 +1109,17 @@ html { overflow-y: scroll; }
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
+
+  /* Tame iOS Safari's body-level rubber-band so it doesn't fight
+     the custom PTR. overscroll-behavior-y: contain stops the bounce
+     from propagating up to the document while still letting our
+     handler track the gesture. */
+  html, body { overscroll-behavior-y: contain; }
 }
 
 @media (min-width: 769px) {
-  /* Desktop must never see PTR transforms or indicator — useIsMobile
-     guards the JS, this guards the CSS. */
-  .today-ptr-wrap { transform: none !important; }
+  /* Desktop must never see PTR — useIsMobile guards the JS, this
+     guards the CSS. */
   .ptr-indicator { display: none !important; }
 }
 

@@ -270,23 +270,30 @@ export default function TodayView({
       : "Pull to refresh";
   const ptrVisible = ptrPull > 0 || ptrRefreshing;
 
+  // PTR indicator is now position: fixed at the top of the viewport
+  // (CSS) so it floats over the sticky header instead of being
+  // clipped behind it. We no longer translateY the .content — iOS
+  // Safari does its own rubber-band overscroll at the body level
+  // and the two transforms fought each other, causing the indicator
+  // to feel laggy or invisible on a real device. The chip's vertical
+  // offset is driven by pull distance, so the user still sees a
+  // responsive drop animation while the browser handles the bounce.
+  const indicatorY = ptrRefreshing
+    ? 16 // hold the chip in view while the refresh runs
+    : ptrPull > 0
+      ? Math.min(ptrPull * 0.6, 64) - 48 // ease into view from -48 (offscreen) to +16
+      : -56; // parked offscreen
+
   return (
-    <div
-      className="content today-ptr-wrap"
-      ref={ptrRef}
-      style={
-        isMobile && ptrPull > 0
-          ? { transform: `translateY(${Math.min(ptrPull, 80)}px)`, transition: "none" }
-          : isMobile
-            ? { transform: "translateY(0)", transition: "transform 220ms ease" }
-            : undefined
-      }
-    >
+    <div className="content today-ptr-wrap" ref={ptrRef}>
       {isMobile && onRefresh && (
         <div
           className={`ptr-indicator${ptrTriggered ? " triggered" : ""}${ptrRefreshing ? " refreshing" : ""}`}
           aria-hidden={!ptrVisible}
-          style={{ opacity: ptrVisible ? 1 : 0 }}
+          style={{
+            transform: `translateX(-50%) translateY(${indicatorY}px)`,
+            opacity: ptrVisible ? 1 : 0,
+          }}
         >
           <span className="ptr-spinner" />
           <span className="ptr-label">{ptrLabel}</span>
