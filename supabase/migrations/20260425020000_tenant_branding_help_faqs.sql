@@ -1,0 +1,21 @@
+-- Lift the FAQ structure currently hardcoded in HelpDrawer.js into
+-- tenant_branding so admins can edit categories + Q/A copy without
+-- a code deploy. NULL means "use the platform default shape" (see
+-- lib/help-faqs.js); a non-null array overrides it.
+--
+-- Shape (validated at the API layer in admin-tenant-branding.js):
+--   [
+--     { key: "access", label: "Access & Door Codes", icon: "🔑", items: [
+--         { q: "...", a: "..." },
+--         ...
+--     ]},
+--     ...
+--   ]
+--
+-- Answer strings can include tokens like {venue}, {bay}, {bay_lower},
+-- {cutoff_phrase}, {hours}, {support_email}, {support_phone}. They're
+-- substituted at render time by lib/help-faqs.js so the copy stays
+-- dynamic when the operator updates support contact info or facility
+-- hours elsewhere in Settings.
+ALTER TABLE tenant_branding
+  ADD COLUMN IF NOT EXISTS help_faqs JSONB DEFAULT NULL;

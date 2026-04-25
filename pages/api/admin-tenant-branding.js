@@ -55,7 +55,22 @@ const EDITABLE_COLUMNS = [
   "tier_colors",
   "max_daily_hours_per_member",
   "dashboard_empty_headline",
+  // Editable Help Center FAQ tree. NULL means "use the platform default
+  // shape from lib/help-faqs.js"; an array overrides it.
+  "help_faqs",
 ];
+
+// Bounds for help_faqs validation. Generous enough to cover any real
+// admin's editing needs without letting a runaway client blow up the
+// member-facing drawer with multi-megabyte payloads.
+const HELP_FAQS_LIMITS = {
+  maxCategories: 12,
+  maxItemsPerCategory: 30,
+  maxLabelLen: 60,
+  maxIconLen: 8,        // an emoji or two, not an essay
+  maxQuestionLen: 250,
+  maxAnswerLen: 4000,
+};
 
 // Accept #RGB, #RRGGBB, #RRGGBBAA forms. Reject anything else to keep bad
 // input from landing in CSS.
@@ -189,6 +204,55 @@ export default async function handler(req, res) {
           if (value === null) { /* allowed */ }
           else if (typeof value !== "string" || value.length > 300) {
             return res.status(400).json({ error: `${col} must be a string up to 300 chars` });
+          }
+        } else if (col === "help_faqs") {
+          // Array of category objects, or null to revert to platform
+          // defaults. Each category needs a non-empty label and an
+          // items array; each item needs a non-empty question. The
+          // troubleshoot + requires flags are passthrough booleans/
+          // strings so the access-code troubleshooting entry survives
+          // a round-trip through the editor.
+          if (value === null) { /* allowed — clears to defaults */ }
+          else if (!Array.isArray(value)) {
+            return res.status(400).json({ error: `${col} must be an array or null` });
+          } else {
+            if (value.length > HELP_FAQS_LIMITS.maxCategories) {
+              return res.status(400).json({ error: `${col} too many categories (max ${HELP_FAQS_LIMITS.maxCategories})` });
+            }
+            for (const cat of value) {
+              if (!cat || typeof cat !== "object") {
+                return res.status(400).json({ error: `${col} categories must be objects` });
+              }
+              if (typeof cat.label !== "string" || cat.label.trim().length === 0 || cat.label.length > HELP_FAQS_LIMITS.maxLabelLen) {
+                return res.status(400).json({ error: `${col} category label must be a non-empty string up to ${HELP_FAQS_LIMITS.maxLabelLen} chars` });
+              }
+              if (cat.icon != null && (typeof cat.icon !== "string" || cat.icon.length > HELP_FAQS_LIMITS.maxIconLen)) {
+                return res.status(400).json({ error: `${col} category icon must be a string up to ${HELP_FAQS_LIMITS.maxIconLen} chars` });
+              }
+              if (!Array.isArray(cat.items)) {
+                return res.status(400).json({ error: `${col} category items must be an array` });
+              }
+              if (cat.items.length > HELP_FAQS_LIMITS.maxItemsPerCategory) {
+                return res.status(400).json({ error: `${col} too many items in category (max ${HELP_FAQS_LIMITS.maxItemsPerCategory})` });
+              }
+              for (const it of cat.items) {
+                if (!it || typeof it !== "object") {
+                  return res.status(400).json({ error: `${col} items must be objects` });
+                }
+                if (typeof it.q !== "string" || it.q.trim().length === 0 || it.q.length > HELP_FAQS_LIMITS.maxQuestionLen) {
+                  return res.status(400).json({ error: `${col} question must be a non-empty string up to ${HELP_FAQS_LIMITS.maxQuestionLen} chars` });
+                }
+                if (it.a != null && (typeof it.a !== "string" || it.a.length > HELP_FAQS_LIMITS.maxAnswerLen)) {
+                  return res.status(400).json({ error: `${col} answer must be a string up to ${HELP_FAQS_LIMITS.maxAnswerLen} chars` });
+                }
+                if (it.troubleshoot != null && typeof it.troubleshoot !== "boolean") {
+                  return res.status(400).json({ error: `${col} item.troubleshoot must be boolean` });
+                }
+                if (it.requires != null && typeof it.requires !== "string") {
+                  return res.status(400).json({ error: `${col} item.requires must be a string` });
+                }
+              }
+            }
           }
         } else if (col === "tier_colors") {
           // Object map { TierName: { bg: "#hex", text: "#hex" } }. Cap at

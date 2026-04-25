@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import HelpFaqsEditor from "./HelpFaqsEditor";
 
 // Tenant-level branding editor.
 //
@@ -364,6 +365,31 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
         payload.tier_colors = branding.tier_colors || null;
       }
 
+      // Help Center FAQ tree. The editor stores _helpFaqsResetToDefaults
+      // when the operator clicks "Reset" so we send null instead of the
+      // current array. Otherwise pass through the array as edited.
+      if (branding._helpFaqsResetToDefaults) {
+        payload.help_faqs = null;
+      } else if (Array.isArray(branding.help_faqs)) {
+        // Trim labels + Q/A; drop categories with no remaining items.
+        const cleaned = branding.help_faqs
+          .map((cat) => ({
+            ...cat,
+            label: typeof cat.label === "string" ? cat.label.trim() : "",
+            icon: typeof cat.icon === "string" ? cat.icon.trim() || null : null,
+            items: (cat.items || [])
+              .map((it) => ({
+                q: typeof it.q === "string" ? it.q.trim() : "",
+                a: it.a == null ? null : (typeof it.a === "string" ? it.a : String(it.a || "")),
+                ...(it.troubleshoot ? { troubleshoot: true } : {}),
+                ...(it.requires ? { requires: it.requires } : {}),
+              }))
+              .filter((it) => it.q.length > 0),
+          }))
+          .filter((cat) => cat.label.length > 0 && cat.items.length > 0);
+        payload.help_faqs = cleaned.length > 0 ? cleaned : null;
+      }
+
       // Platform-mode PATCH requires the target tenant_id in the body
       // (tenant-admin mode resolves from subdomain, no extra field).
       if (isPlatform) payload.tenant_id = tenantIdOverride;
@@ -697,6 +723,8 @@ export default function TenantBranding({ apiKey, tenantIdOverride }) {
             Only relevant when Access Codes is enabled. Shown to members as a fallback in the troubleshooting flow if their Seam code fails. Leave blank if you don&rsquo;t have one.
           </div>
         </div>
+
+        <HelpFaqsEditor branding={branding} update={update} />
       </div>
 
       {/* Operations — multi-tenant policy + naming. Each field falls

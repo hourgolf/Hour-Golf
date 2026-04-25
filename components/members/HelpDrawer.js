@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useBranding } from "../../hooks/useBranding";
 import { useTenantFeatures } from "../../hooks/useTenantFeatures";
+import { resolveHelpFaqs } from "../../lib/help-faqs";
 
 // Strip everything that isn't a digit so `tel:` links work consistently
 // regardless of how the tenant formats support_phone for display.
@@ -10,139 +11,6 @@ function telHref(phone) {
   return digits ? `tel:${digits}` : null;
 }
 
-function buildFaqCategories(branding, { accessCodesEnabled } = {}) {
-  const hoursText =
-    branding?.facility_hours ||
-    "Please see your venue for hours of access.";
-  const supportEmail = branding?.support_email;
-  const supportPhone = branding?.support_phone;
-  const venueName = branding?.app_name || "us";
-  // Multi-tenant readiness: bay noun + cancel cutoff come from
-  // tenant_branding so a tenant running courts/sims doesn't ship FAQ
-  // copy talking about "bays" or hardcoded 6-hour windows.
-  const bayLabel = branding?.bay_label_singular || "Bay";
-  const bayLower = bayLabel.toLowerCase();
-  const cutoffHours = Number(branding?.cancel_cutoff_hours ?? 6);
-  const cutoffPhrase = cutoffHours > 0
-    ? `${cutoffHours} hour${cutoffHours === 1 ? "" : "s"}`
-    : "any time";
-
-  // Visiting category adapts to the access_codes feature flag. When on,
-  // it's the familiar "Access & Door Codes" grouping with the smart-
-  // lock troubleshooting entry at the top. When off, the troubleshoot
-  // entry disappears and the category re-labels to just "Visiting" so
-  // venues without keypad access aren't implying one to their members.
-  const visitingItems = [
-    ...(accessCodesEnabled
-      ? [{ q: "My access code isn't working", a: null, troubleshoot: true }]
-      : []),
-    { q: "What are the facility hours?", a: hoursText },
-    {
-      q: "Can I bring a guest?",
-      a: "Absolutely! You can bring up to 3 guests per bay per booking. Just make sure they\u2019re with you when you enter.",
-    },
-  ];
-
-  return [
-  {
-    key: "access",
-    label: accessCodesEnabled ? "Access & Door Codes" : "Visiting",
-    icon: accessCodesEnabled ? "\uD83D\uDD11" : "\uD83D\uDEAA",
-    items: visitingItems,
-  },
-  {
-    key: "booking",
-    label: "Booking & Cancellation",
-    icon: "\uD83D\uDCC5",
-    items: [
-      {
-        q: `How do I book a ${bayLower}?`,
-        a: `Go to the \u201CBook Time\u201D tab, pick your date, ${bayLower}, and time slot, then confirm. You\u2019ll get an email confirmation.`,
-      },
-      {
-        q: "How far in advance can I book?",
-        a: "You can book up to 7 days in advance. Same-day bookings are available if slots are open.",
-      },
-      {
-        q: "How do I cancel a booking?",
-        a: cutoffHours > 0
-          ? `Go to your Dashboard and find the booking under \u201CUpcoming Bookings.\u201D Click \u201CCancel\u201D \u2014 cancellations must be made at least ${cutoffPhrase} before your start time.`
-          : `Go to your Dashboard and find the booking under \u201CUpcoming Bookings.\u201D Click \u201CCancel\u201D \u2014 you can cancel ${cutoffPhrase} before your start time.`,
-      },
-      {
-        q: "What\u2019s the cancellation policy?",
-        a: cutoffHours > 0
-          ? `You can cancel free of charge up to ${cutoffPhrase} before your booking. Late cancellations or no-shows may be charged. Contact us if you have an emergency.`
-          : `You can cancel ${cutoffPhrase} before your booking. Contact us if you have an emergency.`,
-      },
-      {
-        q: "Can I modify a booking?",
-        a: "Currently you\u2019ll need to cancel and rebook. We\u2019re working on an edit feature!",
-      },
-    ],
-  },
-  {
-    key: "billing",
-    label: "Billing & Membership",
-    icon: "\uD83D\uDCB3",
-    items: [
-      {
-        q: "How does billing work?",
-        a: "Monthly membership fees are charged automatically. Overage hours (usage beyond your included hours) are billed at your tier\u2019s overage rate at the end of the billing period.",
-      },
-      {
-        q: "How do I update my payment method?",
-        a: "Go to the Billing tab and click \u201CUpdate Card.\u201D You\u2019ll be redirected to our secure payment portal to update your card details.",
-      },
-      {
-        q: "What are punch passes / bonus hours?",
-        a: "Punch passes let you pre-purchase extra bay hours at a discount. They never expire and carry over month to month. Buy them on the Billing tab.",
-      },
-      {
-        q: "How do I change my membership tier?",
-        a: "Go to the Billing tab under \u201CMembership.\u201D You can upgrade or downgrade your plan. Changes take effect on your next billing cycle.",
-      },
-      {
-        q: "How do I cancel my membership?",
-        a: "On the Billing tab, scroll to the Membership section and click \u201CCancel Membership.\u201D Your access continues until the end of your current billing period.",
-      },
-    ],
-  },
-  {
-    key: "account",
-    label: "Account & Profile",
-    icon: "\u2699\uFE0F",
-    items: [
-      {
-        q: "How do I change my email or password?",
-        a: "Go to the Account tab. You\u2019ll see separate sections for changing your email and password. Both require your current password to confirm.",
-      },
-      {
-        q: "I forgot my password",
-        a: "Contact us directly and we\u2019ll help you reset it. A self-service password reset feature is coming soon.",
-      },
-    ],
-  },
-  {
-    key: "contact",
-    label: "Contact Us",
-    icon: "\uD83D\uDCE9",
-    items: [
-      {
-        q: `How do I reach ${venueName}?`,
-        a: (() => {
-          if (supportEmail && supportPhone) {
-            return `Email us at ${supportEmail} or call/text ${supportPhone}. We'll get back to you as quickly as possible.`;
-          }
-          if (supportEmail) return `Email us at ${supportEmail}. We'll get back to you as quickly as possible.`;
-          if (supportPhone) return `Call or text us at ${supportPhone}. We'll get back to you as quickly as possible.`;
-          return "Contact info hasn't been set up yet — check with your venue staff.";
-        })(),
-      },
-    ],
-  },
-  ];
-}
 
 /* ── Access Code Troubleshooting Steps ───────────── */
 const ACCESS_STEPS = [
@@ -185,7 +53,7 @@ export default function HelpDrawer({ open, onClose }) {
   const branding = useBranding();
   const { isEnabled } = useTenantFeatures();
   const accessCodesEnabled = isEnabled("access_codes");
-  const faqCategories = buildFaqCategories(branding, { accessCodesEnabled });
+  const faqCategories = resolveHelpFaqs(branding, { accessCodesEnabled });
   const supportEmail = branding?.support_email || null;
   const supportPhone = branding?.support_phone || null;
   const supportTelHref = telHref(supportPhone);
