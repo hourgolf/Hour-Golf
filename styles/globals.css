@@ -894,7 +894,7 @@ html { overflow-y: scroll; }
      actions stacked below. Frees horizontal width for the booking's
      customer name + tier / code / status chips, and makes the tap
      targets bigger. */
-  .slot { flex-direction: column; align-items: stretch; }
+  .slot { flex-direction: column; align-items: stretch; position: relative; }
   .slot-t {
     width: auto;
     padding: 8px 14px;
@@ -915,7 +915,48 @@ html { overflow-y: scroll; }
      inline font-size 10px in the JSX gets overridden because 10px
      is below Apple's 44pt minimum. */
   .slot-i .btn { padding: 8px 14px !important; font-size: 12px !important; min-height: 36px; }
-  .slot-check { transform: scale(1.2); margin: 0 4px; }
+  /* Pull the per-row select-checkbox out of the column flow so it
+     doesn't waste a 22-px row above the time bar. Pin it to the
+     time bar's right edge instead — visible, tappable, no extra
+     vertical real estate. */
+  .slot > .slot-check {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    margin: 0;
+    z-index: 2;
+    transform: scale(1.2);
+  }
+
+  /* CustomersView filter bar crowds at 375-wide: SORT label bleeds
+     behind its own select, "N results" overlaps Export CSV because
+     of marginLeft:auto. Stack it as a grid (only the cust-fbar
+     variant — the BAY filter on TodayView uses the same .fbar class
+     but has fewer children, so the targeting is class-scoped). */
+  .fbar.cust-fbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "sortLbl  sortLbl"
+      "sortSel  sortSel"
+      "results  export";
+    align-items: center;
+    gap: 6px 10px;
+  }
+  .fbar.cust-fbar > label { grid-area: sortLbl; }
+  .fbar.cust-fbar > select:first-of-type { grid-area: sortSel; }
+  .fbar.cust-fbar > .muted { grid-area: results; margin: 0 !important; font-size: 12px; }
+  .fbar.cust-fbar > select:last-of-type { grid-area: export; margin: 0 !important; justify-self: end; }
+
+  /* KPI strip: at 375-wide a 4-up flex row wraps the 4th item alone
+     on its own line, with the bullet floating under "BOOKINGS". A
+     2x2 grid keeps the cards balanced. */
+  .summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 16px;
+  }
+  .sum-item { min-width: 0; }
 
   /* CustomersView mobile polish: bigger chip tap targets + card
      breathing room so thumb-tapping the 72-member list doesn't feel

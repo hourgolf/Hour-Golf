@@ -607,7 +607,7 @@ export default function CustomersView({
         </div>
       )}
 
-      <div className="fbar">
+      <div className="fbar cust-fbar">
         <label>Sort:</label>
         <select value={cSort} onChange={(e) => setCSort(e.target.value)} disabled={isBillingFilter}>
           <option value="hours">Hours</option>
