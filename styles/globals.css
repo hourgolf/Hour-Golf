@@ -778,7 +778,12 @@ html { overflow-y: scroll; }
 }
 
 /* ── Calendar grid ── */
-.wk-grid { display: grid; grid-template-columns: 112px 1fr 1fr; grid-auto-rows: minmax(90px, auto); gap: 1px; background: var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 20px; }
+/* Outer scroller — when N bays * minmax(140px,1fr) + 84px DAY
+   column exceeds the viewport, this scrolls horizontally so each
+   bay column stays readable. The grid itself sets its own width
+   via auto-fit through the inline grid-template-columns. */
+.wk-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; }
+.wk-grid { display: grid; grid-template-columns: 112px 1fr 1fr; grid-auto-rows: minmax(90px, auto); gap: 1px; background: var(--border); border-radius: var(--radius); overflow: hidden; min-width: max-content; }
 .wk-h { background: var(--primary); color: var(--bg); padding: 14px 11px; font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; text-align: center; display: flex; align-items: center; justify-content: center; }
 .wk-d { background: var(--surface); padding: 11px 8px; font-size: 15px; font-weight: 700; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
 .wk-d .dn { font-family: var(--font-display); font-size: 25px; color: var(--primary); line-height: 1; }
@@ -910,7 +915,9 @@ html { overflow-y: scroll; }
   .th, .tr { font-size: 11px; padding: 8px 10px; }
   .header-stats { display: none; }
   .stat-val { font-size: 16px; }
-  .wk-grid { grid-template-columns: 60px 1fr 1fr; }
+  /* Note: grid-template-columns is set inline by WeekView so it
+     scales to N bays — see "calendar grid scales to N bays" comment
+     in WeekView.js. We only tweak typography/padding here. */
   .wk-h { font-size: 16px; padding: 10px 8px; }
   .wk-b { font-size: 12px; padding: 4px 6px; }
   .wk-d .dn { font-size: 20px; }
@@ -1123,7 +1130,7 @@ html { overflow-y: scroll; }
      — the 768px rule above stacks the slot vertically and sizes
      everything appropriately. Leaving this comment as a breadcrumb
      so a future reader doesn't re-add the old column-layout rules. */
-  .wk-grid { grid-template-columns: 46px 1fr 1fr; }
+  /* grid-template-columns is set inline by WeekView (scales to N bays). */
   .wk-h { font-size: 14px; padding: 8px 4px; }
   .wk-b { font-size: 11px; padding: 3px 5px; }
   .wk-c { padding: 6px 4px; }

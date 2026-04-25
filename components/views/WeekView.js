@@ -179,13 +179,20 @@ export default function WeekView({ bookings, members, weekOff, setWeekOff, onSel
         { label: "Utilization", value: `${monthKpis.utilization.toFixed(0)}%` },
       ]} />
 
-      {/* gridTemplateColumns is inlined so the calendar adapts to
-          tenants with more (or fewer) bays than HG's 2 — the global
-          .wk-grid CSS rule defaults to "112px 1fr 1fr" which only
-          renders correctly for 2 bays. */}
+      {/* Calendar grid scales to N bays:
+          • The day column is fixed at 84px (just enough for "WED 24").
+          • Each bay column gets minmax(140px, 1fr) so columns never
+            squish below readable width — when bays * 140 + 84 exceeds
+            the viewport, the wrapping .wk-scroll lets the user pan
+            horizontally instead of cramming everything into a strip
+            too narrow to read.
+          The CSS `grid-template-columns` rules in the mobile @media
+          blocks have been deleted — they hardcoded 2 bays and were
+          overridden here anyway. */}
+      <div className="wk-scroll">
       <div
         className="wk-grid"
-        style={{ gridTemplateColumns: `112px ${BAYS.map(() => "1fr").join(" ")}` }}
+        style={{ gridTemplateColumns: `84px ${BAYS.map(() => "minmax(140px, 1fr)").join(" ")}` }}
       >
         <div className="wk-h">Day</div>
         {BAYS.map((b) => (
@@ -243,6 +250,7 @@ export default function WeekView({ bookings, members, weekOff, setWeekOff, onSel
             </Fragment>
           );
         })}
+      </div>
       </div>
     </div>
   );
