@@ -19,6 +19,7 @@ import Nav from "../../components/layout/Nav";
 import NavMobile from "../../components/layout/NavMobile";
 import Toast from "../../components/ui/Toast";
 import Confirm from "../../components/ui/Confirm";
+import TierChangeConfirm from "../../components/ui/TierChangeConfirm";
 import CommandPalette from "../../components/ui/CommandPalette";
 import ShortcutsHelp from "../../components/ui/ShortcutsHelp";
 import Sheet from "../../components/ui/Sheet";
@@ -83,6 +84,12 @@ export default function Dashboard() {
   const [syncOpen, setSyncOpen] = useState(false);
   const [cmdKOpen, setCmdKOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  // Tier change confirmation. Only opens when the new tier differs
+  // from the current one AND the member has confirmed bookings in the
+  // last 60 days that could be re-snapshotted. Otherwise the tier
+  // change passes through immediately (no friction added to the fast
+  // path).
+  const [tierProposal, setTierProposal] = useState(null);
 
   // Customer list for booking form autocomplete
   const custList = useMemo(() => {
@@ -248,7 +255,40 @@ export default function Dashboard() {
     setSaving(false);
   }
 
-  async function updateTier(email, tier, name) {
+  // Public entry-point used by every TierSelect on the admin app.
+  // Decides whether to open the TierChangeConfirm dialog (when there
+  // are recent bookings whose tier snapshot would otherwise diverge
+  // from the new member tier) or run through immediately.
+  function updateTier(email, tier, name) {
+    const member = members.find((m) => m.email === email);
+    const oldTier = member?.tier || null;
+
+    // No-op tier change — flush through (still calls the API in case
+    // the operator is also linking a Stripe customer this time).
+    if (oldTier === tier) {
+      return runUpdateTier(email, tier, name, false);
+    }
+
+    // Count recent confirmed bookings — if zero, no need to ask about
+    // re-tiering. Skip the modal entirely.
+    const cutoff = Date.now() - 60 * 24 * 60 * 60 * 1000;
+    const affected = bookings.filter((b) =>
+      b.customer_email === email
+      && b.booking_status !== "Cancelled"
+      && new Date(b.booking_start).getTime() >= cutoff
+    ).length;
+
+    if (affected === 0) {
+      return runUpdateTier(email, tier, name, false);
+    }
+
+    setTierProposal({
+      email, name: name || member?.name || email,
+      oldTier, newTier: tier, affected,
+    });
+  }
+
+  async function runUpdateTier(email, tier, name, retroactive) {
     setSaving(true);
     try {
       // Server endpoint instead of direct PostgREST: it bypasses the
@@ -262,14 +302,17 @@ export default function Dashboard() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({ email, tier, name }),
+        body: JSON.stringify({ email, tier, name, retroactive: !!retroactive }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.detail || d.error || `Update failed (${r.status})`);
+      const retroNote = d.retroactive_bookings_updated
+        ? ` (re-tiered ${d.retroactive_bookings_updated} booking${d.retroactive_bookings_updated === 1 ? "" : "s"})`
+        : "";
       showToast(
         d.linked_stripe
-          ? `${name || email} → ${tier} (linked Stripe subscription)`
-          : `${name || email} → ${tier}`
+          ? `${name || email} → ${tier} (linked Stripe subscription)${retroNote}`
+          : `${name || email} → ${tier}${retroNote}`
       );
       await refresh();
     } catch (e) {
@@ -756,6 +799,22 @@ export default function Dashboard() {
       />
 
       <ShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
+
+      <TierChangeConfirm
+        open={!!tierProposal}
+        onClose={() => setTierProposal(null)}
+        memberName={tierProposal?.name}
+        oldTier={tierProposal?.oldTier}
+        newTier={tierProposal?.newTier}
+        affectedBookings={tierProposal?.affected || 0}
+        saving={saving}
+        onConfirm={async (retroactive) => {
+          const proposal = tierProposal;
+          setTierProposal(null);
+          if (!proposal) return;
+          await runUpdateTier(proposal.email, proposal.newTier, proposal.name, retroactive);
+        }}
+      />
 
       <Toast toast={toast} />
 

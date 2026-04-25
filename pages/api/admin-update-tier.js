@@ -23,8 +23,14 @@ import { logActivity } from "../../lib/activity-log";
 //      No Stripe write happens — only reads. Tier change here never
 //      triggers a checkout.
 //
-// Body: { email, tier, name? }
-// Response: 200 { member }, error otherwise.
+// Body: { email, tier, name?, retroactive? }
+// Response: 200 { member, linked_stripe, retroactive_bookings_updated? }
+//
+// retroactive=true also updates bookings.tier on the member's
+// confirmed bookings from the last 60 days so the snapshot reflects
+// the corrected tier (used when a tier change is fixing a data error
+// rather than a real upgrade/downgrade — see lessons memory note on
+// duplicate-customer merges).
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
@@ -35,13 +41,14 @@ export default async function handler(req, res) {
   const key = getServiceKey();
   if (!key) return res.status(500).json({ error: "Server configuration error" });
 
-  const { email, tier, name } = req.body || {};
+  const { email, tier, name, retroactive } = req.body || {};
   if (!email || typeof email !== "string") {
     return res.status(400).json({ error: "email required" });
   }
   if (!tier || typeof tier !== "string") {
     return res.status(400).json({ error: "tier required" });
   }
+  const wantsRetro = retroactive === true;
 
   const cleanEmail = email.toLowerCase().trim();
 
@@ -115,7 +122,42 @@ export default async function handler(req, res) {
       }
       const rows = await upResp.json();
 
-      if (existing.tier !== tier) {
+      // Optional retroactive booking re-tier. Scoped to this member,
+      // last 60 days, non-cancelled bookings only. Used when fixing a
+      // data error (e.g. duplicate-account merge resolved into a
+      // different canonical tier) rather than a real upgrade/downgrade.
+      // Bumps each affected row to the new tier so the InboxView's
+      // "non-members to charge" calculation stops surfacing stale
+      // snapshots.
+      let retroBookingsUpdated = 0;
+      if (wantsRetro) {
+        // Pacific-zone "now minus 60 days" — bookings.booking_start is
+        // stored in UTC ISO so a JS Date comparison via ISO string is
+        // correct without needing a TZ math.
+        const cutoff = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+        const reResp = await fetch(
+          `${SUPABASE_URL}/rest/v1/bookings?customer_email=eq.${encodeURIComponent(cleanEmail)}&tenant_id=eq.${tenantId}&booking_status=neq.Cancelled&booking_start=gte.${encodeURIComponent(cutoff)}`,
+          {
+            method: "PATCH",
+            headers: {
+              apikey: key, Authorization: `Bearer ${key}`,
+              "Content-Type": "application/json",
+              Prefer: "return=representation",
+            },
+            body: JSON.stringify({ tier }),
+          }
+        );
+        if (reResp.ok) {
+          const updated = await reResp.json();
+          retroBookingsUpdated = Array.isArray(updated) ? updated.length : 0;
+        } else {
+          // Non-fatal — the member tier change already succeeded.
+          // Surface in logs but don't blow up the response.
+          console.warn("admin-update-tier: retroactive bookings update failed:", await reResp.text().catch(() => ""));
+        }
+      }
+
+      if (existing.tier !== tier || retroBookingsUpdated > 0) {
         await logActivity({
           tenantId,
           actor: { id: user.id, email: user.email },
@@ -126,11 +168,17 @@ export default async function handler(req, res) {
             from: existing.tier || null,
             to: tier,
             linked_stripe: !!stripeLink.stripe_customer_id,
+            retroactive: wantsRetro,
+            retroactive_bookings_updated: retroBookingsUpdated,
           },
         });
       }
 
-      return res.status(200).json({ member: rows[0] || null, linked_stripe: !!stripeLink.stripe_customer_id });
+      return res.status(200).json({
+        member: rows[0] || null,
+        linked_stripe: !!stripeLink.stripe_customer_id,
+        retroactive_bookings_updated: retroBookingsUpdated,
+      });
     }
 
     // Insert path. NOT NULL columns: tenant_id, email, name, tier.
