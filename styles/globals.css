@@ -262,6 +262,16 @@ html { overflow-y: scroll; }
 .font-opt { padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius); cursor: pointer; font-size: 13px; text-align: center; }
 .font-opt.active { border-color: var(--primary); }
 
+/* ── Shop admin drag-to-reorder ──
+   The drag handle is a sibling of the row; the row itself accepts
+   the drop (we get a bigger target area). drag-over draws a primary
+   bar on the top of the row to mark where the dragged item will
+   land. dragging row goes translucent so the rest of the list stays
+   readable. */
+.shop-drag-handle:active { cursor: grabbing !important; }
+.tr.drag-over { box-shadow: inset 0 2px 0 0 var(--primary, #4c8d73); }
+.tr.dragging { opacity: 0.4; }
+
 /* ── Shop admin toolbar (ShopAdminView) ──
    Desktop: tabs on left, action buttons on right, single row.
    Mobile (≤768px): tabs become a horizontally-scrollable strip

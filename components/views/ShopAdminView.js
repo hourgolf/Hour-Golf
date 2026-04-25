@@ -301,10 +301,6 @@ function ShopItemFormModal({ open, onClose, item, onSave, apiKey }) {
           <label>Sizes (comma-separated)</label>
           <input value={form.sizes} onChange={(e) => update("sizes", e.target.value)} placeholder="S, M, L, XL" />
         </div>
-        <div className="mf">
-          <label>Display Order</label>
-          <input type="number" min={0} value={form.display_order} onChange={(e) => update("display_order", e.target.value)} />
-        </div>
       </div>
       <div className="mf">
         <label>Description</label>
@@ -471,6 +467,12 @@ export default function ShopAdminView({ apiKey }) {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  // Drag-to-reorder state. dragId is the row currently being dragged;
+  // dragOverId is the row it's hovering over so we can show a drop
+  // indicator on the target. Both null when no drag is in flight.
+  const [dragId, setDragId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
+  const [reorderBusy, setReorderBusy] = useState(false);
 
   const fetchItems = useCallback(async () => {
     try {
@@ -504,6 +506,94 @@ export default function ShopAdminView({ apiKey }) {
     } catch (e) {
       alert("Save failed: " + e.message);
     }
+  }
+
+  // Apply a new order to the items list. Optimistic: update local
+  // state first so the row visually settles into place, then fire
+  // the server-side bulk renumber. On error, refetch to restore the
+  // server's view of truth.
+  async function reorderItems(newOrderedIds) {
+    const idToItem = new Map(items.map((i) => [i.id, i]));
+    const newItems = newOrderedIds
+      .map((id, idx) => {
+        const it = idToItem.get(id);
+        return it ? { ...it, display_order: idx } : null;
+      })
+      .filter(Boolean);
+    setItems(newItems);
+    setReorderBusy(true);
+    try {
+      const r = await fetch("/api/admin-shop?action=reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({ ordered_ids: newOrderedIds }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d.error || `Reorder failed (${r.status})`);
+      }
+    } catch (e) {
+      alert("Reorder failed: " + e.message);
+      // Revert by refetching the server's authoritative order.
+      await fetchItems();
+    }
+    setReorderBusy(false);
+  }
+
+  // Move one item up or down by one slot. Used by the mobile arrow
+  // buttons (drag-and-drop is awkward inside a touch list). Calls
+  // reorderItems() so the same bulk-renumber endpoint fires.
+  function moveItem(id, direction) {
+    const idx = items.findIndex((i) => i.id === id);
+    if (idx === -1) return;
+    const targetIdx = idx + (direction === "up" ? -1 : 1);
+    if (targetIdx < 0 || targetIdx >= items.length) return;
+    const next = items.map((i) => i.id);
+    [next[idx], next[targetIdx]] = [next[targetIdx], next[idx]];
+    reorderItems(next);
+  }
+
+  // Desktop drag handlers. The drag source records its id; the drop
+  // target reads the source id and asks reorderItems for the new
+  // sequence. preventDefault on dragOver is what allows drop to fire
+  // — without it the browser refuses the drop and resets the gesture.
+  function handleDragStart(id) {
+    return (e) => {
+      setDragId(id);
+      // Required for Firefox; the value isn't read.
+      try { e.dataTransfer.setData("text/plain", id); e.dataTransfer.effectAllowed = "move"; } catch {}
+    };
+  }
+  function handleDragOver(id) {
+    return (e) => {
+      e.preventDefault();
+      try { e.dataTransfer.dropEffect = "move"; } catch {}
+      if (dragOverId !== id) setDragOverId(id);
+    };
+  }
+  function handleDragEnd() {
+    setDragId(null);
+    setDragOverId(null);
+  }
+  function handleDrop(targetId) {
+    return (e) => {
+      e.preventDefault();
+      const sourceId = dragId;
+      setDragId(null);
+      setDragOverId(null);
+      if (!sourceId || sourceId === targetId) return;
+      const sourceIdx = items.findIndex((i) => i.id === sourceId);
+      const targetIdx = items.findIndex((i) => i.id === targetId);
+      if (sourceIdx === -1 || targetIdx === -1) return;
+      const next = items.map((i) => i.id);
+      next.splice(sourceIdx, 1);
+      // Drop "before" the target — natural for drag-down moves and
+      // matches the typical reorder UX (the dragged item lands in the
+      // slot the cursor was pointing at when released).
+      const insertAt = targetIdx > sourceIdx ? targetIdx - 1 : targetIdx;
+      next.splice(insertAt, 0, sourceId);
+      reorderItems(next);
+    };
   }
 
   async function handleDelete() {
@@ -701,6 +791,7 @@ export default function ShopAdminView({ apiKey }) {
                     aria-label="Select all"
                   />
                 </span>
+                <span style={{ width: 28, flex: "0 0 28px" }} title="Drag to reorder"></span>
                 <span style={{ flex: 0.5 }}></span>
                 <span style={{ flex: 2 }}>Item</span>
                 <span style={{ flex: 1 }}>Category</span>
@@ -710,8 +801,19 @@ export default function ShopAdminView({ apiKey }) {
                 <span style={{ flex: 1 }} className="text-r">Actions</span>
               </div>
             )}
+            {items.length > 0 && (
+              <div className="muted" style={{ fontSize: 11, padding: "8px 12px 4px" }}>
+                Drag the ⋮⋮ handle to reorder. Members see items in this order.
+              </div>
+            )}
             {items.map((it) => (
-              <div key={it.id} className={`tr ${selectedIds.has(it.id) ? "selected" : ""}`}>
+              <div
+                key={it.id}
+                className={`tr ${selectedIds.has(it.id) ? "selected" : ""}${dragOverId === it.id && dragId !== it.id ? " drag-over" : ""}${dragId === it.id ? " dragging" : ""}`}
+                onDragOver={handleDragOver(it.id)}
+                onDrop={handleDrop(it.id)}
+                onDragLeave={() => { if (dragOverId === it.id) setDragOverId(null); }}
+              >
                 <span
                   style={{ width: 28, flex: "0 0 28px", display: "flex", justifyContent: "center" }}
                   onClick={(e) => e.stopPropagation()}
@@ -724,6 +826,15 @@ export default function ShopAdminView({ apiKey }) {
                     aria-label={`Select ${it.title}`}
                   />
                 </span>
+                <span
+                  className="shop-drag-handle"
+                  draggable={true}
+                  onDragStart={handleDragStart(it.id)}
+                  onDragEnd={handleDragEnd}
+                  title="Drag to reorder"
+                  aria-label={`Drag handle for ${it.title}`}
+                  style={{ width: 28, flex: "0 0 28px", display: "flex", alignItems: "center", justifyContent: "center", cursor: reorderBusy ? "wait" : "grab", color: "var(--text-muted)", fontSize: 16, userSelect: "none" }}
+                >⋮⋮</span>
                 <span style={{ flex: 0.5 }}>
                   {it.image_url ? (
                     <img src={it.image_url} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6 }} />
@@ -800,7 +911,25 @@ export default function ShopAdminView({ apiKey }) {
                   </div>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 14px", borderTop: "0.5px solid var(--border)" }}>
-                  <span className="muted">{it.order_count || 0} orders</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <button
+                      className="btn"
+                      style={{ fontSize: 14, padding: "4px 10px", lineHeight: 1, minWidth: 36 }}
+                      onClick={() => moveItem(it.id, "up")}
+                      disabled={reorderBusy || items.indexOf(it) === 0}
+                      aria-label={`Move ${it.title} up`}
+                      title="Move up"
+                    >↑</button>
+                    <button
+                      className="btn"
+                      style={{ fontSize: 14, padding: "4px 10px", lineHeight: 1, minWidth: 36 }}
+                      onClick={() => moveItem(it.id, "down")}
+                      disabled={reorderBusy || items.indexOf(it) === items.length - 1}
+                      aria-label={`Move ${it.title} down`}
+                      title="Move down"
+                    >↓</button>
+                    <span className="muted" style={{ marginLeft: 4 }}>{it.order_count || 0} orders</span>
+                  </div>
                   <div style={{ display: "flex", gap: 6 }}>
                     <button className="btn" style={{ fontSize: 11, padding: "4px 12px" }} onClick={() => setEditItem(it)}>Edit</button>
                     <button className="btn" style={{ fontSize: 11, padding: "4px 12px", color: "var(--red)" }} onClick={() => setDelTarget(it)}>Delete</button>

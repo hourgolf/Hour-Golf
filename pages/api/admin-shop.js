@@ -73,6 +73,36 @@ export default async function handler(req, res) {
       return res.status(200).json(enriched);
     }
 
+    // ── POST ?action=reorder — bulk re-order ──
+    // Body: { ordered_ids: [id1, id2, ...] } in the new desired order.
+    // Renumbers display_order = 0, 1, 2, ... for each id, scoped to
+    // this tenant. The drag-to-reorder UI on the items list calls
+    // this so the operator never has to think about the underlying
+    // integer values — they just drag rows into the order they want.
+    if (req.method === "POST" && action === "reorder") {
+      const { ordered_ids } = req.body || {};
+      if (!Array.isArray(ordered_ids) || ordered_ids.length === 0) {
+        return res.status(400).json({ error: "ordered_ids array required" });
+      }
+      // De-dupe and basic shape check (uuids).
+      const ids = [...new Set(ordered_ids.filter((s) => typeof s === "string" && s.length > 0))];
+      // Iterate PATCHes — small N (typically <50 items in a tenant's
+      // shop), no need for an RPC. Each PATCH is tenant-scoped so
+      // a malicious caller can't flip an item from another tenant.
+      const errors = [];
+      for (let i = 0; i < ids.length; i++) {
+        const r = await sb(key, `shop_items?id=eq.${ids[i]}&tenant_id=eq.${tenantId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ display_order: i }),
+        });
+        if (!r.ok) errors.push({ id: ids[i], status: r.status, error: await r.text() });
+      }
+      if (errors.length > 0) {
+        return res.status(207).json({ updated: ids.length - errors.length, errors });
+      }
+      return res.status(200).json({ updated: ids.length });
+    }
+
     // ── POST — create item ──
     if (req.method === "POST") {
       const { title, subtitle, description, image_url, image_urls, price, compare_at_price, sale_ends_at,
