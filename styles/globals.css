@@ -1778,6 +1778,17 @@ html { overflow-y: scroll; }
   text-align: center; padding: 30px 10px;
 }
 
+/* Brief highlight pulse for "Send ↓" jump targets in the email
+   center — gives the operator a visual confirmation when scroll
+   delivers them to the right section. */
+.highlight-flash {
+  animation: highlightFlash 1.5s ease-out;
+}
+@keyframes highlightFlash {
+  0%   { background-color: var(--primary-bg, rgba(76,141,115,0.18)); }
+  100% { background-color: transparent; }
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

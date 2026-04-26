@@ -124,13 +124,19 @@ function TierEditModal({ open, onClose, tier, onSave }) {
 
 // Catalog of every transactional email the platform sends. Source of
 // truth: lib/email.js (templates) + lib/email-layout.js (visual
-// wrapper). This is purely informational — templates are intentionally
-// locked in code so they stay in lockstep with the data they reference
-// (booking ids, tier configs, Stripe state, etc.). What CAN be
-// customized is in the right-hand "Customize" column.
+// wrapper). The `category` field groups them in the UI so an admin
+// looking for "the second email in our launch sequence" finds it
+// alongside the first one rather than scattered through a flat list.
+//
+// `sendAnchor` (optional) names the on-page section the operator can
+// jump to to fire a broadcast — used to render a "Send →" action so
+// an admin who just edited the copy doesn't need to scroll-hunt for
+// the broadcast UI elsewhere on the tab.
 const TRANSACTIONAL_EMAILS = [
+  // ── Bookings (auto) ─────────────────────────────────────────────
   {
     key: "booking_confirmation",
+    category: "Bookings (automatic)",
     label: "Booking confirmation",
     trigger: "Member books a bay (or a non-member books via the public flow).",
     recipient: "The booking customer.",
@@ -139,6 +145,7 @@ const TRANSACTIONAL_EMAILS = [
   },
   {
     key: "booking_cancellation",
+    category: "Bookings (automatic)",
     label: "Booking cancelled",
     trigger: "Member cancels a booking from their dashboard, or admin cancels.",
     recipient: "The booking customer.",
@@ -147,6 +154,7 @@ const TRANSACTIONAL_EMAILS = [
   },
   {
     key: "access_code",
+    category: "Bookings (automatic)",
     label: "Access code (door code)",
     trigger: "Cron job ~10 min before each Confirmed booking when the access_codes feature is enabled and Seam is configured. Code itself is rendered live on the dashboard hero too.",
     recipient: "The booking customer.",
@@ -154,7 +162,19 @@ const TRANSACTIONAL_EMAILS = [
     preview: "access-code",
   },
   {
+    key: "booking_conflict_alert",
+    category: "Bookings (automatic)",
+    label: "Booking conflict (admin alert)",
+    trigger: "Skedda webhook delivers a booking that overlaps an existing same-bay booking.",
+    recipient: "The tenant's notification inbox (Settings → Tenant Email).",
+    customize: "Two member cards (existing + incoming) plus prose around them. Footer note explains the alert source.",
+    preview: "booking-conflict-alert",
+  },
+
+  // ── Membership (auto) ──────────────────────────────────────────
+  {
     key: "welcome",
+    category: "Membership (automatic)",
     label: "Welcome (new membership)",
     trigger: "Stripe webhook checkout.session.completed in subscription mode.",
     recipient: "The new member.",
@@ -163,6 +183,7 @@ const TRANSACTIONAL_EMAILS = [
   },
   {
     key: "payment_receipt",
+    category: "Membership (automatic)",
     label: "Payment receipt",
     trigger: "Stripe webhook invoice.paid (recurring + first payments).",
     recipient: "The paying member.",
@@ -171,6 +192,7 @@ const TRANSACTIONAL_EMAILS = [
   },
   {
     key: "payment_failed",
+    category: "Membership (automatic)",
     label: "Payment failed (card declined)",
     trigger: "Stripe webhook invoice.payment_failed on attempt #1.",
     recipient: "The paying member.",
@@ -179,22 +201,75 @@ const TRANSACTIONAL_EMAILS = [
   },
   {
     key: "password_reset",
+    category: "Membership (automatic)",
     label: "Password reset",
     trigger: "Member taps Forgot Password on /members.",
     recipient: "The member email on file.",
     customize: "Reset URL is single-use and expires in 1 hour.",
     preview: "password-reset",
   },
+
+  // ── Broadcasts (admin-initiated) ───────────────────────────────
   {
     key: "launch",
+    category: "Broadcasts (admin-initiated)",
     label: "Launch announcement",
-    trigger: "Admin runs the Launch Announcement broadcast above.",
+    trigger: "Admin runs the Launch Announcement broadcast (see section below).",
     recipient: "Every paying member not yet emailed.",
-    customize: "Copy + CTA live in lib/email.js sendLaunchEmail.",
+    customize: "Edit copy on the preview page. Send via the Launch Announcement section below.",
     preview: "launch",
+    sendAnchor: "launch-broadcast",
+    sequenceNote: "Standalone one-off email.",
   },
   {
+    key: "cutover_announcement",
+    category: "Broadcasts (admin-initiated)",
+    label: "Skedda cutover · #1 announcement (T−14)",
+    trigger: "Admin fires phase 1 of the Skedda Cutover broadcast (see section below).",
+    recipient: "All paying members not yet emailed.",
+    customize: "Edit copy on the preview page. Send via the Skedda Cutover Broadcasts section below.",
+    preview: "cutover-announcement",
+    sendAnchor: "cutover-broadcast",
+    sequenceNote: "Phase 1 of 3 — sets the date and explains the upcoming switch.",
+  },
+  {
+    key: "cutover_reminder",
+    category: "Broadcasts (admin-initiated)",
+    label: "Skedda cutover · #2 reminder (T−3)",
+    trigger: "Admin fires phase 2 of the Skedda Cutover broadcast.",
+    recipient: "Paying members who still haven't logged in (first_app_login_at IS NULL).",
+    customize: "Edit copy on the preview page. Send via the Skedda Cutover Broadcasts section below.",
+    preview: "cutover-reminder",
+    sendAnchor: "cutover-broadcast",
+    sequenceNote: "Phase 2 of 3 — gentle nudge, only goes to members who haven't onboarded yet.",
+  },
+  {
+    key: "cutover_complete_member",
+    category: "Broadcasts (admin-initiated)",
+    label: "Skedda cutover · #3a complete (existing app user)",
+    trigger: "Admin fires phase 3 — variant for members already on the app.",
+    recipient: "Paying members who have logged in.",
+    customize: "Edit copy on the preview page. Send via the Skedda Cutover Broadcasts section below.",
+    preview: "cutover-complete-member",
+    sendAnchor: "cutover-broadcast",
+    sequenceNote: "Phase 3 of 3 (variant A) — celebration / what's-now-live for members already onboarded.",
+  },
+  {
+    key: "cutover_complete_new",
+    category: "Broadcasts (admin-initiated)",
+    label: "Skedda cutover · #3b complete (new to app)",
+    trigger: "Admin fires phase 3 — variant for members not yet on the app.",
+    recipient: "Paying members who haven't logged in.",
+    customize: "Edit copy on the preview page. Send via the Skedda Cutover Broadcasts section below.",
+    preview: "cutover-complete-new",
+    sendAnchor: "cutover-broadcast",
+    sequenceNote: "Phase 3 of 3 (variant B) — sign-in walkthrough for members who didn't onboard pre-cutover.",
+  },
+
+  // ── Pro Shop (auto) ────────────────────────────────────────────
+  {
     key: "shop_order",
+    category: "Pro Shop (automatic)",
     label: "Pro Shop order (admin notification)",
     trigger: "Member completes an in-app shop checkout via Stripe.",
     recipient: "The tenant's notification inbox (Settings → Tenant Email).",
@@ -203,6 +278,7 @@ const TRANSACTIONAL_EMAILS = [
   },
   {
     key: "shop_request_admin",
+    category: "Pro Shop (automatic)",
     label: "Pro Shop request (admin notification)",
     trigger: "Member submits a 'request an item' form on the Pro Shop.",
     recipient: "The tenant's notification inbox.",
@@ -211,6 +287,7 @@ const TRANSACTIONAL_EMAILS = [
   },
   {
     key: "shop_request_ready",
+    category: "Pro Shop (automatic)",
     label: "Pro Shop request ready (member notification)",
     trigger: "Admin marks a shop request as in-stock from the Pro Shop Requests panel above.",
     recipient: "The requesting member.",
@@ -218,7 +295,26 @@ const TRANSACTIONAL_EMAILS = [
     preview: "shop-request-ready",
   },
   {
+    key: "shop_refund",
+    category: "Pro Shop (automatic)",
+    label: "Refund issued",
+    trigger: "Admin clicks Refund on a Pro Shop order from the order list.",
+    recipient: "The order's customer.",
+    customize: "Amount + reason + Stripe refund ID rendered live. CTA → /members/shop.",
+    preview: "shop-refund",
+  },
+  {
+    key: "abandoned_cart",
+    category: "Pro Shop (automatic)",
+    label: "Abandoned cart reminder",
+    trigger: "Daily cron (cron-abandoned-carts) for carts sitting 48h+ without a recent reminder.",
+    recipient: "The cart's owner.",
+    customize: "Up to 5 line items + total. CTA → /members/shop. Frequency capped server-side.",
+    preview: "abandoned-cart",
+  },
+  {
     key: "shipment_delivered",
+    category: "Pro Shop (automatic)",
     label: "Shipment delivered",
     trigger: "Shippo webhook reports a tracked order moved to delivered.",
     recipient: "The order's customer.",
@@ -704,53 +800,101 @@ function EmailConfigSection({ jwt }) {
   // the subdomain middleware resolution — same way any other public
   // page is). Safe to share with a designer via Slack/Email.
   const origin = typeof window !== "undefined" ? window.location.origin : "";
+
+  // Bucket by category so the operator finds related templates (e.g.
+  // every step of the cutover sequence) sitting next to each other
+  // instead of scattered through a flat list. Order of categories
+  // matches the order the operator typically thinks about them
+  // (everyday transactional flows first, then admin broadcasts).
+  const grouped = TRANSACTIONAL_EMAILS.reduce((acc, e) => {
+    const cat = e.category || "Other";
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(e);
+    return acc;
+  }, {});
+  const categoryOrder = [
+    "Bookings (automatic)",
+    "Membership (automatic)",
+    "Broadcasts (admin-initiated)",
+    "Pro Shop (automatic)",
+    "Other",
+  ];
+  const categories = categoryOrder.filter((c) => grouped[c]);
+
   return (
     <div style={{ padding: 14, border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)" }}>
       <p style={{ fontSize: 13, color: "var(--text)", margin: "0 0 6px" }}>
-        Every transactional email the platform sends, with what triggers it, and a preview you can open or share.
+        Every transactional email the platform sends, grouped by category. Open any preview to see + edit the copy, or jump to the broadcast section to fire a sequence.
       </p>
       <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 14px" }}>
-        Template HTML lives in <code>lib/email.js</code> and shares a branded wrapper from <code>lib/email-layout.js</code>. Logo + colors come from <strong>Settings → Branding</strong>; sender address + footer come from your tenant email config; recipient inboxes for admin notifications come from the same place. Preview URLs are public (no login) and render with fake sample data — safe to send to a designer.
+        Logo + colors come from <strong>Settings → Branding</strong>. Sender address + footer come from your tenant email config. Subject / preheader / intro / outro / CTA copy is editable per-template on the preview page (click <strong>Edit copy</strong> after signing in).
       </p>
 
-      <div className="tbl">
-        <div className="th" style={{ display: "grid", gridTemplateColumns: "1.4fr 1.8fr 1fr 1.8fr 0.6fr", gap: 12 }}>
-          <span>Email</span>
-          <span>Triggered by</span>
-          <span>Sent to</span>
-          <span>Customize</span>
-          <span className="text-r">Preview</span>
-        </div>
-        {TRANSACTIONAL_EMAILS.map((e) => (
-          <div
-            key={e.key}
-            className="tr"
-            style={{ display: "grid", gridTemplateColumns: "1.4fr 1.8fr 1fr 1.8fr 0.6fr", gap: 12, alignItems: "start", padding: "10px 12px" }}
-          >
-            <span style={{ fontWeight: 700, fontSize: 13 }}>{e.label}</span>
-            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{e.trigger}</span>
-            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{e.recipient}</span>
-            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{e.customize}</span>
-            <span style={{ fontSize: 12 }} className="text-r">
-              {e.preview ? (
-                <a
-                  href={`${origin}/api/email-preview/${e.preview}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}
-                >
-                  Open →
-                </a>
-              ) : (
-                <span style={{ color: "var(--text-muted)", fontSize: 11 }}>—</span>
-              )}
-            </span>
+      {categories.map((cat) => (
+        <div key={cat} style={{ marginBottom: 18 }}>
+          <h4 style={{ fontFamily: "var(--font-display)", fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, color: "var(--text-muted)", margin: "0 0 8px" }}>
+            {cat}
+          </h4>
+          <div className="tbl">
+            <div className="th" style={{ display: "grid", gridTemplateColumns: "1.5fr 2fr 1.6fr 1fr", gap: 12 }}>
+              <span>Email</span>
+              <span>Triggered by</span>
+              <span>Sent to</span>
+              <span className="text-r">Actions</span>
+            </div>
+            {grouped[cat].map((e) => (
+              <div
+                key={e.key}
+                className="tr"
+                style={{ display: "grid", gridTemplateColumns: "1.5fr 2fr 1.6fr 1fr", gap: 12, alignItems: "start", padding: "10px 12px" }}
+              >
+                <span style={{ fontWeight: 700, fontSize: 13 }}>
+                  {e.label}
+                  {e.sequenceNote && (
+                    <div style={{ fontWeight: 400, fontSize: 11, color: "var(--text-muted)", marginTop: 3 }}>
+                      {e.sequenceNote}
+                    </div>
+                  )}
+                </span>
+                <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{e.trigger}</span>
+                <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{e.recipient}</span>
+                <span style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }} className="text-r">
+                  {e.preview && (
+                    <a
+                      href={`${origin}/api/email-preview/${e.preview}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}
+                    >
+                      Preview &amp; edit →
+                    </a>
+                  )}
+                  {e.sendAnchor && (
+                    <a
+                      href={`#${e.sendAnchor}`}
+                      onClick={(ev) => {
+                        ev.preventDefault();
+                        const el = typeof document !== "undefined" ? document.getElementById(e.sendAnchor) : null;
+                        if (el) {
+                          el.scrollIntoView({ behavior: "smooth", block: "start" });
+                          el.classList.add("highlight-flash");
+                          setTimeout(() => el.classList.remove("highlight-flash"), 1500);
+                        }
+                      }}
+                      style={{ color: "var(--text)", fontWeight: 600, textDecoration: "none", fontSize: 11, padding: "2px 8px", border: "1px solid var(--border)", borderRadius: 4 }}
+                    >
+                      Send ↓
+                    </a>
+                  )}
+                </span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
 
-      <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 12, padding: "0 4px" }}>
-        To hand a template to a designer: right-click the Preview link → Copy link, send it to them. The page renders the email in an iframe plus a plain-text version, and has a tab row at the top so they can cycle through every template without asking for more URLs. See <code>docs/EMAIL_TEMPLATE_HANDOFF.md</code> for the delivery format the designer should use when handing work back.
+      <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4, padding: "0 4px" }}>
+        Sharing a template with a designer? Right-click <strong>Preview &amp; edit</strong> → Copy link. The preview page is public (no login) and renders fake sample data — safe to send via Slack/email. See <code>docs/EMAIL_TEMPLATE_HANDOFF.md</code> for handback format.
       </p>
     </div>
   );
@@ -1453,10 +1597,10 @@ export default function ConfigView({ tierCfg, members, onUpdateTier, onLinkStrip
       <h2 className="section-head" style={{ marginTop: 24 }}>Birthday Bonus</h2>
       <BirthdayBonusSection jwt={jwt} />
 
-      <h2 className="section-head" style={{ marginTop: 24 }}>Launch Announcement</h2>
+      <h2 id="launch-broadcast" className="section-head" style={{ marginTop: 24 }}>Launch Announcement</h2>
       <LaunchBroadcastSection jwt={jwt} members={members} />
 
-      <h2 className="section-head" style={{ marginTop: 24 }}>Skedda Cutover Broadcasts</h2>
+      <h2 id="cutover-broadcast" className="section-head" style={{ marginTop: 24 }}>Skedda Cutover Broadcasts</h2>
       <CutoverBroadcastSection jwt={jwt} members={members} />
 
       <h2 className="section-head" style={{ marginTop: 24 }}>News &amp; Announcements</h2>

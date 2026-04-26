@@ -43,7 +43,9 @@ const TEMPLATES = {
   "shop-request-admin":         "sendShopRequestAdminNotification",
   "shop-request-ready":         "sendShopRequestReadyEmail",
   "shop-order-notification":    "sendShopOrderNotification",
+  "shop-refund":                "sendShopRefundNotice",
   "shipment-delivered":         "sendShipmentDeliveredEmail",
+  "abandoned-cart":             "sendAbandonedCartEmail",
 };
 
 // Realistic sample data per template. Kept in one spot so the designer
@@ -217,6 +219,22 @@ function sampleDataFor(tpl, { tenantId, portalUrl }) {
         service: "Ground Advantage",
         portalUrl,
         _preview: true,
+      };
+    case "shop-refund":
+      return {
+        ...common,
+        amountCents: 4500,
+        reason: "Item out of stock",
+        stripeRefundId: "re_sample_1234567890",
+      };
+    case "abandoned-cart":
+      return {
+        ...common,
+        items: [
+          { title: "Pro Shop Polo", size: "M", quantity: 1, lineTotal: 60 },
+          { title: "Hour Golf Hat", size: "One Size", quantity: 1, lineTotal: 35 },
+        ],
+        total: 95,
       };
     default:
       return null;
