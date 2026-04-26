@@ -269,10 +269,17 @@ function wrapPreview({ slug, subject, from, to, html, text, portalUrl, currentOv
   // the preview URL public + shareable for design reviews while still
   // letting an authenticated operator click straight from the preview
   // into editing the prose.
+  //
+  // `defaults` is the platform-default copy with tokens left in place
+  // (e.g. "Hey {name},..."). The editor pre-fills inputs with the
+  // override if set, otherwise the default — so the operator can see
+  // and tweak the existing copy instead of starting from a blank
+  // textarea.
   const editorPayload = templateMeta
     ? {
         slug,
         currentOverrides: currentOverrides || {},
+        defaults: templateMeta.defaults || {},
         fields: templateMeta.fields,
         tokens: templateMeta.tokens,
         limits: FIELD_LIMITS,
@@ -440,33 +447,80 @@ const EDITOR_JS = `
     cta_label: "CTA button label",
   };
   var inputs = {};
+  // Helper: preferred starting value for a field — saved override if
+  // present, else the platform default with tokens. Used both at
+  // render time (initial value) and at save time (to detect "still
+  // default, don't write an override row").
+  function defaultFor(field) {
+    return (payload.defaults && payload.defaults[field]) || "";
+  }
+  function valueFor(field) {
+    var override = payload.currentOverrides && payload.currentOverrides[field];
+    if (typeof override === "string" && override.length > 0) return override;
+    return defaultFor(field);
+  }
+
   payload.fields.forEach(function(field){
     var meta = payload.limits[field] || { max: 500, multiline: true };
     var wrap = document.createElement("div");
     wrap.className = "edit-field";
+
+    var labelRow = document.createElement("div");
+    labelRow.style.display = "flex";
+    labelRow.style.justifyContent = "space-between";
+    labelRow.style.alignItems = "baseline";
+    labelRow.style.marginBottom = "4px";
     var label = document.createElement("label");
+    label.style.margin = "0";
     label.textContent = FIELD_LABELS[field] || field;
-    wrap.appendChild(label);
+    labelRow.appendChild(label);
+    // "Reset field" link only appears when the current value differs
+    // from the default — gives the operator a one-click escape back
+    // to the platform copy without nuking other fields they've edited.
+    var resetLink = document.createElement("a");
+    resetLink.href = "#";
+    resetLink.style.fontSize = "11px";
+    resetLink.style.color = "#6B7A6F";
+    resetLink.style.textDecoration = "none";
+    resetLink.textContent = "↺ default";
+    resetLink.style.display = "none";
+    labelRow.appendChild(resetLink);
+    wrap.appendChild(labelRow);
+
     var input;
     if (meta.multiline) {
       input = document.createElement("textarea");
-      input.rows = field === "intro" ? 4 : 2;
+      input.rows = field === "intro" || field === "outro" ? 4 : 2;
     } else {
       input = document.createElement("input");
       input.type = "text";
     }
     input.name = field;
     input.maxLength = meta.max + 50; // soft buffer; counter shows over-limit
-    input.value = (payload.currentOverrides && payload.currentOverrides[field]) || "";
+    input.value = valueFor(field);
     wrap.appendChild(input);
+
     var counter = document.createElement("div");
     counter.className = "edit-counter";
-    counter.textContent = input.value.length + " / " + meta.max;
     wrap.appendChild(counter);
-    input.addEventListener("input", function(){
+
+    function refreshCounter() {
       counter.textContent = input.value.length + " / " + meta.max;
       counter.classList.toggle("over", input.value.length > meta.max);
+      // Show the "↺ default" link only when the current value
+      // differs from the platform default, so a pristine field has
+      // no clutter.
+      var differs = input.value !== defaultFor(field);
+      resetLink.style.display = differs ? "" : "none";
+    }
+    input.addEventListener("input", refreshCounter);
+    resetLink.addEventListener("click", function(e){
+      e.preventDefault();
+      input.value = defaultFor(field);
+      refreshCounter();
     });
+    refreshCounter();
+
     fieldsEl.appendChild(wrap);
     inputs[field] = input;
   });
@@ -511,7 +565,7 @@ const EDITOR_JS = `
   toggle.addEventListener("click", function(){ setOpen(!panel.classList.contains("open")); });
   cancelBtn.addEventListener("click", function(){
     payload.fields.forEach(function(f){
-      inputs[f].value = (payload.currentOverrides && payload.currentOverrides[f]) || "";
+      inputs[f].value = valueFor(f);
       inputs[f].dispatchEvent(new Event("input"));
     });
     setOpen(false);
@@ -554,12 +608,18 @@ const EDITOR_JS = `
       var blob = {};
       payload.fields.forEach(function(f){
         var v = (inputs[f].value || "").trim();
-        if (v.length > 0) blob[f] = v;
+        var def = (defaultFor(f) || "").trim();
+        // Only store as an override if (a) the field has content and
+        // (b) it differs from the platform default. This keeps the
+        // override blob tight — a tenant who clicked Save without
+        // editing doesn't end up with a row of "overrides" that just
+        // mirror the defaults.
+        if (v.length > 0 && v !== def) blob[f] = v;
       });
       if (Object.keys(blob).length > 0) {
         next[slug] = blob;
       } else {
-        delete next[slug]; // all fields blank = revert to defaults
+        delete next[slug]; // all fields match defaults = no override
       }
       var payloadOut = Object.keys(next).length > 0 ? next : null;
       return saveOverrides(payloadOut);
